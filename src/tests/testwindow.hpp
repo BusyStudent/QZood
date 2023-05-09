@@ -2,6 +2,7 @@
 
 #include <QMainWindow>
 #include <functional>
+#include <QTreeWidgetItem>
 
 #define ZOOD_TEST(name) static QWidget *test__##name(); \
     static bool test__init_##name = []() {              \
@@ -16,8 +17,14 @@ class ZoodTestWindow : public QMainWindow {
         
         ZoodTestWindow(QWidget *parent = nullptr);
         ~ZoodTestWindow();
+
+		public Q_SLOTS:
+		void ItemClicked(QTreeWidgetItem *item, int column);
+
     private:
         void *ui = nullptr;
+				QMap<QTreeWidgetItem*, QWidget*> items;
+				QTreeWidgetItem* currentItem = nullptr;
     friend void ZoodLogString(const QString &text);
 };
 

@@ -21,27 +21,54 @@ void ZoodLogString(const QString &text) {
     auto date = QDateTime::currentDateTime();
     auto timestring = date.toString("dd.MM.yyyy hh:mm:ss");
 
-    ui->logWidget->addItem(QString("[%1] %2").arg(timestring, text));
+    ui->logConsoleView->addItem(QString("[%1] %2").arg(timestring, text));
 }
 
 ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow) {
     auto dui = static_cast<Ui::MainWindow*>(ui);
 
     dui->setupUi(this);
-
+		QAction *clear = new QAction();
+		clear->setText("clear");
+		connect(clear, &QAction::trigger, dui->logConsoleView, &QListWidget::clear);
+		dui->logConsoleView->addAction(clear);
+		
     // Register test
+		dui->testList->setHeaderLabel("测试项");
+		connect(dui->testList, &QTreeWidget::itemClicked, this, &ZoodTestWindow::ItemClicked);
     for (const auto &[name, fn] : GetList()) {
         auto wi = fn();
         if (!wi) {
             continue;
         }
-        dui->tabWidget->addTab(wi, name);
+				QTreeWidgetItem *item = new QTreeWidgetItem(dui->testList);
+				item->setText(0,name);
+				items.insert(item, wi);
+				if (currentItem == nullptr) {
+					ItemClicked(item, 0);
+				}
     }
-
-    connect(dui->clearButton, &QPushButton::clicked, dui->logWidget, &QListWidget::clear);
 
     test_window = this;
 }
+
+void ZoodTestWindow::ItemClicked(QTreeWidgetItem *item, int column) {
+	if (currentItem == item) {
+		return;
+	}
+  auto dui = static_cast<Ui::MainWindow*>(ui);
+  
+	auto wi = items.find(item);
+	if (wi != items.end()) {
+		for (auto &child : dui->testUiContainer->layout()->children()) {
+			child->setParent(nullptr);
+		}
+		(*wi)->setParent(nullptr);
+		dui->testUiContainer->layout()->addWidget(*wi);
+	}
+	currentItem = item;
+}
+
 ZoodTestWindow::~ZoodTestWindow() {
     delete static_cast<Ui::MainWindow*>(ui);
 }
