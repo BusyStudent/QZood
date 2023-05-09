@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>495</width>
+    <width>527</width>
     <height>416</height>
    </rect>
   </property>
@@ -87,7 +87,7 @@
         </property>
        </column>
       </widget>
-      <widget class="QFrame" name="testUiContainer">
+      <widget class="QStackedWidget" name="testUiContainer">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
          <horstretch>2</horstretch>
@@ -100,23 +100,6 @@
          <height>0</height>
         </size>
        </property>
-       <layout class="QHBoxLayout" name="horizontalLayout_3">
-        <property name="spacing">
-         <number>0</number>
-        </property>
-        <property name="leftMargin">
-         <number>0</number>
-        </property>
-        <property name="topMargin">
-         <number>0</number>
-        </property>
-        <property name="rightMargin">
-         <number>0</number>
-        </property>
-        <property name="bottomMargin">
-         <number>0</number>
-        </property>
-       </layout>
       </widget>
      </widget>
     </item>
@@ -127,7 +110,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>495</width>
+     <width>527</width>
      <height>22</height>
     </rect>
    </property>
