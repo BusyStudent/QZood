@@ -20,5 +20,8 @@ target("zood")
     -- Main
     add_files("./src/*.cpp")
 
+    -- Player
+    add_files("./src/player/*")
+
     -- Tests
     add_files("./src/tests/*")

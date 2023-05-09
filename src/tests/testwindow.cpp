@@ -28,26 +28,27 @@ ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui
     auto dui = static_cast<Ui::MainWindow*>(ui);
 
     dui->setupUi(this);
-		QAction *clear = new QAction();
-		clear->setText("clear");
-		connect(clear, &QAction::trigger, dui->logConsoleView, &QListWidget::clear);
-		dui->logConsoleView->addAction(clear);
+	QAction *clear = new QAction();
+	clear->setText("clear");
+	connect(clear, &QAction::trigger, dui->logConsoleView, &QListWidget::clear);
+	dui->logConsoleView->addAction(clear);
 		
     // Register test
-		dui->testList->setHeaderLabel("测试项");
-		connect(dui->testList, &QTreeWidget::itemClicked, this, &ZoodTestWindow::ItemClicked);
+	dui->testList->setHeaderLabel("测试项");
+	connect(dui->testList, &QTreeWidget::itemClicked, this, &ZoodTestWindow::ItemClicked);
     for (const auto &[name, fn] : GetList()) {
         auto wi = fn();
         if (!wi) {
             continue;
         }
-				QTreeWidgetItem *item = new QTreeWidgetItem(dui->testList);
-				item->setText(0,name);
-				items.insert(item, wi);
-				dui->testUiContainer->layout()->addWidget(wi);
-				if (currentItem == nullptr) {
-					ItemClicked(item, 0);
-				}
+		QTreeWidgetItem *item = new QTreeWidgetItem(dui->testList);
+		item->setText(0,name);
+		items.insert(item, wi);
+		dui->testUiContainer->layout()->addWidget(wi);
+		wi->hide();
+		if (currentItem == nullptr) {
+			ItemClicked(item, 0);
+		}
     }
 
     test_window = this;
@@ -57,7 +58,7 @@ void ZoodTestWindow::ItemClicked(QTreeWidgetItem *item, int column) {
 	if (currentItem == item) {
 		return;
 	}
-  auto dui = static_cast<Ui::MainWindow*>(ui);
+	auto dui = static_cast<Ui::MainWindow*>(ui);
   
 	auto wi = items.find(item);
 	if (wi != items.end()) {

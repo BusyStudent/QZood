@@ -43,13 +43,13 @@ class DanmakuItem {
         // 屏蔽等级
         uint32_t level;
 
-        bool is_regular() const noexcept {
+        bool isRegular() const noexcept {
             return type == Regular1 || type == Regular2 || type == Regular3;
         }
-        bool is_bottom() const noexcept {
+        bool isBottom() const noexcept {
             return type == Bottom;
         }
-        bool is_top() const noexcept {
+        bool isTop() const noexcept {
             return type == Top;
         }
 };
@@ -64,3 +64,11 @@ using DanmakuList = QList<DanmakuItem>;
  * @return Result<DanmakuList> 
  */
 Result<DanmakuList> ParseDanmaku(const QString &xmlstr);
+/**
+ * @brief Merge the danmaku
+ * 
+ * @param a 
+ * @param b 
+ * @return DanmakuList 
+ */
+DanmakuList         MergeDanmaku(const DanmakuList &a, const DanmakuList &b);

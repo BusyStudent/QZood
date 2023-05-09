@@ -80,7 +80,7 @@ Result<DanmakuList> ParseDanmaku(const QString &xmlstr) {
         }
 
 
-        // d.text = reinterpret_cast<const char*>(text);
+        d.text = reinterpret_cast<const char*>(text);
 
 
         danmakus.push_back(d);
@@ -95,4 +95,17 @@ Result<DanmakuList> ParseDanmaku(const QString &xmlstr) {
 
     return danmakus;
 
+}
+DanmakuList MergeDanmaku(const DanmakuList &a, const DanmakuList &b) {
+    DanmakuList result;
+
+    result.append(a);
+    result.append(b);
+
+    std::sort(result.begin(), result.end(), [](const DanmakuItem &a,const DanmakuItem &b){
+        return a.position < b.position;
+    });
+
+
+    return result;
 }

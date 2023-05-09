@@ -1,4 +1,5 @@
 #include <QMessageBox>
+#include <QFileDialog>
 #include <QDebug>
 #include "testwindow.hpp"
 #include "ui_danmakutest.h"
@@ -13,6 +14,9 @@ ZOOD_TEST(DanmakuParse) {
 
     QObject::connect(form.parseButton, &QPushButton::clicked, [=]() {
         auto text = form.inputEdit->toPlainText();
+        if (text.isEmpty()) {
+            return;
+        }
 
         qDebug() << text;
 
@@ -27,10 +31,19 @@ ZOOD_TEST(DanmakuParse) {
 
         QString ret;
         for (const auto &item : result.value()) {
-            ret += QString("%1 %2\n").arg(item.text, QString::asprintf("%d", item.position));
+            ret += QString("%1 %2 %3\n").arg(QString::asprintf("Pos : %lf Size : %d", item.position, item.size), item.text, QString::asprintf("%d", item.position));
         }
-        form.outputEdit->setPlainText(text);
+        form.outputEdit->setPlainText(ret);
 
+    });
+    QObject::connect(form.openButton, &QPushButton::clicked, [=]() {
+        auto url = QFileDialog::getOpenFileUrl(root);
+        if (!url.isEmpty()) {
+            QFile file(url.toLocalFile());
+            if (file.open(QFile::ReadOnly)) {
+                form.inputEdit->setPlainText(file.readAll()); // read all text to text edit field.
+            }
+        }
     });
 
     return root;
