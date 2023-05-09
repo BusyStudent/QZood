@@ -44,6 +44,7 @@ ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui
 				QTreeWidgetItem *item = new QTreeWidgetItem(dui->testList);
 				item->setText(0,name);
 				items.insert(item, wi);
+				dui->testUiContainer->layout()->addWidget(wi);
 				if (currentItem == nullptr) {
 					ItemClicked(item, 0);
 				}
@@ -60,11 +61,11 @@ void ZoodTestWindow::ItemClicked(QTreeWidgetItem *item, int column) {
   
 	auto wi = items.find(item);
 	if (wi != items.end()) {
-		for (auto &child : dui->testUiContainer->layout()->children()) {
-			child->setParent(nullptr);
+		for (int i = 0;i < dui->testUiContainer->layout()->count(); ++i) {
+			auto child = dui->testUiContainer->layout()->itemAt(i)->widget();
+			child->setVisible(false);
 		}
-		(*wi)->setParent(nullptr);
-		dui->testUiContainer->layout()->addWidget(*wi);
+		(*wi)->setVisible(true);
 	}
 	currentItem = item;
 }
