@@ -1,8 +1,11 @@
 #include "../player/videocanvas.hpp"
+#include "../log.hpp"
 #include "testwindow.hpp"
 #include <QVideoWidget>
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QNetworkRequest>
+#include <QInputDialog>
 #include <QFile>
 
 #include "ui_videocanvastest.h"
@@ -82,6 +85,20 @@ ZOOD_TEST(VideoCanvas) {
             }
         }
     });
+    QObject::connect(form.urlButton, &QPushButton::clicked, [=]() {
+        auto url = QInputDialog::getText(root, "Enter a URL", "URL");
+        if (url.isEmpty()) {
+            return;
+        }
+        url = url.trimmed(); // Remove whitespace from beginning and end of text box.
+        
+        QNetworkRequest req;
+        req.setUrl(url);
+        req.setRawHeader("Referer", "https://www.bilibili.com");
+
+        player->setMedia(req);
+        player->play();
+    });
     QObject::connect(form.progressSlider, &QSlider::sliderMoved, [=](int pos) {
         player->setPosition(pos);
     });
@@ -89,8 +106,14 @@ ZOOD_TEST(VideoCanvas) {
         form.progressSlider->setRange(0, player->duration());
         form.progressSlider->setValue(position);
     });
+    QObject::connect(player, &QMediaPlayer::positionChanged, [=](qint64 position) {
+        form.progressSlider->setRange(0, player->duration());
+        form.progressSlider->setValue(position);
+    });
     QObject::connect(player, static_cast<void(QMediaPlayer::*)(QMediaPlayer::Error)>(&QMediaPlayer::error), [=](QMediaPlayer::Error error) {
         qDebug() << error;
+
+        ZOOD_QLOG("Failed to play video %1", player->errorString());
     });
 
     return root;

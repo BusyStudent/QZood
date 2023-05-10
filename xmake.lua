@@ -23,5 +23,8 @@ target("zood")
     -- Player
     add_files("./src/player/*")
 
+    -- Network
+    add_files("./src/net/*")
+
     -- Tests
     add_files("./src/tests/*")

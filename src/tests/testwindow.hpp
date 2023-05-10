@@ -4,6 +4,8 @@
 #include <functional>
 #include <QTreeWidgetItem>
 
+#include "../log.hpp"
+
 #define ZOOD_TEST(name) static QWidget *test__##name(); \
     static bool test__init_##name = []() {              \
         ZoodRegisterTest(#name, test__##name);          \
