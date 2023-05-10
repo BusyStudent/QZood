@@ -2,6 +2,8 @@
 #include <QMainWindow>
 
 #include "tests/testwindow.hpp"
+#include "ui/common/customizeTitleWidget.hpp"
+#include "ui/zood/zood.hpp"
 
 int main(int argc, char **argv) {
     QApplication a(argc, argv);
@@ -9,6 +11,9 @@ int main(int argc, char **argv) {
 
     ZoodTestWindow twin;
     twin.show();
+
+	Zood zood;
+	zood.show();
 
     return a.exec();
 }

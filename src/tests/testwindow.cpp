@@ -30,7 +30,7 @@ ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui
 	dui->setupUi(this);
 	QAction *clear = new QAction();
 	clear->setText("clear");
-	connect(clear, &QAction::trigger, dui->logConsoleView, &QListWidget::clear);
+	connect(clear, &QAction::triggered, dui->logConsoleView, &QListWidget::clear);
 	dui->logConsoleView->addAction(clear);
 		
     // Register test

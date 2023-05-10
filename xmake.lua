@@ -9,6 +9,7 @@ end
 add_requires("qt5base", "libxml2")
 add_packages("qt5base", "libxml2")
 
+includes("./src/ui")
 
 target("zood")
     add_rules("qt.widgetapp")
@@ -16,6 +17,9 @@ target("zood")
     add_frameworks("QtCore", "QtGui", "QtWidgets")
     add_frameworks("QtMultimedia", "QtMultimediaWidgets")
     add_frameworks("QtNetwork")
+
+	add_deps("ui")
+	add_files("./resources/resources.qrc")
 
     -- Main
     add_files("./src/*.cpp")
@@ -25,3 +29,4 @@ target("zood")
 
     -- Tests
     add_files("./src/tests/*")
+	add_files("./src/ui/common/tests/*")
