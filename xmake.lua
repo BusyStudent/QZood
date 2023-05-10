@@ -4,10 +4,12 @@ set_languages("c++17")
 
 if is_host("windows") then
     add_cxxflags("cl::/utf-8")
+    add_cxxflags("cl::/Zc:__cplusplus")
+    add_cxxflags("cl::/permissive-")
 end 
 
-add_requires("qt5base", "libxml2")
-add_packages("qt5base", "libxml2")
+add_requires("libxml2")
+add_packages("libxml2")
 
 includes("./src/ui")
 

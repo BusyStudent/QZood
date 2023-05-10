@@ -27,6 +27,6 @@ QByteArray RandomUserAgent() {
     };
     
     // 随机选择一个UserAgent并返回
-    int index = qrand() %  (sizeof(userAgents) / sizeof(void*));
+    int index = ::rand() %  (sizeof(userAgents) / sizeof(void*));
     return userAgents[index];
 }

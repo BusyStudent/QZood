@@ -167,13 +167,13 @@ CustomizeTitleWidget::CustomizeTitleWidget(QWidget *parent) : QWidget(parent) {
   container_widget->setSizePolicy(QSizePolicy::Expanding,
                                   QSizePolicy::Expanding);
   container_layout->addWidget(container_widget);
-  container_layout->setMargin(5);
+  container_layout->setContentsMargins(QMargins(5, 5, 5, 5));
   container_layout->setSpacing(0);
   setLayout(container_layout);
 
   main_layout = new QVBoxLayout();
   container_widget->setLayout(main_layout);
-  main_layout->setMargin(0);
+  main_layout->setContentsMargins(QMargins(0, 0, 0, 0));
   main_layout->setSpacing(0);
 
   top_layout = new QVBoxLayout();
@@ -405,12 +405,12 @@ void CustomizeTitleWidget::resizeRegion(int marginTop, int marginBottom,
 }
 void CustomizeTitleWidget::showMinimized() { QWidget::showMinimized(); }
 void CustomizeTitleWidget::showMaximized() {
-  container_layout->setMargin(0);
+  container_layout->setContentsMargins(QMargins(0, 0, 0, 0));
   QWidget::showMaximized();
 }
 void CustomizeTitleWidget::showFullScreen() { QWidget::showFullScreen(); }
 void CustomizeTitleWidget::showNormal() {
-  container_layout->setMargin(5);
+  container_layout->setContentsMargins(QMargins(5, 5, 5, 5));
   QWidget::showNormal();
 }
 

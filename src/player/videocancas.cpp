@@ -14,11 +14,12 @@ VideoCanvas::VideoCanvas(QWidget *parent) : QGraphicsView(parent) {
     setScene(scene);
 
     // Add Item
-    // item = new QGraphicsVideoItem();
-    // scene->addItem(item);
-    widget = new QVideoWidget();
-    widget->setStyleSheet("background-color: rgba(0, 0, 0, 255)");
-    widgetProxy = scene->addWidget(widget);
+    item = new QGraphicsVideoItem();
+    scene->addItem(item);
+
+    // widget = new QVideoWidget();
+    // widget->setStyleSheet("background-color: rgba(0, 0, 0, 255)");
+    // widgetProxy = scene->addWidget(widget);
 
     danmakuGroup = new QGraphicsItemGroup();
     scene->addItem(danmakuGroup);
@@ -38,18 +39,18 @@ VideoCanvas::VideoCanvas(QWidget *parent) : QGraphicsView(parent) {
 
     danmakuFont.setBold(true);
 
-    // connect(item, &QVideoWidget::nativeSizeChanged, this, &VideoCanvas::_on_videoItemSizeChanged);
+    connect(item, &QGraphicsVideoItem::nativeSizeChanged, this, &VideoCanvas::_on_videoItemSizeChanged);
 }
 VideoCanvas::~VideoCanvas() {
     
 }
 void VideoCanvas::attachPlayer(QMediaPlayer *pl) {
     player = pl;
-    // player->setVideoOutput(item);
-    player->setVideoOutput(widget);
+    player->setVideoOutput(item);
+    // player->setVideoOutput(widget);
 
     // Connect the media status , for displaying danmaku
-    connect(player, &QMediaPlayer::stateChanged, this, &VideoCanvas::_on_playerStateChanged);
+    connect(player, &QMediaPlayer::playbackStateChanged, this, &VideoCanvas::_on_playerStateChanged);
 
     connect(player, &QMediaPlayer::positionChanged, [this](qint64 position) {
         // Do check here
@@ -83,10 +84,10 @@ void VideoCanvas::attachPlayer(QMediaPlayer *pl) {
     });    // for updating progress
 }
 void VideoCanvas::_on_videoItemSizeChanged(const QSizeF &size) {
-    // nativeItemSize = size;
+    nativeItemSize = size;
     putVideoItem();
 }
-void VideoCanvas::_on_playerStateChanged(QMediaPlayer::State state) {
+void VideoCanvas::_on_playerStateChanged(QMediaPlayer::PlaybackState state) {
     switch (state) {
         case QMediaPlayer::PlayingState : {
             // Not empty, start timer
@@ -109,46 +110,46 @@ void VideoCanvas::_on_playerStateChanged(QMediaPlayer::State state) {
     }
 }
 void VideoCanvas::putVideoItem() {
-    // if (!player) {
-    //     return;
-    // }
-    // if (nativeItemSize.width() == 0 || nativeItemSize.height() == 0) {
-    //     item->hide();
-    //     return;
-    // }
-    // scene->setSceneRect(0, 0, width(), height());
+    if (!player) {
+        return;
+    }
+    if (nativeItemSize.width() == 0 || nativeItemSize.height() == 0) {
+        item->hide();
+        return;
+    }
+    scene->setSceneRect(0, 0, width(), height());
 
-    // qreal tex_w = nativeItemSize.width();
-    // qreal tex_h = nativeItemSize.height();
-    // qreal win_w = width();
-    // qreal win_h = height();
+    qreal tex_w = nativeItemSize.width();
+    qreal tex_h = nativeItemSize.height();
+    qreal win_w = width();
+    qreal win_h = height();
 
-    // qreal x, y, w, h;
+    qreal x, y, w, h;
 
-    // if(tex_w * win_h > tex_h * win_w){
-    //     w = win_w;
-    //     h = tex_h * win_w / tex_w;
-    // }
-    // else{
-    //     w = tex_w * win_h / tex_h;
-    //     h = win_h;
-    // }
-    // x = (win_w - w) / 2;
-    // y = (win_h - h) / 2;
+    if(tex_w * win_h > tex_h * win_w){
+        w = win_w;
+        h = tex_h * win_w / tex_w;
+    }
+    else{
+        w = tex_w * win_h / tex_h;
+        h = win_h;
+    }
+    x = (win_w - w) / 2;
+    y = (win_h - h) / 2;
 
-    // // Size the item Size
-    // item->setPos(x, y);
-    // item->setSize(QSizeF(w, h));
-    // item->show();
+    // Size the item Size
+    item->setPos(x, y);
+    item->setSize(QSizeF(w, h));
+    item->show();
 }
 void VideoCanvas::resizeEvent(QResizeEvent *event) {
     QGraphicsView::resizeEvent(event);
 
     scene->setSceneRect(0, 0, width(), height());
     
-    // putVideoItem();
-    widgetProxy->setPos(0, 0);
-    widgetProxy->resize(width(), height());
+    putVideoItem();
+    // widgetProxy->setPos(0, 0);
+    // widgetProxy->resize(width(), height());
 
     makeDanmakuTrack();
 }
@@ -314,7 +315,7 @@ void VideoCanvas::setDanmakuList(const DanmakuList &list) {
     danmakuList = list;
     danmakuIter = list.cbegin();
 
-    if (danmakuTimer == 0 && player->state() == QMediaPlayer::PlayingState) {
+    if (danmakuTimer == 0 && player->playbackState() == QMediaPlayer::PlayingState) {
         // Start timer
         danmakuTimer = startTimer(1000 / danmakuFps, Qt::PreciseTimer);
     }

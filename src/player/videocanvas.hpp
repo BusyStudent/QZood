@@ -41,7 +41,7 @@ class VideoCanvas final : public QGraphicsView {
         void resizeEvent(QResizeEvent *) override;
     private:
         void _on_videoItemSizeChanged(const QSizeF &size);
-        void _on_playerStateChanged(QMediaPlayer::State status);
+        void _on_playerStateChanged(QMediaPlayer::PlaybackState status);
     private:
         void runDanmaku(); //< Do danmaku suffer
         void addDanmaku(); //< Insert danmaku to
@@ -50,14 +50,14 @@ class VideoCanvas final : public QGraphicsView {
         void makeDanmakuTrack(); //< Calc the track of it
 
         QGraphicsScene     *scene = nullptr;
-        // QGraphicsVideoItem *item = nullptr;  //< Display item for the canvas.
+        QGraphicsVideoItem *item = nullptr;  //< Display item for the canvas.
         QMediaPlayer       *player = nullptr;
         QGraphicsItemGroup *danmakuGroup = nullptr; //< Place of group
         QGraphicsItemGroup *normalDanmakuGroup = nullptr; //< Place of normal danmaku
-        QVideoWidget         *widget = nullptr;
-        QGraphicsProxyWidget *widgetProxy = nullptr;
+        // QVideoWidget         *widget = nullptr;
+        // QGraphicsProxyWidget *widgetProxy = nullptr;
         QGraphicsTextItem    *progressText = nullptr;
-        // QSizeF              nativeItemSize {0.0, 0.0};
+        QSizeF                nativeItemSize {0.0, 0.0};
         qint64                playerPosition = 0;
 
 

@@ -1,18 +1,22 @@
 #include "../player/videocanvas.hpp"
 #include "../log.hpp"
+#include "../net/client.hpp"
 #include "testwindow.hpp"
 #include <QVideoWidget>
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QNetworkRequest>
 #include <QInputDialog>
+#include <QAudioOutput>
 #include <QFile>
 
 #include "ui_videocanvastest.h"
 
+
 ZOOD_TEST(VideoCanvas) {
     auto root = new QWidget;
     auto vcanvas = new VideoCanvas;
+    auto audio = new QAudioOutput(root);
     // auto vwidget = new QVideoWidget;
 
     auto player = new QMediaPlayer(root);
@@ -25,18 +29,19 @@ ZOOD_TEST(VideoCanvas) {
 
 
     vcanvas->attachPlayer(player);
+    player->setAudioOutput(audio);
     // player->setVideoOutput(vwidget);
 
     QObject::connect(form.loadButton, &QPushButton::clicked, [=]() {
         auto result = QFileDialog::getOpenFileUrl(root, "Select a url to display");
         qDebug() << result;
         if (!result.isEmpty()) {
-            player->setMedia(result);
+            player->setSource(result);
             player->play();
         }
     });
     QObject::connect(form.puaseButton, &QPushButton::clicked, [=]() {
-        switch (player->state()) {
+        switch (player->playbackState()) {
             case QMediaPlayer::PlayingState : {
                 // Current is playing
                 player->pause();
@@ -63,18 +68,18 @@ ZOOD_TEST(VideoCanvas) {
             }
         }
     });
-    QObject::connect(player, &QMediaPlayer::stateChanged, [=](QMediaPlayer::State s) {
+    QObject::connect(player, &QMediaPlayer::playbackStateChanged, [=](QMediaPlayer::PlaybackState s) {
         switch (s) {
             case QMediaPlayer::PlayingState : {
                 // Current is playing
                 form.puaseButton->setEnabled(true);
-                form.progressSlider->setEnabled(true);
+                form.progressSlider->setEnabled(player->isSeekable());
                 form.puaseButton->setText("Pause");
                 break;
             }
             case QMediaPlayer::PausedState : {
                 form.puaseButton->setEnabled(true);
-                form.progressSlider->setEnabled(true);
+                form.progressSlider->setEnabled(player->isSeekable());
                 form.puaseButton->setText("Resume");
                 break;
             }
@@ -92,12 +97,13 @@ ZOOD_TEST(VideoCanvas) {
         }
         url = url.trimmed(); // Remove whitespace from beginning and end of text box.
         
-        QNetworkRequest req;
-        req.setUrl(url);
-        req.setRawHeader("Referer", "https://www.bilibili.com");
+        // QNetworkRequest req;
+        // req.setUrl(url);
+        // req.setRawHeader("Referer", "https://www.bilibili.com");
+        // req.setRawHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537");
 
-        player->setMedia(req);
-        player->play();
+        // player->setMedia(req);
+        // player->play();
     });
     QObject::connect(form.progressSlider, &QSlider::sliderMoved, [=](int pos) {
         player->setPosition(pos);
@@ -110,10 +116,10 @@ ZOOD_TEST(VideoCanvas) {
         form.progressSlider->setRange(0, player->duration());
         form.progressSlider->setValue(position);
     });
-    QObject::connect(player, static_cast<void(QMediaPlayer::*)(QMediaPlayer::Error)>(&QMediaPlayer::error), [=](QMediaPlayer::Error error) {
+    QObject::connect(player, &QMediaPlayer::errorOccurred, [=](QMediaPlayer::Error error, const QString &errorString) {
         qDebug() << error;
 
-        ZOOD_QLOG("Failed to play video %1", player->errorString());
+        ZOOD_QLOG("Failed to play video %1", errorString);
     });
 
     return root;
