@@ -16,6 +16,9 @@
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
+     <property name="spacing">
+      <number>0</number>
+     </property>
      <item>
       <widget class="QSlider" name="progressSlider">
        <property name="enabled">
@@ -29,7 +32,20 @@
      <item>
       <widget class="QPushButton" name="loadButton">
        <property name="text">
-        <string>Load</string>
+        <string>Load File</string>
+       </property>
+       <property name="flat">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="urlButton">
+       <property name="text">
+        <string>Load Network</string>
+       </property>
+       <property name="flat">
+        <bool>false</bool>
        </property>
       </widget>
      </item>
@@ -37,6 +53,9 @@
       <widget class="QPushButton" name="danmakuButton">
        <property name="text">
         <string>Load Danmaku</string>
+       </property>
+       <property name="flat">
+        <bool>false</bool>
        </property>
       </widget>
      </item>
@@ -47,6 +66,9 @@
        </property>
        <property name="text">
         <string>Puase</string>
+       </property>
+       <property name="flat">
+        <bool>false</bool>
        </property>
       </widget>
      </item>
