@@ -15,8 +15,8 @@ TitleBar::TitleBar(QWidget *parent) : QWidget(parent) {
   hBoxLayout = new QHBoxLayout();
 
   setLayout(hBoxLayout);
-  hBoxLayout->setContentsMargins(2, 4, 2, 5);
-  hBoxLayout->setSpacing(0);
+  hBoxLayout->setContentsMargins(5, 10, 5, 10);
+  hBoxLayout->setSpacing(2);
 }
 void TitleBar::MinimizedEvent(bool checked) {
   CustomizeTitleWidget *main_window =
@@ -45,8 +45,6 @@ void TitleBar::showMaximized() {
   } else {
     window()->showMaximized();
   }
-  toolButton_max->setIcon(
-      style()->standardPixmap(QStyle::SP_TitleBarNormalButton));
 }
 
 void TitleBar::showFullLeftScreen() {
@@ -79,8 +77,6 @@ void TitleBar::showNormal() {
     } else {
       window()->showNormal();
     }
-    toolButton_max->setIcon(
-        style()->standardPixmap(QStyle::SP_TitleBarMaxButton));
   }
 }
 
@@ -88,7 +84,6 @@ void TitleBar::CloseEvent(bool checked) { window()->close(); }
 
 void TitleBar::setResizable(bool resizeable) {
   flag_resizable = resizeable;
-  toolButton_max->setVisible(resizeable);
 }
 
 void TitleBar::setMovable(bool moveable) { flag_movable = moveable; }

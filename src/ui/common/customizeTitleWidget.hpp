@@ -40,7 +40,7 @@ class TitleBar final : public QWidget {
    * @param alignment 对齐方式
    */
   inline void insertWidget(QWidget *widget, int index, int stretch = 0,
-                        Qt::Alignment alignment = {0}) {
+                           Qt::Alignment alignment = {0}) {
     hBoxLayout->insertWidget(index, widget, stretch, alignment);
   }
   inline void insertStretch(int index, int strectch = 0) {
@@ -93,11 +93,7 @@ class TitleBar final : public QWidget {
   void CloseEvent(bool checked);
 
  private:
-  QToolButton *toolButton_mini = nullptr;   // 最小化
-  QToolButton *toolButton_max = nullptr;    // 最大化
-  QToolButton *toolButton_close = nullptr;  // 关闭
   QHBoxLayout *hBoxLayout = nullptr;
-  QLabel *titleIcon = nullptr;
   bool flag_resizable = true;
   bool flag_movable = true;
   bool flag_moving = false;
@@ -127,7 +123,7 @@ class CustomizeTitleWidget : public QWidget {
  public:
   void addToolBar(QToolBar *toolBar);
   void addMenuBar(QMenuBar *menu);
-  void insertActionToTitleBar(QAction* action, int index);
+  void insertActionToTitleBar(QAction *action, int index);
   void setCentralWidget(QWidget *centralWidget);
   void setStatusBar(QStatusBar *statusBar);
   void showMinimized();
