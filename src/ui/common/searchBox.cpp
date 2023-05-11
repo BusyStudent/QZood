@@ -29,8 +29,8 @@ SearchBox::SearchBox(QWidget *parent) : QLineEdit(parent) {
   clearAction->setVisible(false);
 
   setStyleSheet(
-      "QLineEdit#searchBox{border: 1px solid black}"
-      "QLineEdit#searchBox{border-radius: 12px}"
+      "QLineEdit#searchBox{border: 2px solid black}"
+      "QLineEdit#searchBox{border-radius: 10px}"
       "QLineEdit#searchBox::focus{border-color: #ff0000}");
 }
 
