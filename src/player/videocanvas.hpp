@@ -2,12 +2,10 @@
 
 #include <QGraphicsView>
 #include <QGraphicsScene>
-#include <QGraphicsVideoItem>
 #include <QGraphicsProxyWidget>
-#include <QVideoWidget>
-#include <QMediaPlayer>
 
 #include "../danmaku.hpp"
+#include "../nekoav/nekoav.hpp"
 #include <vector>
 #include <list>
 
@@ -29,7 +27,7 @@ class VideoCanvas final : public QGraphicsView {
         VideoCanvas(QWidget *parent = nullptr);
         ~VideoCanvas();
 
-        void attachPlayer(QMediaPlayer *player);
+        void attachPlayer(NekoMediaPlayer *player);
 
         void setDanmakuOpacity(double op);
         void setDanmakuFont(const QFont &font);
@@ -41,7 +39,7 @@ class VideoCanvas final : public QGraphicsView {
         void resizeEvent(QResizeEvent *) override;
     private:
         void _on_videoItemSizeChanged(const QSizeF &size);
-        void _on_playerStateChanged(QMediaPlayer::PlaybackState status);
+        void _on_playerStateChanged(NekoMediaPlayer::PlaybackState status);
     private:
         void runDanmaku(); //< Do danmaku suffer
         void addDanmaku(); //< Insert danmaku to
@@ -50,15 +48,15 @@ class VideoCanvas final : public QGraphicsView {
         void makeDanmakuTrack(); //< Calc the track of it
 
         QGraphicsScene     *scene = nullptr;
-        QGraphicsVideoItem *item = nullptr;  //< Display item for the canvas.
-        QMediaPlayer       *player = nullptr;
+        NekoMediaPlayer    *player = nullptr;
         QGraphicsItemGroup *danmakuGroup = nullptr; //< Place of group
         QGraphicsItemGroup *normalDanmakuGroup = nullptr; //< Place of normal danmaku
+        NekoGraphicsVideoItem *item = nullptr;  //< Display item for the canvas.
         // QVideoWidget         *widget = nullptr;
         // QGraphicsProxyWidget *widgetProxy = nullptr;
         QGraphicsTextItem    *progressText = nullptr;
         QSizeF                nativeItemSize {0.0, 0.0};
-        qint64                playerPosition = 0;
+        qreal                 playerPosition = 0;
 
 
         // Danmakus

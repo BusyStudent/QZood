@@ -12,15 +12,16 @@ add_requires("libxml2")
 add_packages("libxml2")
 
 includes("./src/ui")
+includes("./src/nekoav")
 
 target("zood")
     add_rules("qt.widgetapp")
 
     add_frameworks("QtCore", "QtGui", "QtWidgets")
-    add_frameworks("QtMultimedia", "QtMultimediaWidgets")
+    -- add_frameworks("QtMultimedia", "QtMultimediaWidgets")
     add_frameworks("QtNetwork")
 
-	add_deps("ui")
+	add_deps("ui", "nekoav")
 	add_files("./resources/resources.qrc")
 
     -- Main

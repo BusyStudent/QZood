@@ -2,12 +2,10 @@
 #include "../log.hpp"
 #include "../net/client.hpp"
 #include "testwindow.hpp"
-#include <QVideoWidget>
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QNetworkRequest>
 #include <QInputDialog>
-#include <QAudioOutput>
 #include <QFile>
 
 #include "ui_videocanvastest.h"
@@ -16,10 +14,10 @@
 ZOOD_TEST(VideoCanvas) {
     auto root = new QWidget;
     auto vcanvas = new VideoCanvas;
-    auto audio = new QAudioOutput(root);
+    auto audio = new NekoAudioOutput(root);
     // auto vwidget = new QVideoWidget;
 
-    auto player = new QMediaPlayer(root);
+    auto player = new NekoMediaPlayer(root);
     Ui::VideoCanvasTest form;
 
     form.setupUi(root);
@@ -42,12 +40,12 @@ ZOOD_TEST(VideoCanvas) {
     });
     QObject::connect(form.puaseButton, &QPushButton::clicked, [=]() {
         switch (player->playbackState()) {
-            case QMediaPlayer::PlayingState : {
+            case NekoMediaPlayer::PlayingState : {
                 // Current is playing
                 player->pause();
                 break;
             }
-            case QMediaPlayer::PausedState : {
+            case NekoMediaPlayer::PausedState : {
                 player->play();
                 break;
             }
@@ -68,27 +66,30 @@ ZOOD_TEST(VideoCanvas) {
             }
         }
     });
-    QObject::connect(player, &QMediaPlayer::playbackStateChanged, [=](QMediaPlayer::PlaybackState s) {
+    QObject::connect(player, &NekoMediaPlayer::playbackStateChanged, [=](NekoMediaPlayer::PlaybackState s) {
         switch (s) {
-            case QMediaPlayer::PlayingState : {
+            case NekoMediaPlayer::PlayingState : {
                 // Current is playing
                 form.puaseButton->setEnabled(true);
                 form.progressSlider->setEnabled(player->isSeekable());
                 form.puaseButton->setText("Pause");
                 break;
             }
-            case QMediaPlayer::PausedState : {
+            case NekoMediaPlayer::PausedState : {
                 form.puaseButton->setEnabled(true);
                 form.progressSlider->setEnabled(player->isSeekable());
                 form.puaseButton->setText("Resume");
                 break;
             }
-            case QMediaPlayer::StoppedState : {
+            case NekoMediaPlayer::StoppedState : {
                 form.puaseButton->setDisabled(true);
                 form.progressSlider->setDisabled(true);
                 break;
             }
         }
+    });
+    QObject::connect(player, &NekoMediaPlayer::seekableChanged, [=](bool v) {
+        form.progressSlider->setEnabled(v);
     });
     QObject::connect(form.urlButton, &QPushButton::clicked, [=]() {
         auto url = QInputDialog::getText(root, "Enter a URL", "URL");
@@ -108,15 +109,15 @@ ZOOD_TEST(VideoCanvas) {
     QObject::connect(form.progressSlider, &QSlider::sliderMoved, [=](int pos) {
         player->setPosition(pos);
     });
-    QObject::connect(player, &QMediaPlayer::positionChanged, [=](qint64 position) {
+    QObject::connect(player, &NekoMediaPlayer::positionChanged, [=](qint64 position) {
         form.progressSlider->setRange(0, player->duration());
         form.progressSlider->setValue(position);
     });
-    QObject::connect(player, &QMediaPlayer::positionChanged, [=](qint64 position) {
+    QObject::connect(player, &NekoMediaPlayer::positionChanged, [=](qint64 position) {
         form.progressSlider->setRange(0, player->duration());
         form.progressSlider->setValue(position);
     });
-    QObject::connect(player, &QMediaPlayer::errorOccurred, [=](QMediaPlayer::Error error, const QString &errorString) {
+    QObject::connect(player, &NekoMediaPlayer::errorOccurred, [=](NekoMediaPlayer::Error error, const QString &errorString) {
         qDebug() << error;
 
         ZOOD_QLOG("Failed to play video %1", errorString);

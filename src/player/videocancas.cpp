@@ -14,7 +14,7 @@ VideoCanvas::VideoCanvas(QWidget *parent) : QGraphicsView(parent) {
     setScene(scene);
 
     // Add Item
-    item = new QGraphicsVideoItem();
+    item = new NekoGraphicsVideoItem();
     scene->addItem(item);
 
     // widget = new QVideoWidget();
@@ -39,36 +39,36 @@ VideoCanvas::VideoCanvas(QWidget *parent) : QGraphicsView(parent) {
 
     danmakuFont.setBold(true);
 
-    connect(item, &QGraphicsVideoItem::nativeSizeChanged, this, &VideoCanvas::_on_videoItemSizeChanged);
+    connect(item, &NekoGraphicsVideoItem::nativeSizeChanged, this, &VideoCanvas::_on_videoItemSizeChanged);
 }
 VideoCanvas::~VideoCanvas() {
     
 }
-void VideoCanvas::attachPlayer(QMediaPlayer *pl) {
+void VideoCanvas::attachPlayer(NekoMediaPlayer *pl) {
     player = pl;
     player->setVideoOutput(item);
     // player->setVideoOutput(widget);
 
     // Connect the media status , for displaying danmaku
-    connect(player, &QMediaPlayer::playbackStateChanged, this, &VideoCanvas::_on_playerStateChanged);
+    connect(player, &NekoMediaPlayer::playbackStateChanged, this, &VideoCanvas::_on_playerStateChanged);
 
-    connect(player, &QMediaPlayer::positionChanged, [this](qint64 position) {
+    connect(player, &NekoMediaPlayer::positionChanged, [this](qreal position) {
         // Do check here
         if (!danmakuList.empty()) {
             if (position < playerPosition) {
                 // Back
-                seekDanmaku(position / 1000.0);
+                seekDanmaku(position);
             }
             if (position - playerPosition > 2000) {
                 // Bigger than 2 ms, is seeking
-                seekDanmaku(position / 1000.0);
+                seekDanmaku(position);
             }
         }
 
         playerPosition = position;
 
 #if !defined(NDEBUG)
-        auto text = QString::asprintf("Progress %lf to %lf", position / 1000.0, player->duration() / 1000.0);
+        auto text = QString::asprintf("Progress %lf to %lf", position, player->duration());
         if (danmakuTimer != 0 && danmakuIter != danmakuList.cend()) {
             // Has danmaku
             text += QString("\nTracks %1 Danmaku %2 %3").arg(
@@ -87,19 +87,19 @@ void VideoCanvas::_on_videoItemSizeChanged(const QSizeF &size) {
     nativeItemSize = size;
     putVideoItem();
 }
-void VideoCanvas::_on_playerStateChanged(QMediaPlayer::PlaybackState state) {
+void VideoCanvas::_on_playerStateChanged(NekoMediaPlayer::PlaybackState state) {
     switch (state) {
-        case QMediaPlayer::PlayingState : {
+        case NekoMediaPlayer::PlayingState : {
             // Not empty, start timer
             if (!danmakuList.empty()) {
                 danmakuTimer = startTimer(1000 / danmakuFps, Qt::PreciseTimer);
             }
             break;
         }
-        case QMediaPlayer::PausedState : {
+        case NekoMediaPlayer::PausedState : {
             [[fallthrough]];
         }
-        case QMediaPlayer::StoppedState : {
+        case NekoMediaPlayer::StoppedState : {
             // Stop danmakuTimer if
             if (danmakuTimer != 0) {
                 killTimer(danmakuTimer);
@@ -165,7 +165,7 @@ void VideoCanvas::timerEvent(QTimerEvent *event) {
 
 // Danmakus
 void VideoCanvas::runDanmaku() {
-    qreal position = player->position() / 1000.0;
+    qreal position = player->position();
     qreal width = scene->width();
 
     if (danmakuIter != danmakuList.cend() && danmakuIter->position < position) {
@@ -315,7 +315,7 @@ void VideoCanvas::setDanmakuList(const DanmakuList &list) {
     danmakuList = list;
     danmakuIter = list.cbegin();
 
-    if (danmakuTimer == 0 && player->playbackState() == QMediaPlayer::PlayingState) {
+    if (danmakuTimer == 0 && player->playbackState() == NekoMediaPlayer::PlayingState) {
         // Start timer
         danmakuTimer = startTimer(1000 / danmakuFps, Qt::PreciseTimer);
     }

@@ -22,6 +22,7 @@ void ZoodLogString(const QString &text) {
 	auto timestring = date.toString("dd.MM.yyyy hh:mm:ss");
 
 	ui->logConsoleView->addItem(QString("[%1] %2").arg(timestring, text));
+	ui->logConsoleView->scrollToBottom();
 }
 
 ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow) {
