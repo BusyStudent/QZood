@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QMainWindow>
+#include <QSurfaceFormat>
 
 #include "tests/testwindow.hpp"
 #include "ui/common/customizeTitleWidget.hpp"

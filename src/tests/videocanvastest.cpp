@@ -6,6 +6,7 @@
 #include <QFileDialog>
 #include <QNetworkRequest>
 #include <QInputDialog>
+#include <QMetaEnum>
 #include <QFile>
 
 #include "ui_videocanvastest.h"
@@ -86,7 +87,11 @@ ZOOD_TEST(VideoCanvas) {
                 form.progressSlider->setDisabled(true);
                 break;
             }
+        ZOOD_QLOG("MediaPlayer state changed to %1", QMetaEnum::fromType<NekoMediaPlayer::PlaybackState>().valueToKey(s));
         }
+    });
+    QObject::connect(player, &NekoMediaPlayer::mediaStatusChanged, [=](NekoMediaPlayer::MediaStatus s) {
+        ZOOD_QLOG("MediaPlayer status changed to %1", QMetaEnum::fromType<NekoMediaPlayer::MediaStatus>().valueToKey(s));
     });
     QObject::connect(player, &NekoMediaPlayer::seekableChanged, [=](bool v) {
         form.progressSlider->setEnabled(v);

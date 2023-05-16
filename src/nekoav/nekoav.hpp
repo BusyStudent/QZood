@@ -6,10 +6,10 @@
 #include <QObject>
 #include <QUrl>
 
-#if   defined(_MSC_VER)
+#if   defined(_MSC_VER) && defined(NEKO_DLL)
     #define NEKO_EXPORT 	__declspec(dllexport)
     #define NEKO_IMPORT     __declspec(dllimport)
-#elif defined(__GNUC__) && defined(_WIN32)
+#elif defined(__GNUC__) && defined(NEKO_DLL) && defined(_WIN32)
     #define NEKO_EXPORT 	__attribute__(dllexport)
     #define NEKO_IMPORT     __attribute__(dllimport)
 #else
@@ -24,7 +24,6 @@
 #endif
 
 #define NEKO_USING(n) using Neko##n = NekoAV::n
-#define NEKO_API
 
 namespace NekoAV {
 

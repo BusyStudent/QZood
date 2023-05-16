@@ -18,7 +18,7 @@ target("zood")
     add_rules("qt.widgetapp")
 
     add_frameworks("QtCore", "QtGui", "QtWidgets")
-    -- add_frameworks("QtMultimedia", "QtMultimediaWidgets")
+    add_frameworks("QtOpenGL", "QtOpenGLWidgets")
     add_frameworks("QtNetwork")
 
 	add_deps("ui", "nekoav")

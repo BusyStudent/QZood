@@ -809,8 +809,8 @@ qreal DemuxerThread::position() const {
     if (audioThread) {
         return audioThread->clock();
     }
-    Q_ASSERT(false);
-    return true;
+    qDebug() << "DemuxerThread::position warning no audioThread";
+    return 0.0;
 }
 
 // MediaPlayerPrivate here
