@@ -102,14 +102,11 @@ ZOOD_TEST(VideoCanvas) {
             return;
         }
         url = url.trimmed(); // Remove whitespace from beginning and end of text box.
-        
-        // QNetworkRequest req;
-        // req.setUrl(url);
-        // req.setRawHeader("Referer", "https://www.bilibili.com");
-        // req.setRawHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537");
 
-        // player->setMedia(req);
-        // player->play();
+        player->setHttpReferer("https://www.bilibili.com");
+        player->setHttpUseragent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537");
+        player->setSource(url);
+        player->play();
     });
     QObject::connect(form.progressSlider, &QSlider::sliderMoved, [=](int pos) {
         player->setPosition(pos);
