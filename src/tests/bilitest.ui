@@ -108,7 +108,17 @@
     </layout>
    </item>
    <item>
+    <widget class="QLineEdit" name="searchEdit"/>
+   </item>
+   <item>
     <widget class="QPlainTextEdit" name="bigOutEdit"/>
+   </item>
+   <item alignment="Qt::AlignRight">
+    <widget class="QPushButton" name="saveDanButton">
+     <property name="text">
+      <string>Save Danmaku</string>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>

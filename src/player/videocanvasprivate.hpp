@@ -48,6 +48,7 @@ class VideoCanvasPrivate final : public QObject {
         qreal               danmakuScale = 0.8; //< Scale factor for danmaku.  1.0 = 100% scale.  0.0 = normal scale.
         qreal               danmakuAliveTime = 10.0; //< Alive of a danmaku
         qreal               danmakuSpacing = 2.0; //< Spacing 
+        qreal               danmakuOpacity = 1.0; //< Opacity
         bool                danmakuPlaying = false; //< Is danmaku playing?
         DanmakuList         danmakuList; //< The list of danmaku to display.
         DanmakuTracks       danmakuTracks; //< The list of QGraphicsTextItem to display.  Each QTextItem is a danmaku.

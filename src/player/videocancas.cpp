@@ -34,6 +34,7 @@ void VideoCanvas::setDanmakuList(const DanmakuList &list) {
         // Start timer
         d->danmakuTimer = d->startTimer(1000 / d->danmakuFps, Qt::PreciseTimer);
     }
+    update();
 }
 void VideoCanvas::setDanmakuPosition(qreal position) {
     for (auto &track : d->danmakuTracks) {
@@ -48,7 +49,11 @@ void VideoCanvas::setDanmakuPosition(qreal position) {
     if (d->danmakuIter != d->danmakuList.cend()) {
         qDebug() << "Seek to pos: " << d->danmakuIter->position << " text: " << d->danmakuIter->text;
     }
-
+    update();
+}
+void VideoCanvas::setDanmakuOpacity(qreal op) {
+    d->danmakuOpacity = op;
+    update();    
 }
 void VideoCanvas::paintGL() {
     QPainter painter(this);
@@ -107,6 +112,8 @@ void VideoCanvasPrivate::paint(QPainter &painter) {
     paintDanmaku(painter);
 }
 void VideoCanvasPrivate::paintDanmaku(QPainter &painter) {
+    painter.save();
+    painter.setOpacity(painter.opacity() * danmakuOpacity);
     for (auto &tracks : danmakuTracks) {
         for (auto &node : tracks) {
             painter.setFont(node.font);
@@ -118,6 +125,7 @@ void VideoCanvasPrivate::paintDanmaku(QPainter &painter) {
             painter.drawStaticText(node.x, node.y, node.text);
         }
     }
+    painter.restore();
 }
 void VideoCanvasPrivate::resizeTracks() {
     qreal height = videoCanvas->height();
@@ -244,9 +252,12 @@ void VideoCanvasPrivate::_on_playerStateChanged(NekoMediaPlayer::PlaybackState s
 }
 void VideoCanvasPrivate::_on_VideoFrameChanged(const NekoVideoFrame &frame) {
     // Update frame
+    if (frame.isNull() || player->playbackState() == NekoMediaPlayer::StoppedState) {
+        return;
+    }
     std::lock_guard locker(frame);
 
-    Q_ASSERT(frame.pixelFormat() == NekoVideoPixelFormat::RGBA32);
+    // Q_ASSERT(frame.pixelFormat() == NekoVideoPixelFormat::RGBA32);
 
     int w = frame.width();
     int h = frame.height();
@@ -259,12 +270,18 @@ void VideoCanvasPrivate::_on_VideoFrameChanged(const NekoVideoFrame &frame) {
     uchar *dst = image.bits();
     int    dstPitch = image.bytesPerLine();
 
-    // Update it
-    for (int y = 0; y < image.height(); y++) {
-        for (int x = 0; x < image.width(); x++) {
-            *((uint32_t*)   &dst[y * dstPitch + x * 4]) = *(
-                (uint32_t*) &pixels[y * pitch + x * 4]
-            );
+    if (dstPitch == pitch) {
+        // Just memcpy
+        ::memcpy(dst, pixels, pitch * h);
+    }
+    else {
+        // Update it
+        for (int y = 0; y < image.height(); y++) {
+            for (int x = 0; x < image.width(); x++) {
+                *((uint32_t*)   &dst[y * dstPitch + x * 4]) = *(
+                    (uint32_t*) &pixels[y * pitch + x * 4]
+                );
+            }
         }
     }
     

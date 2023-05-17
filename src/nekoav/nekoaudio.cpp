@@ -11,7 +11,7 @@ extern "C" {
     #define  MA_NO_GENERATION
     #define  MA_API static
 
-    #if !defined(NDEBUG)
+    #if defined(NEKOAV_DEBUG)
         #define  MA_DEBUG_OUTPUT
     #endif
 

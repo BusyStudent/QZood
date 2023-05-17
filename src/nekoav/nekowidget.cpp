@@ -48,6 +48,10 @@ VideoSink *VideoWidget::videoSink() const {
 }
 
 void VideoWidgetPrivate::_on_VideoFrameChanged(const VideoFrame &frame) {
+    if (frame.isNull()) {
+        return;
+    }
+
     std::lock_guard locker(frame);
 
     Q_ASSERT(frame.pixelFormat() == VideoPixelFormat::RGBA32);
@@ -121,6 +125,9 @@ QSizeF     GraphicsVideoItem::nativeSize() const {
 }
 
 void GraphicsVideoItemPrivate::_on_VideoFrameChanged(const VideoFrame &frame) {
+    if (frame.isNull()) {
+        return;
+    }
     std::lock_guard locker(frame);
 
     Q_ASSERT(frame.pixelFormat() == VideoPixelFormat::RGBA32);

@@ -4,6 +4,24 @@
 #include <QDateTime>
 #include <QToolButton>
 
+#if defined(_WIN32)
+#include <Windows.h>
+
+#define SetConsoleColor(color)                                          \
+	::SetConsoleTextAttribute(::GetStdHandle(STD_OUTPUT_HANDLE), color);  \
+	::SetConsoleTextAttribute(::GetStdHandle(STD_ERROR_HANDLE), color);
+
+#define CONSOLE_RED     FOREGROUND_RED
+#define CONSOLE_GREEN   FOREGROUND_GREEN
+#define CONSOLE_BLUE    FOREGROUND_BLUE
+#define CONSOLE_DEFAULT CONSOLE_RED | CONSOLE_GREEN | CONSOLE_BLUE
+#define CONSOLE_YELLOW  CONSOLE_GREEN | FOREGROUND_RED
+#define CONSOLE_LIGHTBLUE  CONSOLE_GREEN | FOREGROUND_BLUE
+#else
+
+#endif
+
+
 static QList<QPair<QString, std::function<QWidget*()>>> &GetList() {
 	static QList<QPair<QString, std::function<QWidget*()>>> lt;
 	return lt;
@@ -61,6 +79,22 @@ ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui
 	}
 
 	test_window = this;
+
+	// qInstallMessageHandler
+	qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &, const QString &msg) {
+		switch (type) {
+			case QtDebugMsg :  SetConsoleColor(CONSOLE_LIGHTBLUE); printf("qDebug "); break;
+			case QtWarningMsg : SetConsoleColor(CONSOLE_YELLOW); printf("qWarn "); break;
+			case QtCriticalMsg : SetConsoleColor(CONSOLE_RED); printf("qCrit "); break;
+			case QtFatalMsg : SetConsoleColor(CONSOLE_RED); printf("qError "); break;
+			case QtInfoMsg : SetConsoleColor(CONSOLE_DEFAULT); printf("qInfo "); break;
+		}
+		printf("%s", msg.toUtf8().data());
+
+		SetConsoleColor(CONSOLE_DEFAULT);
+
+		printf("\n");
+	});
 }
 
 void ZoodTestWindow::ItemClicked(QTreeWidgetItem *item, int column) {

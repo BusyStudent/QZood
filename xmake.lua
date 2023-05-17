@@ -8,14 +8,15 @@ if is_host("windows") then
     add_cxxflags("cl::/permissive-")
 end 
 
-add_requires("libxml2")
-add_packages("libxml2")
+add_requires("libxml2", "protobuf-cpp")
+add_packages("libxml2", "protobuf-cpp")
 
 includes("./src/ui")
 includes("./src/nekoav")
 
 target("zood")
     add_rules("qt.widgetapp")
+    add_rules("protobuf.cpp")
 
     add_frameworks("QtCore", "QtGui", "QtWidgets")
     add_frameworks("QtOpenGL", "QtOpenGLWidgets")
@@ -32,6 +33,7 @@ target("zood")
 
     -- Network
     add_files("./src/net/*")
+    add_files("./src/net/protos/*")
 
     -- Tests
     add_files("./src/tests/*")

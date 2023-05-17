@@ -15,7 +15,7 @@ class BiliVideoSource final {
         QByteArray referHeader; //< Header of refer
 };
 
-class BiliClient final : public QObject {
+class BiliClient final : public VideoInterface {
     Q_OBJECT
     public:
         BiliClient(QObject *parent = nullptr);
@@ -28,6 +28,34 @@ class BiliClient final : public QObject {
          * @return The async result of this request
          */
         NetResult<DanmakuList> fetchDanmaku(const QString &cid);
+        /**
+         * @brief fetch danmaku xml file
+         * 
+         * @param cid 
+         * @return NetResult<DanmakuList> 
+         */
+        NetResult<QByteArray> fetchDanmakuXml(const QString &cid);
+        /**
+         * @brief fetch danmaku protobuf
+         * 
+         * @param cid 
+         * @return NetResult<QByteArray> 
+         */
+        NetResult<DanmakuList> fetchDanmakuProtobuf(const QString &cid, int segment);
+        /**
+         * @brief Get suggestions
+         * 
+         * @param text 
+         * @return NetResult<QStringList> 
+         */
+        NetResult<QStringList> fetchSearchSuggestions(const QString &text);
+        /**
+         * @brief fetch file by
+         * 
+         * @param url 
+         * @return NetResult<QByteArray> 
+         */
+        NetResult<QByteArray>  fetchFile(const QString &url);
         /**
          * @brief fetch danmaku video info
          * 
@@ -59,7 +87,6 @@ class BiliClient final : public QObject {
          */
         Result<QString> parseBvid(const QString &url);
     private:
-        void _on_danmakuReplyReady(NetResult<DanmakuList> &result, QNetworkReply *reply);
         void _on_videoCidReplyReady(NetResult<QString> &result, QNetworkReply *reply);
 
         QNetworkAccessManager manager; //< Manager to access it

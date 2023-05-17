@@ -1,4 +1,5 @@
 #include <QMessageBox>
+#include <QFileDialog>
 #include "testwindow.hpp"
 #include "ui_bilitest.h"
 
@@ -51,6 +52,41 @@ ZOOD_TEST(Bilibili) {
             ui.bigOutEdit->setPlainText(ret);
         });
     });
+    QObject::connect(ui.saveDanButton, &QPushButton::clicked, [=]() {
+        bili->fetchDanmakuXml(ui.danEdit->text()).then([=](const Result<QString> &dan) {
+            if (!dan) {
+                QMessageBox::critical(root, "Error", "Failed to Get Danmaku");
+                return;
+            }
+            auto url = QFileDialog::getSaveFileUrl(root, "Select position");
+            if (!url.isEmpty()) {
+                QFile f(url.toLocalFile());
+                if (!f.open(QFile::WriteOnly)) {
+                    QMessageBox::critical(
+                        root, 
+                        "Error", 
+                        QString("Failed to Open file %1 : %2").arg(url.toLocalFile(), f.errorString())
+                    );
+                    return;
+                }
+                f.write(dan.value().toUtf8());
+            }
+        });
+    });
+    QObject::connect(ui.searchEdit, &QLineEdit::textChanged,[=](const QString &value) {
+        bili->fetchSearchSuggestions(value).then([=](const Result<QStringList> &items) {
+            ui.bigOutEdit->clear();
+            if (items) {
+                QString str;
+                for (const auto &i : items.value()) {
+                    str += i;
+                    str += '\n';
+                }
+                ui.bigOutEdit->setPlainText(str);
+            }
+        });
+    });
+
     // QObject::connect(bili, &BiliClient::videoCidReady, [=](uint64_t id, const Result<QString> &cid) {
     //     if (!cid) {
     //         QMessageBox::critical(root, "Error", "Failed to Get CID");

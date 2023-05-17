@@ -378,6 +378,7 @@ void VideoThread::run() {
 
         videoWriteFrame(frame);
     }
+    videoSink->putVideoFrame(VideoFrame());
 }
 bool VideoThread::videoDecodeFrame(AVPacket *packet, AVFrame **retFrame) {
     AVFrame *cvtSource = srcFrame.get();
@@ -524,6 +525,9 @@ bool DemuxerThread::load() {
         player->setMediaStatus(MediaStatus::InvalidMedia);
         return sendError(errcode);
     }
+
+    // Dump info
+    av_dump_format(formatCtxt, 0, stdstr.data(), 0);
 
     player->setMediaStatus(MediaStatus::LoadedMedia);
     player->loaded = true;
@@ -1054,18 +1058,27 @@ QSize VideoSink::videoSize() const {
 
 // Video Frame
 int VideoFrame::width() const {
+    if (isNull()) {
+        return 0;
+    }
     return d->width;
 }
 int VideoFrame::height() const {
+    if (isNull()) {
+        return 0;
+    }
     return d->height;
 }
 QSize VideoFrame::size() const {
-    return QSize(d->width, d->height);
+    return QSize(width(), height());
 }
 bool VideoFrame::isNull() const {
     return d == nullptr;
 }
 int  VideoFrame::planeCount() const {
+    if (isNull()) {
+        return 0;
+    }
     return av_pix_fmt_count_planes(AVPixelFormat(d->format));
 }
 void VideoFrame::lock() const {
@@ -1083,14 +1096,23 @@ void VideoFrame::unlock() const {
     }
 }
 uchar *VideoFrame::bits(int plane) const {
-    Q_ASSERT(plane < planeCount());
+    if (isNull()) {
+        return nullptr;
+    }
+    // Q_ASSERT(plane < planeCount());
     return d->data[plane];
 }
 int    VideoFrame::bytesPerLine(int plane) const {
-    Q_ASSERT(plane < planeCount());
+    if (isNull()) {
+        return 0;
+    }
+    // Q_ASSERT(plane < planeCount());
     return d->linesize[plane];
 }
 VideoPixelFormat VideoFrame::pixelFormat() const {
+    if (isNull()) {
+        return VideoPixelFormat::Invalid;
+    }
     switch (d->format) {
         case AV_PIX_FMT_RGBA : return VideoPixelFormat::RGBA32;
         default :              return VideoPixelFormat::Invalid;

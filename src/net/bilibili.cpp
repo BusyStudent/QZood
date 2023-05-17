@@ -1,29 +1,178 @@
-#include "bilibili.hpp"
 #include "../log.hpp"
+#include "bilibili.hpp"
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
 
-BiliClient::BiliClient(QObject *parent) : QObject(parent) {
+#if !defined(QZOOD_NO_PROTOBUF)
+#include "dm.pb.h"
+#endif
+
+BiliClient::BiliClient(QObject *parent) : VideoInterface(parent) {
 
 }
 BiliClient::~BiliClient() {
 
 }
-
 NetResult<DanmakuList> BiliClient::fetchDanmaku(const QString &cid) {
+#if !defined(QZOOD_NO_PROTOBUF)
+    class Routinue : public std::enable_shared_from_this<Routinue> {
+        public:
+            ~Routinue() {
+
+            }
+            QString cid; //< CID
+            int     idx = 1; //< Current Index
+            DanmakuList dans;
+            NetResult<DanmakuList> result;
+            BiliClient *client;
+
+            void process(const Result<DanmakuList> &dan) {
+                if (!dan) {
+                    // Eof
+                    if (dans.empty()) {
+                        result.putResult(std::nullopt);
+                    }
+                    else {
+                        result.putResult(dans);
+                    }
+                    return;
+                }
+                // Merge
+                dans = MergeDanmaku(dans, dan.value());
+                idx += 1;
+
+                client->fetchDanmakuProtobuf(cid, idx).
+                    then([self = this->shared_from_this()](const Result<DanmakuList> &d) mutable {
+                        self->process(d);
+                });
+            }
+    };
+    auto result   = NetResult<DanmakuList>::Alloc();
+    auto routinue = std::make_shared<Routinue>();
+    routinue->cid = cid;
+    routinue->idx = 1;
+    routinue->result = result;
+    routinue->client = this;
+
+    fetchDanmakuProtobuf(cid, 1).then([routinue](const Result<DanmakuList> &d) {
+        routinue->process(d);
+    });
+
+    return result;
+#else
+    auto result = NetResult<DanmakuList>::Alloc();
+    fetchDanmakuXml(cid).then([result](const Result<QByteArray> &xml) mutable {
+        Result<DanmakuList> danmaku;
+        if (xml) {
+            danmaku = ParseDanmaku(xml.value());
+        }
+
+        result.putResult(danmaku);
+    });
+    return result;
+#endif
+}
+
+#if !defined(QZOOD_NO_PROTOBUF)
+NetResult<DanmakuList> BiliClient::fetchDanmakuProtobuf(const QString &cid, int segment) {
+    auto result = NetResult<DanmakuList>::Alloc();
+    fetchFile(QString("https://api.bilibili.com/x/v2/dm/web/seg.so?oid=%1&type=1&segment_index=%2").arg(cid, QString::number(segment)))
+        .then(this, [result](const Result<QByteArray> &binary) mutable {
+            Result<DanmakuList> danmaku;
+            if (binary) {
+                ::bilibili::community::service::dm::v1::DmSegMobileReply reply;
+
+                if (reply.ParseFromArray(binary.value().data(), binary.value().size())) {
+                    DanmakuList list;
+
+                    for (int idx = 0; idx < reply.elems_size(); idx++) {
+                        auto &elem = reply.elems(idx);
+
+                        DanmakuItem item;
+                        item.position = qreal(elem.progress()) / 1000.0; //< To S
+                        item.type     = DanmakuItem::Type(elem.mode());
+                        item.size     = DanmakuItem::Size(elem.fontsize());
+
+                        item.color    = QColor(elem.color());
+                        item.text     = QString::fromUtf8(elem.content());
+                        item.pool     = DanmakuItem::Pool(elem.pool());
+                        item.level    = elem.weight();
+
+                        list.push_back(item);
+                    }
+
+                    danmaku = list;
+                }
+                else {
+                    QJsonParseError error;
+                    auto json = QJsonDocument::fromJson(binary.value(), &error);
+
+                    if (!json.isNull()) {
+                        qDebug() << "BiliClient::fetchDanmakuProtobuf error" << json;
+                    }
+                }
+            }
+            result.putResult(danmaku);
+        })
+    ;
+    return result;
+}
+#endif
+NetResult<QStringList> BiliClient::fetchSearchSuggestions(const QString &text) {
+    auto result = NetResult<QStringList>::Alloc();
+    if (text.isEmpty()) {
+        result.putLater(std::nullopt);
+        return result;
+    }
+
+    fetchFile(QString("https://s.search.bilibili.com/main/suggest?term=%1&main_ver=v1").arg(text)).then(
+        this, [result](const Result<QByteArray> &jsondata) mutable {
+
+        Result<QStringList> list;
+        if (jsondata) {
+            QJsonParseError error;
+            auto json = QJsonDocument::fromJson(jsondata.value(), &error);
+
+            // Debug print
+            qDebug() << "fetchSearchSuggestions reply" << json;
+            if (!json.isNull() && json["code"] == 0) {
+                QStringList v;
+                for (auto item : json["result"]["tag"].toArray()) {
+                    v.push_back(item.toObject()["value"].toString());
+                }
+                list = v;
+            }
+        }
+
+        result.putResult(list);
+    });
+
+
+    return result;
+}
+NetResult<QByteArray> BiliClient::fetchDanmakuXml(const QString &cid) {
+    return fetchFile(QString("https://api.bilibili.com/x/v1/dm/list.so?oid=%1").arg(cid));
+}
+NetResult<QByteArray> BiliClient::fetchFile(const QString &url) {
     QNetworkRequest request;
 
     // Mark request
-    request.setUrl(QString("https://api.bilibili.com/x/v1/dm/list.so?oid=%1").arg(cid));
+    request.setUrl(url);
     request.setRawHeader("User-Agent", RandomUserAgent());
 
-    auto result = NetResult<DanmakuList>::Alloc();
+    auto result = NetResult<QByteArray>::Alloc();
     auto reply = manager.get(request);
 
-
     connect(reply, &QNetworkReply::finished, this, [this, reply, result]() mutable {
-        _on_danmakuReplyReady(result, reply);
+        Result<QByteArray> data;
+
+        reply->deleteLater();
+        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) == 200) {
+            data = reply->readAll();
+        }
+
+        result.putResult(data);
     });
 
     return result;
@@ -86,17 +235,6 @@ NetResult<BiliVideoSource> BiliClient::fetchVideoSource(const QString &cid, cons
     });
 
     return result;
-}
-void    BiliClient::_on_danmakuReplyReady(NetResult<DanmakuList> &result, QNetworkReply *reply) {
-    Result<DanmakuList> danmakus;
-
-    reply->deleteLater();
-    if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) == 200) {
-        auto text = reply->readAll();
-        danmakus = ParseDanmaku(text);
-    }
-
-    result.putResult(danmakus);
 }
 void    BiliClient::_on_videoCidReplyReady(NetResult<QString> &result, QNetworkReply *reply) {
     Result<QString> cid;
