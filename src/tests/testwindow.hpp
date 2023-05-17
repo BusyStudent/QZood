@@ -19,14 +19,15 @@ class ZoodTestWindow : public QMainWindow {
         
         ZoodTestWindow(QWidget *parent = nullptr);
         ~ZoodTestWindow();
+        QWidget* TerminatorParent();
 
 		public Q_SLOTS:
 		void ItemClicked(QTreeWidgetItem *item, int column);
 
     private:
         void *ui = nullptr;
-				QMap<QTreeWidgetItem*, QWidget*> items;
-				QTreeWidgetItem* currentItem = nullptr;
+		QMap<QTreeWidgetItem*, QWidget*> items;
+		QTreeWidgetItem* currentItem = nullptr;
     friend void ZoodLogString(const QString &text);
 };
 

@@ -2,6 +2,7 @@
 #include "ui_testwindow.h"
 #include <QListWidget>
 #include <QDateTime>
+#include <QToolButton>
 
 static QList<QPair<QString, std::function<QWidget*()>>> &GetList() {
 	static QList<QPair<QString, std::function<QWidget*()>>> lt;
@@ -25,12 +26,23 @@ void ZoodLogString(const QString &text) {
 	ui->logConsoleView->scrollToBottom();
 }
 
+QWidget* ZoodTestWindow::TerminatorParent() {
+	auto dui = static_cast<Ui::MainWindow*>(ui);
+    
+    return dui->consoleView;
+}
+
+
 ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow) {
 	auto dui = static_cast<Ui::MainWindow*>(ui);
 
 	dui->setupUi(this);
 	QAction *clear = new QAction();
 	clear->setText("clear");
+
+    dui->tabWidget->setTabText(0, "日志");
+    dui->tabWidget->setTabText(1, "调试控制台");
+
 	connect(clear, &QAction::triggered, dui->logConsoleView, &QListWidget::clear);
 	dui->logConsoleView->addAction(clear);
 		
