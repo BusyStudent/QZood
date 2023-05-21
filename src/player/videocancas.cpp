@@ -7,6 +7,7 @@
 #include <QOpenGLFunctions>
 #include <QTextCharFormat>
 #include <QTextDocument>
+#include <QFontMetricsF>
 #include <QTextCursor>
 #include <QPainter>
 #include <mutex>
@@ -27,6 +28,7 @@ void VideoCanvas::attachPlayer(NekoMediaPlayer *player) {
 }
 void VideoCanvas::setDanmakuList(const DanmakuList &list) {
     Q_ASSERT(d->player);
+    d->clearTracks();
     d->danmakuList = list;
     d->danmakuIter = d->danmakuList.cbegin();
 
@@ -37,10 +39,7 @@ void VideoCanvas::setDanmakuList(const DanmakuList &list) {
     update();
 }
 void VideoCanvas::setDanmakuPosition(qreal position) {
-    for (auto &track : d->danmakuTracks) {
-        track.clear();
-    }
-    d->danmakuTracks.clear();
+    d->clearTracks();
 
     d->danmakuIter = d->danmakuList.begin();
     while (d->danmakuIter->position < position && d->danmakuIter != d->danmakuList.cend()) {
@@ -101,11 +100,22 @@ void VideoCanvasPrivate::paint(QPainter &painter) {
     if (player) {
         painter.setFont(videoCanvas->font());
         painter.setPen(Qt::white);
-        painter.drawText(0, 0, videoCanvas->width(), videoCanvas->height(), Qt::AlignTop,
-            QString::asprintf("Progress %lf to %lf", 
-                player->position(), player->duration()
-            )
-        );
+        
+        if (danmakuIter != danmakuList.cend()) {
+            painter.drawText(0, 0, videoCanvas->width(), videoCanvas->height(), Qt::AlignBottom,
+                QString::asprintf("Tracks %d Progress %lf to %lf Danmaku %lf %s", 
+                    int(danmakuTracks.size()), player->position(), player->duration(),
+                    danmakuIter->position, danmakuIter->text.toUtf8().constData()
+                )
+            );
+        }
+        else {
+            painter.drawText(0, 0, videoCanvas->width(), videoCanvas->height(), Qt::AlignBottom,
+                QString::asprintf("Tracks %d Progress %lf to %lf", 
+                    int(danmakuTracks.size()), player->position(), player->duration()
+                )
+            );
+        }
     }
 
     // Then paint danmaku
@@ -118,18 +128,33 @@ void VideoCanvasPrivate::paintDanmaku(QPainter &painter) {
         for (auto &node : tracks) {
             painter.setFont(node.font);
 
-            painter.setPen(Qt::gray);
+            painter.setPen(Qt::darkGray);
             painter.drawStaticText(node.x + 1, node.y + 1, node.text);
 
             painter.setPen(node.data->color);
             painter.drawStaticText(node.x, node.y, node.text);
         }
     }
+
+    qreal screenWidth = videoCanvas->width();
+    for (auto &node : danmakuTopBottomTrack) {
+        qreal x = (screenWidth / 2) - (node.w / 2);
+        qreal y = node.y;
+
+        painter.setFont(node.font);
+
+        painter.setPen(Qt::darkGray);
+        painter.drawStaticText(x + 1, y + 1, node.text);
+
+        painter.setPen(node.data->color);
+        painter.drawStaticText(x, y, node.text);
+    }
+
     painter.restore();
 }
 void VideoCanvasPrivate::resizeTracks() {
     qreal height = videoCanvas->height();
-    int num = height / DanmakuItem::Medium * danmakuScale;
+    int num = height / (DanmakuItem::Medium * danmakuScale + danmakuSpacing);
     danmakuTracks.resize(num);
 }
 void VideoCanvasPrivate::timerEvent(QTimerEvent *event) {
@@ -148,7 +173,7 @@ void VideoCanvasPrivate::timerEvent(QTimerEvent *event) {
     if (danmakuIter != danmakuList.cend() && std::abs(diff) < 5) {
         if (std::abs(diff) > 10) {
             // Too big
-            qDebug() << diff;
+            qWarning() << diff;
         }
 
         while (danmakuIter->position < position && danmakuIter != danmakuList.cend()) {
@@ -166,7 +191,7 @@ void VideoCanvasPrivate::timerEvent(QTimerEvent *event) {
 
             iter->x -= (width + iter->w) / danmakuAliveTime / danmakuFps;      
                   // item.setSize(size);
-            qDebug() << "Move To" << iter->x << " " << iter->h;
+            // qDebug() << "Move To" << iter->x << " " << iter->h;
 
             if (iter->x + iter->w < -100) {
                 // Out of range, drop
@@ -177,17 +202,28 @@ void VideoCanvasPrivate::timerEvent(QTimerEvent *event) {
             }
         }
     }
+    // Check the danmaku still alive
+    for (auto iter = danmakuTopBottomTrack.begin(); iter != danmakuTopBottomTrack.end(); ) {
+        if (std::abs(position - iter->data->position) > danmakuAliveTime) {
+            // Out of range, drop
+            iter = danmakuTopBottomTrack.erase(iter);
+        }
+        else {
+            ++iter;
+        }
+    }
+
     videoCanvas->update();
 }
 void VideoCanvasPrivate::addDanmaku() {
     auto &dan = *danmakuIter;
 
     QFont font = danmakuFont;
-    font.setPointSize(danmakuScale * int(dan.size));
+    font.setPixelSize(danmakuScale * int(dan.size));
 
-    QFontMetrics metrics(font);
+    QFontMetricsF metrics(font);
 
-    QSize size = metrics.size(Qt::TextSingleLine, dan.text);
+    QSizeF size = metrics.size(Qt::TextSingleLine, dan.text);
     qreal width = size.width();
     qreal height = size.height();
 
@@ -227,6 +263,85 @@ void VideoCanvasPrivate::addDanmaku() {
         }
         // Drop
     }
+    else if (dan.isTop()) {
+        // form Top to bottom (begin to end)
+        item.w = width;
+        item.h = height;
+        qreal x = 0;
+        qreal y = 0;
+        if (!danmakuTopBottomTrack.empty()) {
+            for (auto iter = danmakuTopBottomTrack.begin(); iter != danmakuTopBottomTrack.end(); ++iter) {
+                if (y >= iter->y + iter->h || iter->y >= y + height) {
+                    // Not in range, has space
+                    item.x = x;
+                    item.y = y;
+
+                    danmakuTopBottomTrack.insert(iter, std::move(item));
+                    return;
+                }
+                y += qMax(height, iter->h);
+                y += danmakuSpacing;
+            }
+            // Check if out of the bounds
+            if (y + height <= videoCanvas->height()) {
+                item.x = x;
+                item.y = y;
+
+                danmakuTopBottomTrack.push_back(std::move(item));
+            }
+        }
+        else {
+            item.x = x;
+            item.y = y;
+
+            danmakuTopBottomTrack.push_front(std::move(item));
+            return;
+        }
+        // Drop
+    }
+    else if (dan.isBottom()) {
+        // form Bottom to top (end to begin)
+        item.w = width;
+        item.h = height;
+        qreal x = 0;
+        qreal y = videoCanvas->height() - height;
+        if (!danmakuTopBottomTrack.empty()) {
+            for (auto iter = danmakuTopBottomTrack.rbegin(); iter != danmakuTopBottomTrack.rend(); ++iter) {
+                if (y >= iter->y + iter->h || iter->y >= y + height) {
+                    // Not in range, has space
+                    item.x = x;
+                    item.y = y;
+
+                    danmakuTopBottomTrack.insert(iter.base(), std::move(item));
+                    return;
+                }
+                y -= qMax(height, iter->h);
+                y -= danmakuSpacing;
+            }
+            // Check if out of the bounds
+            if (y >= 0) {
+                item.x = x;
+                item.y = y;
+
+                danmakuTopBottomTrack.push_front(std::move(item));
+            }
+        }
+        else {
+            item.x = x;
+            item.y = y;
+
+            danmakuTopBottomTrack.push_back(std::move(item));
+            return;
+        }
+        // Drop
+    }
+    qDebug() << "Danmaku drop " << dan.text;
+}
+void VideoCanvasPrivate::clearTracks() {
+    for (auto &track : danmakuTracks) {
+        track.clear();
+    }
+    danmakuTopBottomTrack.clear();
 }
 void VideoCanvasPrivate::_on_playerStateChanged(NekoMediaPlayer::PlaybackState state) {
     switch (state) {
@@ -245,6 +360,8 @@ void VideoCanvasPrivate::_on_playerStateChanged(NekoMediaPlayer::PlaybackState s
             if (danmakuTimer != 0) {
                 killTimer(danmakuTimer);
                 danmakuTimer = 0;
+
+                // clearTracks();
             }
             break;
         }

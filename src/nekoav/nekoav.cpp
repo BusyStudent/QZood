@@ -69,7 +69,7 @@ AVPacket *PacketQueue::get(bool block) {
 
 // AudioThread    
 AudioThread::AudioThread(DemuxerThread *parent, AVStream *stream, AVCodecContext *ctxt) 
-    : QObject(parent), 
+    : QObject(), 
       stream(stream), 
       codecCtxt(ctxt),
       audioOutput(parent->audioOutput())
@@ -793,7 +793,7 @@ bool DemuxerThread::waitForEvent(std::chrono::milliseconds ms) {
 }
 void DemuxerThread::doUpdateClock() {
     qreal curPos = position();
-    if (abs(curPos - curPosition) > 1) {
+    if (abs(curPos - curPosition) >= 1) {
         // Time to update
         curPosition = curPos;
 
@@ -850,7 +850,7 @@ void MediaPlayerPrivate::load() {
         );
 
         demuxerThread->start(QThread::HighPriority);
-    });
+    }, Qt::QueuedConnection);
 }
 void MediaPlayerPrivate::play() {
     load();

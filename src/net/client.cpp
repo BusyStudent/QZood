@@ -1,4 +1,5 @@
 #include "client.hpp"
+#include <QApplication>
 
 
 NetPromiseHelper::NetPromiseHelper(QObject *p) : QObject(p) {
@@ -29,4 +30,37 @@ QByteArray RandomUserAgent() {
     // 随机选择一个UserAgent并返回
     int index = ::rand() %  (sizeof(userAgents) / sizeof(void*));
     return userAgents[index];
+}
+
+static QList<VideoInterface *(*)()> &GetVideoCreateList() {
+    static QList<VideoInterface *(*)()> list;
+    return list;
+}
+static bool VideoInited = false;
+
+QList<VideoInterface*> &GetVideoInterfaceList() {
+    static QList<VideoInterface*> list;
+    return list;
+}
+void RegisterVideoInterface(VideoInterface *(*fn)()) {
+    if (!VideoInited) {
+        // Not inited, just add into list
+        GetVideoCreateList().push_back(fn);
+    }
+    else {
+        auto interface = fn();
+        GetVideoInterfaceList().push_back(interface);
+
+        interface->setParent(qApp);
+    }
+}
+void InitializeVideoInterface() {
+    VideoInited = true;
+    auto &objects = GetVideoInterfaceList();
+    for (auto fn : GetVideoCreateList()) {
+        auto interface = fn();
+        objects.push_back(interface);
+
+        interface->setParent(qApp);
+    }
 }

@@ -8,7 +8,7 @@
 #include "dm.pb.h"
 #endif
 
-BiliClient::BiliClient(QObject *parent) : VideoInterface(parent) {
+BiliClient::BiliClient(QObject *parent) : QObject(parent) {
 
 }
 BiliClient::~BiliClient() {
@@ -192,7 +192,27 @@ NetResult<QString> BiliClient::convertToCid(const QString &bvid) {
     auto reply = manager.get(request);
 
     connect(reply, &QNetworkReply::finished, this, [this, reply, result]() mutable {
-        _on_videoCidReplyReady(result, reply);
+        Result<QString> cid;
+
+        reply->deleteLater();
+        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) == 200) {
+            QJsonParseError error;
+            auto doc = QJsonDocument::fromJson(reply->readAll(), &error);
+
+            qDebug() << doc;
+
+            if (!doc.isEmpty()) {
+                if (doc["code"] == 0) {
+                    cid = QString::number(doc["data"][0]["cid"].toInt());
+                }
+                else {
+                    // Error
+                    ZOOD_QLOG("Failed to fetch message %1", doc["message"].toString());
+                }
+            }
+        }
+
+        result.putResult(cid);
     });
 
     return result;
@@ -236,28 +256,59 @@ NetResult<BiliVideoSource> BiliClient::fetchVideoSource(const QString &cid, cons
 
     return result;
 }
-void    BiliClient::_on_videoCidReplyReady(NetResult<QString> &result, QNetworkReply *reply) {
-    Result<QString> cid;
+NetResult<BiliBangumi> BiliClient::fetchBangumiInternal(const QString &seasonID, const QString &episodeID) {
+    QString url = QString("https://api.bilibili.com/pgc/view/web/season?");
+    if (!seasonID.isEmpty()) {
+        url += "season_id=";
+        url += seasonID;
+    }
+    else {
+        url += "ep_id=";
+        url += episodeID;
+    }
+    
+    auto result = NetResult<BiliBangumi>::Alloc();
 
-    reply->deleteLater();
-    if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) == 200) {
-        QJsonParseError error;
-        auto doc = QJsonDocument::fromJson(reply->readAll(), &error);
-
-        qDebug() << doc;
-
-        if (!doc.isEmpty()) {
+    fetchFile(url).then([result](const Result<QByteArray> &data) mutable {
+        Result<BiliBangumi> ban;
+        if (data) {
+            QJsonParseError error;
+            auto doc = QJsonDocument::fromJson(data.value(), &error);
             if (doc["code"] == 0) {
-                cid = QString::number(doc["data"][0]["cid"].toInt());
-            }
-            else {
-                // Error
-                ZOOD_QLOG("Failed to fetch message %1", doc["message"].toString());
+                BiliBangumi bangumi;
+
+                auto result = doc["result"];
+
+                bangumi.alias = result["alias"].toString();
+                bangumi.cover = result["cover"].toString();
+                bangumi.evaluate = result["evaluate"].toString();
+                bangumi.title = result["title"].toString();
+                bangumi.jpTitle  = result["jp_title"].toString();
+
+                for (auto elem : result["episodes"].toArray()) {
+                    BiliEpisode eps;
+                    auto object = elem.toObject();
+
+                    eps.bvid = object["bvid"].toString();
+                    eps.cid = QString::number(object["cid"].toInteger());
+                    eps.duration = object["duration"].toInteger();
+
+                    eps.cover = object["cover"].toString();
+
+                    eps.longTitle = object["long_title"].toString();
+                    eps.title = object["title"].toString();
+                    eps.subtitle = object["subtitle"].toString();
+
+                    bangumi.episodes.push_back(eps);
+                }
+
+                ban = bangumi;
             }
         }
-    }
+        result.putResult(ban);
+    });
 
-    result.putResult(cid);
+    return result;
 }
 
 // Parse Utils
@@ -271,4 +322,113 @@ Result<QString> BiliClient::parseBvid(const QString &url) {
         return std::nullopt;
     }
     return url.mid(bvbegin, bvend - bvbegin);
+}
+BiliUrlParse    BiliClient::parseUrl(const QString &url) {
+    BiliUrlParse result;
+    
+    // BVID here
+    int bvbegin = url.indexOf("BV");
+    if (bvbegin >= 0) {
+        int bvend = url.indexOf("/", bvbegin);
+        if (bvend >= 0) {
+            result.bvid = url.mid(bvbegin, bvend - bvbegin);
+        }
+    }
+    if (url.contains("bangumi")) {
+        // Url like this 
+        // https://www.bilibili.com/bangumi/play/ep732395?sxxx
+        // Season ID here
+        int ssbegin = url.indexOf("ss");
+        if (ssbegin >= 0) {
+            QString seasonID;
+            int ssend = url.indexOf("?", ssend);
+
+            // Skip SS prefix
+            if (ssend >= 0) {
+                seasonID = url.mid(ssbegin + 2, ssend - ssbegin - 2);
+            }
+            else {
+                seasonID = url.mid(ssbegin + 2);
+            }
+
+            // Check can onvert to number
+            bool ok;
+            seasonID.toInt(&ok);
+            if (ok) {
+                result.seasonID = seasonID;
+            }
+        }
+
+        // Episode id here, as same as Season ID
+        int epbegin = url.indexOf("ep");
+        if (epbegin >= 0) {
+            QString episodeID;
+            int epend = url.indexOf("?", epbegin);
+
+            if (epend >= 0) {
+                episodeID = url.mid(epbegin + 2, epend - epbegin - 2);
+            }
+            else {
+                episodeID = url.mid(epbegin + 2);
+            }
+
+            bool ok;
+            episodeID.toInt(&ok);
+            if (ok) {
+                result.episodeID = episodeID;
+            }
+        }
+    }
+
+    return result;
+}
+
+// Convert Utils
+
+// From https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/docs/other/bvid_desc.md
+
+static constexpr char table[] = "fZodR9XQDSUm21yCkr6zBqiveYah8bt4xsWpHnJE7jL5VG3guMTKNPAwcF"; // 码表
+static constexpr uint64_t XOR = 177451812; // 固定异或值
+static constexpr uint64_t ADD = 8728348608; // 固定加法值
+static constexpr int s[] = {11, 10, 3, 8, 4, 6}; // 位置编码表
+// static char trTable[124]; // 反查码表
+static constexpr char trTable [74] = {
+    13, 12, 46, 31, 43, 18, 40, 28,  5,  0,  0,  0,  0,  0,  0,  0, 54, 20, 15, 8,
+    39, 57, 45, 36,  0, 38, 51, 42, 49, 52,  0, 53,  7,  4,  9, 50, 10, 44, 34, 6,
+    25,  1,  0,  0,  0,  0,  0,  0, 26, 29, 56,  3, 24,  0, 47, 27, 22, 41, 16, 0,
+    11, 37,  2, 35, 21, 17, 33, 30, 48, 23, 55, 32, 14, 19,
+};
+
+
+// 初始化反查码表
+static void tr_init() {
+	// for (int i = 0; i < 58; i++)
+	// 	trTable[table[i]] = i;
+}
+
+QString  BiliClient::avidToBvid(uint64_t av) {
+    tr_init();
+
+	char *result = (char*)::malloc(13);
+	::strcpy(result,"BV1  4 1 7  ");
+	av = (av ^ ::XOR) + ::ADD;
+	for (int i = 0; i < 6; i++)
+		result[s[i]] = ::table[(uint64_t)(av / (uint64_t)::pow(58, i)) % 58];
+    auto ret = QString::fromLocal8Bit(result);
+    ::free(result);
+	return ret;
+}
+uint64_t BiliClient::bvidToAvid(const QString &bvid) {
+    tr_init();
+
+    auto u8 = bvid.toUtf8();
+    auto bv = u8.constData();
+
+    uint64_t r = 0;
+	uint64_t av;
+	for (int i = 0; i < 6; i++)
+		r += trTable[bv[s[i]]] * (uint64_t)pow(58, i);
+	av = (r - ::ADD) ^ ::XOR;
+	return av;
+
 }

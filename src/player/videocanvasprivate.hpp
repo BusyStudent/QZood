@@ -21,6 +21,7 @@ class DanmakuPaintItem final {
 };
 
 using DanmakuTracks = std::list<std::list<DanmakuPaintItem>>;
+using DanmakuTrack  = std::list<DanmakuPaintItem>;
 
 class VideoCanvasPrivate final : public QObject {
     Q_OBJECT
@@ -47,16 +48,18 @@ class VideoCanvasPrivate final : public QObject {
         qreal               danmakuFps   = 60;
         qreal               danmakuScale = 0.8; //< Scale factor for danmaku.  1.0 = 100% scale.  0.0 = normal scale.
         qreal               danmakuAliveTime = 10.0; //< Alive of a danmaku
-        qreal               danmakuSpacing = 2.0; //< Spacing 
-        qreal               danmakuOpacity = 1.0; //< Opacity
+        qreal               danmakuSpacing = 6.0; //< Spacing 
+        qreal               danmakuOpacity = 0.8; //< Opacity
         bool                danmakuPlaying = false; //< Is danmaku playing?
         DanmakuList         danmakuList; //< The list of danmaku to display.
         DanmakuTracks       danmakuTracks; //< The list of QGraphicsTextItem to display.  Each QTextItem is a danmaku.
+        DanmakuTrack        danmakuTopBottomTrack; //< Botttom danmaku
         DanmakuList::const_iterator danmakuIter; //< The iterator of current position
 
         void paint(QPainter &);
         void paintDanmaku(QPainter &);
         void resizeTracks();
+        void clearTracks();
     protected:
         void timerEvent(QTimerEvent *) override;
     private:

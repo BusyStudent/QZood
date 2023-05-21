@@ -14,8 +14,36 @@ class BiliVideoSource final {
         QStringList urls;
         QByteArray referHeader; //< Header of refer
 };
+class BiliUrlParse final {
+    public:
+        QString bvid;      //< BVXXX
+        QString seasonID;  //< ID of season, juat number, like 1234
+        QString episodeID; //< ID of episode, juat number, like 1234
+};
+class BiliEpisode final {
+    public:
+        QString bvid; //< BVID 
+        QString cid; //< Cid of episode, juat number, like 1234
+        qreal   duration    = 0;
 
-class BiliClient final : public VideoInterface {
+        QString cover;
+
+        QString subtitle;
+        QString title;
+        QString longTitle;
+};
+class BiliBangumi final {
+    public:
+        QString cover; //< Url of cover
+        QString title;
+        QString alias; //< Alias name
+        QString jpTitle; //< Title in japanese format
+        QString evaluate; //< Evaluate
+
+        QList<BiliEpisode> episodes;
+};
+
+class BiliClient final : public QObject{
     Q_OBJECT
     public:
         BiliClient(QObject *parent = nullptr);
@@ -57,6 +85,20 @@ class BiliClient final : public VideoInterface {
          */
         NetResult<QByteArray>  fetchFile(const QString &url);
         /**
+         * @brief Get bangumi info by episode ID
+         * 
+         * @param episodeID 
+         * @return NetResult<BiliBangumi> 
+         */
+        NetResult<BiliBangumi> fetchBangumiByEpisodeID(const QString &episodeID);
+        /**
+         * @brief Get bangumi info by season ID
+         * 
+         * @param seasonID 
+         * @return NetResult<BiliBangumi> 
+         */
+        NetResult<BiliBangumi> fetchBangumiBySeasonID(const QString &seasonID);
+        /**
          * @brief fetch danmaku video info
          * 
          * @param bvid The bvid of the video
@@ -86,8 +128,25 @@ class BiliClient final : public VideoInterface {
          * @return Result<QString> 
          */
         Result<QString> parseBvid(const QString &url);
+        /**
+         * @brief Parse url from bilibili, get bvid ssid epid from the url
+         * 
+         * @param url 
+         * @return BiliUrlParse 
+         */
+        BiliUrlParse    parseUrl(const QString &url);
+
+        static QString  avidToBvid(uint64_t avid);
+        static uint64_t bvidToAvid(const QString &bvid);
     private:
-        void _on_videoCidReplyReady(NetResult<QString> &result, QNetworkReply *reply);
+        NetResult<BiliBangumi> fetchBangumiInternal(const QString &seasonID, const QString &episodeID);
 
         QNetworkAccessManager manager; //< Manager to access it
 };
+
+inline NetResult<BiliBangumi> BiliClient::fetchBangumiByEpisodeID(const QString &episodeID) {
+    return fetchBangumiInternal(QString(), episodeID);
+}
+inline NetResult<BiliBangumi> BiliClient::fetchBangumiBySeasonID(const QString &seasonID) {
+    return fetchBangumiInternal(seasonID, QString());
+}

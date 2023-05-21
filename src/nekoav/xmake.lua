@@ -29,4 +29,6 @@ target("nekoav")
 
     add_files("*.cpp")
     add_files("*.hpp")
+
+    set_license("GPL-2.0")
 target_end()

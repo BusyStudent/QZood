@@ -1,5 +1,6 @@
 #include "testwindow.hpp"
 #include "ui_testwindow.h"
+#include <QKeyEvent>
 #include <QListWidget>
 #include <QDateTime>
 #include <QToolButton>
@@ -40,8 +41,11 @@ void ZoodLogString(const QString &text) {
 	auto date = QDateTime::currentDateTime();
 	auto timestring = date.toString("dd.MM.yyyy hh:mm:ss");
 
-	ui->logConsoleView->addItem(QString("[%1] %2").arg(timestring, text));
+	auto ret = QString("[%1] %2").arg(timestring, text);
+
+	ui->logConsoleView->addItem(ret);
 	ui->logConsoleView->scrollToBottom();
+	ui->statusbar->showMessage(ret, 5);
 }
 
 QWidget* ZoodTestWindow::TerminatorParent() {
@@ -89,7 +93,7 @@ ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui
 			case QtFatalMsg : SetConsoleColor(CONSOLE_RED); printf("qError "); break;
 			case QtInfoMsg : SetConsoleColor(CONSOLE_DEFAULT); printf("qInfo "); break;
 		}
-		printf("%s", msg.toUtf8().data());
+		printf("%s", msg.toLocal8Bit().data());
 
 		SetConsoleColor(CONSOLE_DEFAULT);
 
@@ -110,6 +114,17 @@ void ZoodTestWindow::ItemClicked(QTreeWidgetItem *item, int column) {
 	currentItem = item;
 }
 
+void ZoodTestWindow::keyPressEvent(QKeyEvent *event) {
+	if (event->key() == Qt::Key_F11) {
+		if (window()->isFullScreen()) {
+			window()->showNormal();
+		}
+		else {
+			window()->showFullScreen();
+		}
+	}
+}
+
 ZoodTestWindow::~ZoodTestWindow() {
-		delete static_cast<Ui::MainWindow*>(ui);
+	delete static_cast<Ui::MainWindow*>(ui);
 }

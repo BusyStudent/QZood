@@ -8,7 +8,7 @@
 #include "../danmaku.hpp"
 #include "../stl.hpp"
 
-class NetPromiseHelper : public QObject {
+class NetPromiseHelper : public QObject, public std::enable_shared_from_this<NetPromiseHelper> {
     Q_OBJECT
     public:
         NetPromiseHelper(QObject *parent = nullptr);
@@ -46,6 +46,17 @@ class NetPromise {
             });
             return *this;
         }
+        template <typename Object, typename RetT, typename ...Args>
+        NetPromise &then(Object *ctxt, RetT (Object::*fn)(Args ...)) {
+            QObject::connect(helper.get(), &NetPromiseHelper::notify, ctxt, [ctxt, fn](const void *v) mutable {
+                (ctxt->*fn)(*static_cast<const T*>(v));
+            });
+            return *this;
+        }
+        template <typename Object, typename RetT, typename ...Args>
+        NetPromise &then(RetT (Object::*fn)(Args ...), Object *ctxt) {
+            return then(ctxt, fn);
+        }
 
         /**
          * @brief Notify the backend of this result
@@ -56,10 +67,40 @@ class NetPromise {
             helper->doNotify(&value);
             return *this;
         }
+        /**
+         * @brief Notify the backend of this result with Qt::QueuedConnection 
+         * 
+         * @param value 
+         * @return NetPromise& 
+         */
         NetPromise &putLater(const T &value) {
+            putResult(value, Qt::QueuedConnection);
+            return *this;
+        }
+        /**
+         * @brief Notify the backend of this result with giving con type
+         * 
+         * @param value 
+         * @param type 
+         * @return NetPromise& 
+         */
+        NetPromise &putResult(const T &value, Qt::ConnectionType type) {
             QMetaObject::invokeMethod(helper.get(), [h = this->helper, value]() {
                 h->doNotify(&value);
-            }, Qt::QueuedConnection);
+            }, type);
+            return *this;
+        }
+        /**
+         * @brief Cancel it
+         * 
+         * @return NetPromise& 
+         */
+        NetPromise &cancel() {
+            helper->disconnect();
+            return *this;
+        }
+        NetPromise &moveToThread(QThread *thread) {
+            helper->moveToThread(thread);
             return *this;
         }
 
@@ -75,32 +116,74 @@ class NetPromise {
         NetPromise &operator =(const NetPromise &) = default;
         NetPromise &operator =(NetPromise &&) = default;
     private:
-        NetPromise(std::shared_ptr<NetPromiseHelper> &&h) : helper(h) { }
+        NetPromise(RefPtr<NetPromiseHelper> &&h) : helper(h) { }
         
-        std::shared_ptr<NetPromiseHelper> helper;
+        RefPtr<NetPromiseHelper> helper;
 };
 template <typename T>
-using AsyncResult = NetPromise<Result<T>>;
+using AsyncResult = NetPromise<Result<T> >;
 template <typename T>
-using NetResult = NetPromise<Result<T>>;
+using NetResult = NetPromise<Result<T> >;
+template <typename T>
+using NetResultPtr = NetPromise<ResultPtr<T> >;
 
-// Video Interface
-class VideoSource     : public QObject {
+/**
+ * @brief 
+ * 
+ */
+class VideoSource : public QObject {
     Q_OBJECT
     public:
         using QObject::QObject;
+
+        /**
+         * @brief Get detail url
+         * 
+         * @return NetResult<QString> 
+         */
+        virtual NetResult<QString> url(size_t index = 0) = 0;
 };
-class VideoCollection : public QObject {
+/**
+ * @brief Interface for Video 
+ * 
+ */
+class VideoList  : public QObject {
     Q_OBJECT
     public:
         using QObject::QObject;
+
+        virtual NetResultPtr<VideoSource> fechVideoSource() = 0;
+        virtual NetResult<QImage>         cover() = 0;
+        virtual QString                   name() = 0;
+        virtual QString                   description() = 0;
 };
+/**
+ * @brief Interface for searching video sources
+ * 
+ */
 class VideoInterface : public QObject  {
     Q_OBJECT
     public:
         using QObject::QObject;
+
+        /**
+         * @brief Do search videos
+         * 
+         * @param video 
+         * @return NetResultPtr<VideoList> 
+         */
+        virtual NetResultPtr<VideoList> searchVideo(const QString& video) = 0;
+        virtual QString                 name()                            = 0;
 };
 
+
+#define ZOOD_VIDEO_INTERFACE(name) \
+    static bool video__init_##name = []() {              \
+        RegisterVideoInterface([]() -> VideoInterface *{ \
+            return new name();                           \
+        });                                              \
+        return true;                                     \
+    }();                           
 
 /**
  * @brief Get An random useragent
@@ -108,3 +191,6 @@ class VideoInterface : public QObject  {
  * @return QByteArray 
  */
 QByteArray RandomUserAgent();
+void       RegisterVideoInterface(VideoInterface *(*fn)());
+void       InitializeVideoInterface();
+QList<VideoInterface*> &GetVideoInterfaceList();

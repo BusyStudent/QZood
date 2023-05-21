@@ -21,9 +21,10 @@ class ZoodTestWindow : public QMainWindow {
         ~ZoodTestWindow();
         QWidget* TerminatorParent();
 
-		public Q_SLOTS:
+    public Q_SLOTS:
 		void ItemClicked(QTreeWidgetItem *item, int column);
-
+    protected:
+        void keyPressEvent(QKeyEvent *) override;
     private:
         void *ui = nullptr;
 		QMap<QTreeWidgetItem*, QWidget*> items;
