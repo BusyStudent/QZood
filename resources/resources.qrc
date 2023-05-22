@@ -1,14 +1,17 @@
-<!DOCTYPE RCC><RCC version="1.0">
-    <qresource prefix="/icons">
-        <file alias="close.png">icons/close.png</file>
-        <file alias="cross.png">icons/cross.png</file>
-        <file alias="maximize.png">icons/maximize.png</file>
-        <file alias="minimize.png">icons/minimize.png</file>
-        <file alias="minus.png">icons/minus.png</file>
-        <file alias="search.png">icons/search.png</file>
-        <file alias="home.png">icons/home.png</file>
-        <file alias="localFile.png">icons/file-management.png</file>
-        <file alias="history.png">icons/history.png</file>
-        <file alias="settings.png">icons/settings.png</file>
-    </qresource>
+<RCC>
+  <qresource prefix="/icons">
+    <file alias="night_mode.png">icons/night-mode.png</file>
+    <file alias="user.png">icons/user.png</file>
+    <file alias="back.png">icons/left.png</file>
+    <file alias="close.png">icons/close.png</file>
+    <file alias="cross.png">icons/cross.png</file>
+    <file alias="maximize.png">icons/maximize.png</file>
+    <file alias="minimize.png">icons/minimize.png</file>
+    <file alias="minus.png">icons/minus.png</file>
+    <file alias="search.png">icons/search.png</file>
+    <file alias="home.png">icons/home.png</file>
+    <file alias="localFile.png">icons/file-management.png</file>
+    <file alias="history.png">icons/history.png</file>
+    <file alias="settings.png">icons/settings.png</file>
+  </qresource>
 </RCC>

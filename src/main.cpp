@@ -37,8 +37,5 @@ int main(int argc, char **argv) {
     OpenTerminal(twin.TerminatorParent());
     twin.show();
 
-	Zood zood;
-	zood.show();
-
     return a.exec();
 }
