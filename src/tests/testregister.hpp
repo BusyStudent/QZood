@@ -47,14 +47,14 @@ enum TestType {
       
 #define ZOOD_TEST_W(module_name,test_name) ZOOD_TEST_BODY(module_name,test_name,TestType::WIDGET_W)
 
-#define ZOOD_TEST_C(module_name,test_name) static void *test__##module_name ## _##test_name (const int id);                                          \
+#define ZOOD_TEST_C(module_name,test_name) static void *test__##module_name ## _##test_name (const int id);   \
     static bool test__init_##module_name ## _##test_name = []() {                                             \
         ZoodRegisterTest(#module_name, #test_name, TestType::CMD, test__##module_name ## _##test_name);       \
         return true;                                                                                          \
     }();                                                                                                      \
     static void test__##module_name ## _##test_name ##_imp (const int id);                                    \
     static void *test__##module_name ## _##test_name (const int id) {                                         \
-        INIT_TEST_START(module_name,test_name,TestType::CMD);                                                          \
+        INIT_TEST_START(module_name,test_name,TestType::CMD);                                                 \
         test__##module_name ## _##test_name ## _imp(id);                                                      \
         INIT_TEST_END(module_name,test_name);                                                                 \
         return nullptr;                                                                                       \

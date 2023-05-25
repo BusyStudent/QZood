@@ -53,15 +53,21 @@ void ZoodLogString(const QString &text) {
 	if (!test_window) {
 		return;
 	}
-	auto ui = static_cast<Ui::MainWindow*>(test_window->ui);
 	auto date = QDateTime::currentDateTime();
 	auto timestring = date.toString("dd.MM.yyyy hh:mm:ss");
 
 	auto ret = QString("[%1] %2").arg(timestring, text);
 
-	ui->logConsoleView->addItem(ret);
-	ui->logConsoleView->scrollToBottom();
-	ui->statusbar->showMessage(ret, 5);
+    QMetaObject::invokeMethod(
+        test_window,
+        [=]() {
+            auto ui = static_cast<Ui::MainWindow*>(test_window->ui);
+            ui->logConsoleView->addItem(ret);
+            ui->logConsoleView->scrollToBottom();
+            ui->statusbar->showMessage(ret, 5);
+        },
+        Qt::QueuedConnection
+    );
 }
 
 QWidget* ZoodTestWindow::TerminatorParent() {
@@ -70,16 +76,6 @@ QWidget* ZoodTestWindow::TerminatorParent() {
     return dui->consoleView;
 }
 
-void Worker::setTask(std::function<void*()> task) {
-        this->task = task;
-}
-
-void Worker::run() {
-    // 执行任务
-    auto result = task();
-    // 发出信号
-    emit finished(result);
-}
 
 ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow) {
 	auto dui = static_cast<Ui::MainWindow*>(ui);
@@ -115,6 +111,14 @@ ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui
 
 		printf("\n");
 	});
+
+    // Start Test Thread
+    cmdWorkerThread = new QThread();
+    cmdWorkerThread->setObjectName("cmdWorkerThread");
+    cmdWorkerThread->start();
+
+    cmdHelperObject = new QObject();
+    cmdHelperObject->moveToThread(cmdWorkerThread);
 }
 
 void ZoodTestWindow::showEvent(QShowEvent* event) {
@@ -156,6 +160,7 @@ void ZoodTestWindow::RunAllTest() {
             if (wi) {
                 auto widget = static_cast<QWidget*>(wi);
                 widget->show();
+                widget->setAttribute(Qt::WA_DeleteOnClose);
                 connect(widget, &QWidget::destroyed, this, [item, test_task](){
                     if (TestFlag(test_task.id)) {
                         item->setText(1, "finished");
@@ -167,20 +172,18 @@ void ZoodTestWindow::RunAllTest() {
                 });
             }
         } else if (test_task.type == TestType::CMD) {
-            auto worker = new Worker([item, dui, test_task, this]() -> void*{
-                return test_task.task();
+            QMetaObject::invokeMethod(cmdHelperObject, [item, dui, test_task, this] {
+                test_task.task();
+                QMetaObject::invokeMethod(test_window, [=]() {
+                    if (TestFlag(test_task.id)) {
+                        item->setText(1, "finished");
+                        item->setForeground(1, QColor("#008000"));
+                    } else {
+                        item->setText(1, "falied");
+                        item->setForeground(1, QColor("#b22222"));
+                    }
+                });
             });
-            connect(worker, &Worker::finished, [item, worker, test_task](void *){
-                if (TestFlag(test_task.id)) {
-                    item->setText(1, "finished");
-                    item->setForeground(1, QColor("#008000"));
-                } else {
-                    item->setText(1, "falied");
-                    item->setForeground(1, QColor("#b22222"));
-                }
-                worker->deleteLater();
-            });
-            worker->start();
         }
 	}
 }
@@ -212,5 +215,9 @@ void ZoodTestWindow::keyPressEvent(QKeyEvent *event) {
 }
 
 ZoodTestWindow::~ZoodTestWindow() {
+    cmdWorkerThread->exit();
+    cmdWorkerThread->wait();
+    delete cmdWorkerThread;
+    delete cmdHelperObject;
 	delete static_cast<Ui::MainWindow*>(ui);
 }

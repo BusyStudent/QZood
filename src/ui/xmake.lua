@@ -6,9 +6,6 @@ if is_host("windows") then
     add_cxxflags("cl::/utf-8")
 end 
 
-add_requires("libxml2")
-add_packages("libxml2")
-
 target("ui")
  	add_rules("qt.static")
 	add_frameworks("QtCore", "QtGui", "QtWidgets")

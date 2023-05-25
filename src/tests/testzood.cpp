@@ -1,5 +1,5 @@
 #include "../ui/zood/zood.hpp"
-#include "testwindow.hpp"
+#include "testregister.hpp"
 #include "../net/bilibili.hpp"
 
 ZOOD_TEST_W(Ui, zoodTest) {

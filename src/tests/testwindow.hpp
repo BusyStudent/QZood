@@ -8,22 +8,6 @@
 #include "../log.hpp"
 #include "testregister.hpp"
 
-class Worker : public QThread {
-    Q_OBJECT
-
-public:
-    Worker() = default;
-    Worker(std::function<void*()> task) : task(task) {}
-    void run() override;
-    void setTask(std::function<void*()> task);
-
-Q_SIGNALS:
-    void finished(void *);
-
-private:
-    std::function<void*()> task;
-};
-
 
 class ZoodTestWindow : public QMainWindow {
     Q_OBJECT
@@ -45,5 +29,7 @@ class ZoodTestWindow : public QMainWindow {
         void *ui = nullptr;
 		QMap<QTreeWidgetItem*, QObject*> items;
 		QTreeWidgetItem* currentItem = nullptr;
+        QThread        * cmdWorkerThread = nullptr;
+        QObject        * cmdHelperObject = nullptr;
     friend void ZoodLogString(const QString &text);
 };

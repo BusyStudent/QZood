@@ -2,7 +2,10 @@
 
 #include <QObject>
 #include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
 #include "client.hpp"
+#include "../danmaku.hpp"
 
 class BiliVideoInfo final {
     public:
@@ -22,6 +25,7 @@ class BiliUrlParse final {
 };
 class BiliEpisode final {
     public:
+        QString id; //< ID of episode, juat number, like 1234
         QString bvid; //< BVID 
         QString cid; //< Cid of episode, juat number, like 1234
         qreal   duration    = 0;
@@ -34,14 +38,18 @@ class BiliEpisode final {
 };
 class BiliBangumi final {
     public:
+        QString seasonID; //< ID of season, juat number, like 1234
         QString cover; //< Url of cover
         QString title;
         QString alias; //< Alias name
         QString jpTitle; //< Title in japanese format
+        QString orgTitle; //< Org title
         QString evaluate; //< Evaluate
 
         QList<BiliEpisode> episodes;
 };
+
+using BiliBangumiList = QList<BiliBangumi>;
 
 class BiliClient final : public QObject{
     Q_OBJECT
@@ -114,6 +122,13 @@ class BiliClient final : public QObject{
          */
         NetResult<BiliVideoSource> fetchVideoSource(const QString &cid, const QString &bvid);
         /**
+         * @brief Seaech for bangumi
+         * 
+         * @param what 
+         * @return NetResult<BiliBangumiList> 
+         */
+        NetResult<BiliBangumiList> searchBangumi(const QString &what);
+        /**
          * @brief Convert bvid or avid to cid
          * 
          * @param bvid 
@@ -140,8 +155,10 @@ class BiliClient final : public QObject{
         static uint64_t bvidToAvid(const QString &bvid);
     private:
         NetResult<BiliBangumi> fetchBangumiInternal(const QString &seasonID, const QString &episodeID);
+        void                   fetchCookie();
 
         QNetworkAccessManager manager; //< Manager to access it
+        bool                  hasCookie = false; //< Try Get the cookie
 };
 
 inline NetResult<BiliBangumi> BiliClient::fetchBangumiByEpisodeID(const QString &episodeID) {

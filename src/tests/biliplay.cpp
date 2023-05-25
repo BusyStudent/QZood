@@ -1,7 +1,7 @@
 #include "../player/videocanvas.hpp"
 #include "../net/bilibili.hpp"
 #include "../log.hpp"
-#include "testwindow.hpp"
+#include "testregister.hpp"
 #include "ui_biliplay.h"
 
 #include <QInputDialog>
@@ -66,6 +66,15 @@ ZOOD_TEST(Network, BiliPlay) {
                 play.progressSlider->setDisabled(true);
                 break;
             }
+        }
+    });
+    QObject::connect(play.muteButton, &QPushButton::clicked, [=]() { 
+        audioOutput->setMuted(!audioOutput->isMuted());
+        if (audioOutput->isMuted()) {
+            play.muteButton->setText("Clear Mute");
+        }
+        else {
+            play.muteButton->setText("Mute");
         }
     });
     QObject::connect(play.loadButton, &QPushButton::clicked, [=]() mutable {

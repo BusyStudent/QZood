@@ -31,6 +31,13 @@
       </widget>
      </item>
      <item>
+      <widget class="QPushButton" name="muteButton">
+       <property name="text">
+        <string>Mute</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QLabel" name="positionLabel">
        <property name="text">
         <string>0</string>

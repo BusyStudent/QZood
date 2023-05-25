@@ -56,3 +56,7 @@ Accept-Encoding: gzip
 https://s.search.bilibili.com/main/suggest?term={{search}}&main_ver=v1
 
 @search=你好
+
+### Timeline
+
+GET https://api.bilibili.com/pgc/web/timeline?types=1&before=7&after=7

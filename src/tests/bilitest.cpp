@@ -1,6 +1,6 @@
 #include <QMessageBox>
 #include <QFileDialog>
-#include "testwindow.hpp"
+#include "testregister.hpp"
 #include "ui_bilitest.h"
 
 #include "../net/bilibili.hpp"
@@ -84,6 +84,20 @@ ZOOD_TEST(Network, Bilibili) {
                 }
                 ui.bigOutEdit->setPlainText(str);
             }
+        });
+    });
+    QObject::connect(ui.searchEdit, &QLineEdit::returnPressed, [=]() {
+        bili->searchBangumi(ui.searchEdit->text()).then([=](const Result<BiliBangumiList> &list){
+            QString str;
+            ui.bigOutEdit->clear();
+            if (!list) {
+                return;
+            }
+            for (auto &ban : list.value()) {
+                str += ("   " + ban.title + "orgTitle :" + ban.orgTitle + "jpTitle :" + ban.jpTitle + "\n");
+                str += ("   Evaluate :" + ban.evaluate + "\n");
+            }
+            ui.bigOutEdit->setPlainText(str);
         });
     });
 

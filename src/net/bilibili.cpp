@@ -1,5 +1,6 @@
 #include "../log.hpp"
 #include "bilibili.hpp"
+#include <QNetworkCookieJar>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -9,7 +10,9 @@
 #endif
 
 BiliClient::BiliClient(QObject *parent) : QObject(parent) {
+    manager.setCookieJar(new QNetworkCookieJar(&manager));
 
+    // Try cookie
 }
 BiliClient::~BiliClient() {
 
@@ -135,7 +138,7 @@ NetResult<QStringList> BiliClient::fetchSearchSuggestions(const QString &text) {
             auto json = QJsonDocument::fromJson(jsondata.value(), &error);
 
             // Debug print
-            qDebug() << "fetchSearchSuggestions reply" << json;
+            // qDebug() << "fetchSearchSuggestions reply" << json;
             if (!json.isNull() && json["code"] == 0) {
                 QStringList v;
                 for (auto item : json["result"]["tag"].toArray()) {
@@ -155,6 +158,8 @@ NetResult<QByteArray> BiliClient::fetchDanmakuXml(const QString &cid) {
     return fetchFile(QString("https://api.bilibili.com/x/v1/dm/list.so?oid=%1").arg(cid));
 }
 NetResult<QByteArray> BiliClient::fetchFile(const QString &url) {
+    qDebug() << "BiliClient::fetchFile " << url;
+
     QNetworkRequest request;
 
     // Mark request
@@ -171,6 +176,9 @@ NetResult<QByteArray> BiliClient::fetchFile(const QString &url) {
         if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) == 200) {
             data = reply->readAll();
         }
+        else {
+            qDebug() << "Failed to fetch " << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+        }
 
         result.putResult(data);
     });
@@ -183,7 +191,7 @@ NetResult<QString> BiliClient::convertToCid(const QString &bvid) {
 
     url += QString("?bvid=%1").arg(bvid);
 
-    qDebug() << "Prepare for " << url;
+    // qDebug() << "Prepare for " << url;
 
     request.setUrl(url);
     request.setRawHeader("User-Agent", RandomUserAgent());
@@ -199,7 +207,7 @@ NetResult<QString> BiliClient::convertToCid(const QString &bvid) {
             QJsonParseError error;
             auto doc = QJsonDocument::fromJson(reply->readAll(), &error);
 
-            qDebug() << doc;
+            // qDebug() << doc;
 
             if (!doc.isEmpty()) {
                 if (doc["code"] == 0) {
@@ -222,7 +230,7 @@ NetResult<BiliVideoSource> BiliClient::fetchVideoSource(const QString &cid, cons
     QString url = QString("https://api.bilibili.com/x/player/playurl?qn=64&cid=%1&bvid=%2").arg(cid, bvid);
 
     
-    qDebug() << "Prepare for " << url;
+    // qDebug() << "Prepare for " << url;
 
     request.setUrl(url);
     request.setRawHeader("User-Agent", RandomUserAgent());
@@ -239,7 +247,7 @@ NetResult<BiliVideoSource> BiliClient::fetchVideoSource(const QString &cid, cons
             QJsonParseError error;
             auto doc = QJsonDocument::fromJson(reply->readAll(), &error);
 
-            qDebug() << doc;
+            // qDebug() << doc;
 
             if (!doc.isEmpty() && doc["code"] == 0) {
                 BiliVideoSource bilisource;
@@ -252,6 +260,62 @@ NetResult<BiliVideoSource> BiliClient::fetchVideoSource(const QString &cid, cons
         }
 
         result.putResult(source);
+    });
+
+    return result;
+}
+NetResult<BiliBangumiList> BiliClient::searchBangumi(const QString &name) {
+    auto result = NetResult<BiliBangumiList>::Alloc();
+    // Todo cookie here
+    fetchFile(QString("https://api.bilibili.com/x/web-interface/search/type?search_type=media_bangumi&keyword=%1").arg(name)).then(this, [result](const Result<QByteArray> &data) mutable {
+        Result<BiliBangumiList> list;
+        if (!data) {
+            result.putResult(list);
+            return;
+        }
+        QJsonParseError error;
+        auto doc = QJsonDocument::fromJson(data.value(), &error);
+
+        if (doc.isEmpty() || !(doc["code"] == 0)) {
+            qDebug() << doc;
+            result.putResult(list);
+            return;
+        }
+
+        BiliBangumiList blist;
+
+        for (auto jitem : doc["data"]["result"].toArray()) {
+            auto item = jitem.toObject();
+
+            BiliBangumi ban;
+            ban.seasonID = QString::number(item["season_id"].toInt());
+            ban.cover = item["cover"].toString();
+            ban.title = item["title"].toString();
+            ban.orgTitle = item["org_title"].toString();
+            ban.evaluate = item["desc"].toString();
+
+            // Clean the title
+            ban.title.replace("\u003cem class=\"keyword\"\u003e", "").replace("\u003c/em\u003e", "");
+            ban.orgTitle.replace("\u003cem class=\"keyword\"\u003e", "").replace("\u003c/em\u003e", "");
+            
+            // For 
+            for (auto jitem : item["eps"].toArray()) {
+                auto ep = jitem.toObject();
+
+                BiliEpisode episode;
+                episode.id = QString::number(ep["id"].toInt());
+                episode.cover = ep["cover"].toString();
+                episode.title = ep["title"].toString();
+                episode.longTitle = ep["long_title"].toString();
+
+                ban.episodes.push_back(episode);
+            }
+
+            blist.push_back(ban);
+        }
+
+        list = blist;
+        result.putResult(list);
     });
 
     return result;
@@ -309,6 +373,12 @@ NetResult<BiliBangumi> BiliClient::fetchBangumiInternal(const QString &seasonID,
     });
 
     return result;
+}
+void BiliClient::fetchCookie() {
+    // TODO Get cookie here
+    fetchFile("https://www.bilibili.com").then(this, [this](const Result<QByteArray> &) {
+        hasCookie = true;
+    });
 }
 
 // Parse Utils

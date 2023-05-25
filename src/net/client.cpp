@@ -51,7 +51,7 @@ void RegisterVideoInterface(VideoInterface *(*fn)()) {
         auto interface = fn();
         GetVideoInterfaceList().push_back(interface);
 
-        interface->setParent(qApp);
+        // interface->setParent(qApp);
     }
 }
 void InitializeVideoInterface() {
@@ -61,6 +61,6 @@ void InitializeVideoInterface() {
         auto interface = fn();
         objects.push_back(interface);
 
-        interface->setParent(qApp);
+        // interface->setParent(qApp);
     }
 }

@@ -1,7 +1,7 @@
 #include "../player/videocanvas.hpp"
 #include "../log.hpp"
 #include "../net/client.hpp"
-#include "testwindow.hpp"
+#include "testregister.hpp"
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QNetworkRequest>

@@ -1,7 +1,7 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QDebug>
-#include "testwindow.hpp"
+#include "testregister.hpp"
 #include "ui_danmakutest.h"
 
 #include "../danmaku.hpp"
