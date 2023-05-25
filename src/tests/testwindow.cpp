@@ -3,6 +3,7 @@
 #include <QKeyEvent>
 #include <QListWidget>
 #include <QDateTime>
+#include <QThreadPool>
 #include <QToolButton>
 
 #if defined(_WIN32)
@@ -22,16 +23,31 @@
 
 #endif
 
+struct TestTask {
+    TestTask() {};
+    TestTask(const uint64_t id,const QString &module_name, const QString &test_name, const TestType type,const std::function<void*()> &task) : 
+        id(id), module_name(module_name),test_name(test_name),type(type),task(task) {}
+    uint64_t id;
+    QString module_name;
+    QString test_name;
+    TestType type;
+    std::function<void*()> task;
+};
 
-static QList<QPair<QString, std::function<QWidget*()>>> &GetList() {
-	static QList<QPair<QString, std::function<QWidget*()>>> lt;
+static QList<TestTask> &GetList() {
+	static QList<TestTask> lt;
 	return lt;
 }
-
+QMap<int, bool>& TestFlags() {
+    static QMap<int, bool> flags;
+    return flags;
+}
 static ZoodTestWindow *test_window = nullptr;
 
-void ZoodRegisterTest(const QString &name, const std::function<QWidget*()> &create) {
-	GetList().push_back(qMakePair(name, create));
+void ZoodRegisterTest(const QString &module_name, const QString &name,const TestType type, const std::function<void*(const int id)> &task) {
+    static uint64_t id = 0;
+    ++id;
+	GetList().push_back(TestTask(id, module_name, name, type, std::bind(task, id)));
 }
 void ZoodLogString(const QString &text) {
 	if (!test_window) {
@@ -54,6 +70,16 @@ QWidget* ZoodTestWindow::TerminatorParent() {
     return dui->consoleView;
 }
 
+void Worker::setTask(std::function<void*()> task) {
+        this->task = task;
+}
+
+void Worker::run() {
+    // 执行任务
+    auto result = task();
+    // 发出信号
+    emit finished(result);
+}
 
 ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui::MainWindow) {
 	auto dui = static_cast<Ui::MainWindow*>(ui);
@@ -68,19 +94,9 @@ ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui
 	connect(clear, &QAction::triggered, dui->logConsoleView, &QListWidget::clear);
 	dui->logConsoleView->addAction(clear);
 		
-    // Register test
-	dui->testList->setHeaderLabel("测试项");
+
 	connect(dui->testList, &QTreeWidget::itemClicked, this, &ZoodTestWindow::ItemClicked);
-	for (const auto &[name, fn] : GetList()) {
-		auto wi = fn();
-		if (!wi) {
-			continue;
-		}
-		QTreeWidgetItem *item = new QTreeWidgetItem(dui->testList);
-		item->setText(0,name);
-		items.insert(item, wi);
-		dui->testUiContainer->addWidget(wi);
-	}
+	
 
 	test_window = this;
 
@@ -101,6 +117,74 @@ ZoodTestWindow::ZoodTestWindow(QWidget *parent) : QMainWindow(parent), ui(new Ui
 	});
 }
 
+void ZoodTestWindow::showEvent(QShowEvent* event) {
+    static bool flag = (RunAllTest(), true);
+    QMainWindow::showEvent(event);
+}
+
+void ZoodTestWindow::RunAllTest() {
+	auto dui = static_cast<Ui::MainWindow*>(ui);
+    
+    // Register test
+	dui->testList->setHeaderLabels(QStringList{"测试列表", "完成进度"});
+    QMap<QString, QTreeWidgetItem*> tree_items;
+    dui->testList->setIndentation(10);
+    for (const auto &test_task : GetList()) {
+        auto item_ = tree_items.find(test_task.module_name);
+        if (item_ == tree_items.end()) {
+            tree_items[test_task.module_name] = new QTreeWidgetItem(dui->testList, QStringList(test_task.module_name));
+        }
+        auto item = new QTreeWidgetItem(tree_items[test_task.module_name], QStringList(test_task.test_name));
+        item->setText(1, "testing");
+        item->setForeground(1, QColor("#daa520"));
+		if (test_task.type == TestType::WIDGET) {
+            auto wi = static_cast<QWidget*>(test_task.task());
+            if (wi) {
+                auto widget = static_cast<QWidget*>(wi);
+                dui->testUiContainer->addWidget(widget);
+                items.insert(item, widget);
+            }
+            if (TestFlag(test_task.id) && wi) {
+                item->setText(1, "finished");
+                item->setForeground(1, QColor("#008000"));
+            } else {
+                item->setText(1, "failed");
+                item->setForeground(1, QColor("#b22222"));
+            }
+        } else if (test_task.type == TestType::WIDGET_W) {
+            auto wi = static_cast<QWidget*>(test_task.task());
+            if (wi) {
+                auto widget = static_cast<QWidget*>(wi);
+                widget->show();
+                connect(widget, &QWidget::destroyed, this, [item, test_task](){
+                    if (TestFlag(test_task.id)) {
+                        item->setText(1, "finished");
+                        item->setForeground(1, QColor("#008000"));
+                    } else {
+                        item->setText(1, "failed");
+                        item->setForeground(1, QColor("#b22222"));
+                    }
+                });
+            }
+        } else if (test_task.type == TestType::CMD) {
+            auto worker = new Worker([item, dui, test_task, this]() -> void*{
+                return test_task.task();
+            });
+            connect(worker, &Worker::finished, [item, worker, test_task](void *){
+                if (TestFlag(test_task.id)) {
+                    item->setText(1, "finished");
+                    item->setForeground(1, QColor("#008000"));
+                } else {
+                    item->setText(1, "falied");
+                    item->setForeground(1, QColor("#b22222"));
+                }
+                worker->deleteLater();
+            });
+            worker->start();
+        }
+	}
+}
+
 void ZoodTestWindow::ItemClicked(QTreeWidgetItem *item, int column) {
 	if (currentItem == item) {
 		return;
@@ -109,7 +193,9 @@ void ZoodTestWindow::ItemClicked(QTreeWidgetItem *item, int column) {
   
 	auto wi = items.find(item);
 	if (wi != items.end()) {
-		dui->testUiContainer->setCurrentWidget(*wi);
+        if ((*wi) && (*wi)->isWidgetType()) {
+    		dui->testUiContainer->setCurrentWidget(static_cast<QWidget*>(*wi));
+        }
 	}
 	currentItem = item;
 }

@@ -6,9 +6,9 @@
 
 #include "../danmaku.hpp"
 
-ZOOD_TEST(DanmakuParse) {
+ZOOD_TEST(Network, DanmakuParse) {
     auto root = new QWidget;
-
+    
     Ui::Form form;
     form.setupUi(root);
 

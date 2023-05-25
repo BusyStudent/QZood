@@ -6,7 +6,7 @@
 
 #include <QInputDialog>
 
-ZOOD_TEST(BiliPlay) {
+ZOOD_TEST(Network, BiliPlay) {
     auto root = new QWidget();
     auto canvas = new VideoCanvas();
     auto player = new NekoMediaPlayer(root);

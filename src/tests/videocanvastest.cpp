@@ -12,7 +12,7 @@
 #include "ui_videocanvastest.h"
 
 
-ZOOD_TEST(VideoCanvas) {
+ZOOD_TEST(Player, VideoCanvas) {
     auto root = new QWidget;
     auto vcanvas = new VideoCanvas;
     auto audio = new NekoAudioOutput(root);

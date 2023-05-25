@@ -1,17 +1,29 @@
 #pragma once
 
 #include <QMainWindow>
-#include <functional>
 #include <QTreeWidgetItem>
+#include <QThread>
+#include <functional>
 
 #include "../log.hpp"
+#include "testregister.hpp"
 
-#define ZOOD_TEST(name) static QWidget *test__##name(); \
-    static bool test__init_##name = []() {              \
-        ZoodRegisterTest(#name, test__##name);          \
-        return true;                                    \
-    }();                                                \
-    static QWidget *test__##name()                      
+class Worker : public QThread {
+    Q_OBJECT
+
+public:
+    Worker() = default;
+    Worker(std::function<void*()> task) : task(task) {}
+    void run() override;
+    void setTask(std::function<void*()> task);
+
+Q_SIGNALS:
+    void finished(void *);
+
+private:
+    std::function<void*()> task;
+};
+
 
 class ZoodTestWindow : public QMainWindow {
     Q_OBJECT
@@ -20,6 +32,10 @@ class ZoodTestWindow : public QMainWindow {
         ZoodTestWindow(QWidget *parent = nullptr);
         ~ZoodTestWindow();
         QWidget* TerminatorParent();
+        void RunAllTest();
+
+    public:
+        void showEvent(QShowEvent* event) override;
 
     public Q_SLOTS:
 		void ItemClicked(QTreeWidgetItem *item, int column);
@@ -27,10 +43,7 @@ class ZoodTestWindow : public QMainWindow {
         void keyPressEvent(QKeyEvent *) override;
     private:
         void *ui = nullptr;
-		QMap<QTreeWidgetItem*, QWidget*> items;
+		QMap<QTreeWidgetItem*, QObject*> items;
 		QTreeWidgetItem* currentItem = nullptr;
     friend void ZoodLogString(const QString &text);
 };
-
-void ZoodRegisterTest(const QString &name, const std::function<QWidget*()> &create);
-void ZoodLogString(const QString &text);

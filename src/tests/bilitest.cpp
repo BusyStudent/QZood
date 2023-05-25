@@ -5,7 +5,7 @@
 
 #include "../net/bilibili.hpp"
 
-ZOOD_TEST(Bilibili) {
+ZOOD_TEST(Network, Bilibili) {
     struct Date : public QObject {
         using QObject::QObject;
     };
