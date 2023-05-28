@@ -161,6 +161,9 @@ void ZoodTestWindow::RunAllTest() {
                 auto widget = static_cast<QWidget*>(wi);
                 widget->show();
                 widget->setAttribute(Qt::WA_DeleteOnClose);
+                connect(this, &QWidget::destroyed, widget, [widget](){
+                    widget->close();
+                });
                 connect(widget, &QWidget::destroyed, this, [item, test_task](){
                     if (TestFlag(test_task.id)) {
                         item->setText(1, "finished");

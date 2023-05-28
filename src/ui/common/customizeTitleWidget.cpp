@@ -34,13 +34,14 @@ void CustomizeTitleWidget::mouseMoveEvent(QMouseEvent *event) {
   if (flag_pressed) {
     move_pos = event->globalPos() - press_pos;
     press_pos += move_pos;
-    if (!flag_resizing) {
-        move(mapToGlobal(move_pos));
-    }
   }
 
   if (windowState() != Qt::WindowMaximized) {
     updateRegion(event);
+  }
+
+  if (flag_pressed && !flag_resizing) {
+    move(mapToGlobal(move_pos));
   }
   QWidget::mouseMoveEvent(event);
 }
@@ -122,7 +123,7 @@ void CustomizeTitleWidget::updateRegion(QMouseEvent *event) {
 }
 void CustomizeTitleWidget::resizeRegion(int marginTop, int marginBottom,
                                         int marginLeft, int marginRight) {
-  if (flag_pressed) {
+  if (flag_pressed && flag_resizing) {
     switch (m_direction) {
       case BOTTOMRIGHT: {
         QRect rect = geometry();

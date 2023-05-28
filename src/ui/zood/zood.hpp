@@ -10,6 +10,9 @@
 #include <QCompleter>
 #include <QLineEdit>
 
+extern HomeWidget;
+extern VideoView;
+
 class Zood : public CustomizeTitleWidget {
 	Q_OBJECT
 	public:
@@ -25,6 +28,7 @@ class Zood : public CustomizeTitleWidget {
 
 	private:
 		void* ui = nullptr;
+        HomeWidget *homePage;
         QLineEdit* searchEdit = nullptr;
         QCompleter* searchCompleter = nullptr;
 };

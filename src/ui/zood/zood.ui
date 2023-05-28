@@ -101,7 +101,14 @@ QComboBox::drop-down {
        <number>0</number>
       </property>
       <item row="1" column="3">
-       <widget class="QStackedWidget" name="centerWidget"/>
+       <widget class="QStackedWidget" name="centerWidget">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+       </widget>
       </item>
       <item row="0" column="3">
        <widget class="QWidget" name="topBarWidget" native="true">
@@ -152,33 +159,35 @@ QComboBox::drop-down {
           </widget>
          </item>
          <item>
-          <layout class="QHBoxLayout" name="searchBoxLayout">
-           <property name="spacing">
-            <number>0</number>
-           </property>
-           <item alignment="Qt::AlignRight|Qt::AlignVCenter">
-            <widget class="QComboBox" name="searchBox">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="minimumSize">
-              <size>
-               <width>200</width>
-               <height>0</height>
-              </size>
-             </property>
-             <property name="editable">
-              <bool>true</bool>
-             </property>
-             <property name="frame">
-              <bool>true</bool>
-             </property>
-            </widget>
-           </item>
-          </layout>
+          <widget class="QWidget" name="searchBoxContainer" native="true">
+           <layout class="QHBoxLayout" name="searchBoxLayout">
+            <property name="spacing">
+             <number>0</number>
+            </property>
+            <item alignment="Qt::AlignRight|Qt::AlignVCenter">
+             <widget class="QComboBox" name="searchBox">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>200</width>
+                <height>0</height>
+               </size>
+              </property>
+              <property name="editable">
+               <bool>true</bool>
+              </property>
+              <property name="frame">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
          </item>
          <item>
           <widget class="Line" name="line">

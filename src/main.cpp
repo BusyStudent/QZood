@@ -33,9 +33,10 @@ void OpenTerminal(){ }
 int main(int argc, char **argv) {
     QApplication a(argc, argv);
 
-    ZoodTestWindow twin;
-    OpenTerminal(twin.TerminatorParent());
-    twin.show();
+    ZoodTestWindow* twin = new ZoodTestWindow();
+    twin->setAttribute(Qt::WA_DeleteOnClose, true);
+    OpenTerminal(twin->TerminatorParent());
+    twin->show();
 
     return a.exec();
 }

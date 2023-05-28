@@ -9,6 +9,7 @@
 #include <QScrollBar>
 
 #include "ui_zood.h"
+#include "homeWidget.hpp"
 
 Zood::Zood(QWidget *parent) : CustomizeTitleWidget(parent), ui(new Ui::Zood()) {
     // 得到设计器生成的类指针。
@@ -17,6 +18,13 @@ Zood::Zood(QWidget *parent) : CustomizeTitleWidget(parent), ui(new Ui::Zood()) {
     zood->setupUi(this);
     // 应用自定义窗口基类定义的容器shadow
     createShadow(zood->containerWidget);
+    
+    homePage = new HomeWidget();
+    zood->centerWidget->addWidget(homePage);
+
+    connect(zood->homeButton, &QToolButton::clicked, this, [this, zood](){
+        zood->centerWidget->setCurrentWidget(homePage);
+    });
 
     // 连接默认窗口按钮的功能
     connect(zood->minimizeButton, &QToolButton::clicked, this, [this](){
@@ -68,7 +76,8 @@ Zood::Zood(QWidget *parent) : CustomizeTitleWidget(parent), ui(new Ui::Zood()) {
         R"(QAbstractItemView{
             border:1px solid #F5F5F5;
             border-radius: 15px;
-            padding: 1px;}
+            padding: 1px;
+            outline: 0px;}
         QAbstractItemView::item{
             border: 1px solid white;
             border-radius: 11px;
@@ -83,8 +92,8 @@ Zood::Zood(QWidget *parent) : CustomizeTitleWidget(parent), ui(new Ui::Zood()) {
             border-radius: 11px;
             color: black;})"
         );
-    searchCompleterPopupWidget->horizontalScrollBar()->setStyleSheet("QScrollBar {height:0px;}");
-    searchCompleterPopupWidget->verticalScrollBar()->setStyleSheet("QScrollBar {width:0px;}");
+    searchCompleterPopupWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    searchCompleterPopupWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 }
 
 void Zood::setPredictStringList(QStringList indicator) {
@@ -129,7 +138,7 @@ bool Zood::eventFilter(QObject *obj, QEvent *e) {
             QPropertyAnimation *animation = new QPropertyAnimation(zood->searchBox, "geometry");
             animation->setDuration(500); // 设置动画持续时间为1秒
             auto rect = zood->searchBox->geometry();
-            auto container_rect = zood->searchBoxLayout->geometry();
+            auto container_rect = zood->searchBoxContainer->geometry();
             animation->setStartValue(rect); // 设置起始值为左对齐
             animation->setEndValue(QRect{(container_rect.width() - rect.width()), rect.y(), rect.width(), rect.height()}); // 设置结束值为居中对齐
             animation->setEasingCurve(QEasingCurve::InOutQuad); // 设置缓动曲线为InOutQuad
