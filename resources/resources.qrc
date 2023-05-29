@@ -13,5 +13,6 @@
     <file alias="localFile.png">icons/file-management.png</file>
     <file alias="history.png">icons/history.png</file>
     <file alias="settings.png">icons/settings.png</file>
+    <file alias="loading_bar.png">icons/loading-bar.png</file>
   </qresource>
 </RCC>

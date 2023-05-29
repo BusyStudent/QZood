@@ -27,12 +27,12 @@
   </property>
   <property name="styleSheet">
    <string notr="true">QLabel {
-background-color: rgb(255, 255, 255);
-border: 1px solid blue;
+background-color: white;
+border: 1px solid white;
 border-radius: 5px;
 }
-QLabel#videSource, QLabel#videMessage{
-color: #A0A0A0
+QLabel#videoSource, QLabel#videoExtraInfo{
+color: #A0A0A0;
 }
 QLabel#videSource:hover, QLabel#videMessage:hover{
 color: blue
@@ -62,10 +62,16 @@ color:blue;
    <item>
     <widget class="QLabel" name="videoIcon">
      <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+      <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
+     </property>
+     <property name="minimumSize">
+      <size>
+       <width>185</width>
+       <height>100</height>
+      </size>
      </property>
      <property name="cursor">
       <cursorShape>PointingHandCursor</cursorShape>
@@ -93,12 +99,12 @@ color:blue;
       <cursorShape>PointingHandCursor</cursorShape>
      </property>
      <property name="text">
-      <string/>
+      <string>text</string>
      </property>
     </widget>
    </item>
    <item>
-    <widget class="QLabel" name="videMessage">
+    <widget class="QLabel" name="videoExtraInfo">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
        <horstretch>0</horstretch>
@@ -114,12 +120,12 @@ color:blue;
       <cursorShape>PointingHandCursor</cursorShape>
      </property>
      <property name="text">
-      <string/>
+      <string>text</string>
      </property>
     </widget>
    </item>
    <item>
-    <widget class="QLabel" name="videSource">
+    <widget class="QLabel" name="videoSource">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
        <horstretch>0</horstretch>
@@ -135,7 +141,7 @@ color:blue;
       <cursorShape>PointingHandCursor</cursorShape>
      </property>
      <property name="text">
-      <string/>
+      <string>text</string>
      </property>
     </widget>
    </item>

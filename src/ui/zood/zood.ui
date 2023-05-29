@@ -53,7 +53,7 @@ QWidget#containerWidget {
 }
 QComboBox#searchBox {
 	border: none;
-	border-radius: 9px;
+	border-radius: 8px;
 	background-color: #F5F5F5;
 }
 QComboBox#searchBox::focus {
