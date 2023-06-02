@@ -22,12 +22,31 @@ ZOOD_TEST(Network, BiliPlay) {
     canvas->attachPlayer(player);
 
     QObject::connect(player, &NekoMediaPlayer::durationChanged, [=](qreal dur) {
-        play.durationLabel->setText(QString::number(dur));
+        play.durationLabel->setText(QString::asprintf("%.2f", dur));
         play.progressSlider->setRange(0, dur);
     });
     QObject::connect(player, &NekoMediaPlayer::positionChanged, [=](qreal pos) {
-        play.positionLabel->setText(QString::number(pos));
+        play.positionLabel->setText(QString::asprintf("%.2f", pos));
+
+        if (play.progressSlider->isSliderDown()) {
+            // Pressed
+            return;
+        }
         play.progressSlider->setValue(pos);
+    });
+    QObject::connect(play.danLimitButton, &QPushButton::clicked, [=]() {
+        auto v = QInputDialog::getDouble(
+            root, 
+            "Input limit ratio", 
+            "Ratio", canvas->danmakuTracksLimit(), 
+            0.0, 
+            1.0, 
+            1, 
+            nullptr, 
+            {},
+            0.1
+        );
+        canvas->setDanmakuTracksLimit(v);
     });
     QObject::connect(play.pauseButton, &QPushButton::clicked, [=]() {
         switch (player->playbackState()) {
@@ -42,7 +61,7 @@ ZOOD_TEST(Network, BiliPlay) {
             }
         }
     });
-        QObject::connect(play.progressSlider, &QSlider::sliderMoved, [=](int pos) {
+    QObject::connect(play.progressSlider, &QSlider::sliderMoved, [=](int pos) {
         player->setPosition(pos);
         canvas->setDanmakuPosition(pos);
     });

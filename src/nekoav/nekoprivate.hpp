@@ -97,14 +97,14 @@ class PacketQueue {
         void flush();
         void put(AVPacket *packet);
         auto get(bool blocking = true) -> AVPacket *;
-        size_t size();
-        int64_t duration();
+        size_t size() const;
+        int64_t duration() const;
     private:
         std::queue<AVPacket*> packets;
         std::condition_variable cond;
-        std::mutex              mutex;
         std::mutex              condMutex;
         int64_t                 packetsDuration = 0; //< Sums of packet duration
+        mutable std::mutex      mutex;
 };
 
 class DemuxerThread;
@@ -116,7 +116,8 @@ class AudioThread : public QObject {
         ~AudioThread();
         
         bool idle() const {
-            return waitting;
+            // return waitting;
+            return queue.size() == 0;
         }
         bool isPaused() const {
             return audioOutput->isPaused();
@@ -224,6 +225,7 @@ class DemuxerThread : public QThread {
          */
         void wakeUp();
         void requestSeek(qreal position);
+        void doPause(bool v);
 
         /**
          * @brief Current position
@@ -231,6 +233,7 @@ class DemuxerThread : public QThread {
          * @return qreal 
          */
         qreal position() const;
+        qreal bufferedDuration() const;
 
         AVFormatContext *formatContext() const noexcept {
             return formatCtxt;
@@ -238,6 +241,8 @@ class DemuxerThread : public QThread {
         AudioOutput     *audioOutput() const noexcept;
         VideoSink       *videoSink() const  noexcept;
     Q_SIGNALS:
+        void ffmpegMediaStatusChanged(MediaStatus status);
+        void ffmpegPlaybackStateChanged(PlaybackState state);
         void ffmpegPositionChanged(qreal pos);
         void ffmpegErrorOccurred(int avcode);
         void ffmpegMediaLoaded();
@@ -247,11 +252,14 @@ class DemuxerThread : public QThread {
         bool prepareCodec(int stream);
         bool sendError(int avcode);
         bool runDemuxer();
-        bool runDemuxerOnce();
+        bool readFrame(int *eof);
+        bool tooMuchPackets();
+        bool tooLessPackets();
         bool waitForEvent(std::chrono::milliseconds ms);
         void doUpdateClock();
         bool doSeek();
 
+        AVIOContext     *ioCtxt = nullptr; //< Custom IO Context
         AVFormatContext *formatCtxt = nullptr; //< Container of format context
         AVPacket        *packet = nullptr; //< Allocated packet
 
@@ -266,8 +274,12 @@ class DemuxerThread : public QThread {
         qreal               seekPosition = 0;
         qreal               curPosition = 0;
 
+        uint8_t            *ioBuffer = nullptr;
+        int                 ioBufferSize = 0;
+
         // Buffering     
         int                 bufferedPacketsLimit = 4000;
+        int                 bufferedPacketsLessThreshold = 1000;
 
         std::condition_variable cond;
         std::mutex              condMutex;
@@ -303,7 +315,9 @@ class MediaPlayerPrivate : public QObject {
 
         // Begin settingsMutex protect
         QString       url; //< Player Url
+        QIODevice    *ioDevice; //< IODevice for playback
         AVDictionary *options = nullptr;
+        AVInputFormat *inputFormat = nullptr; //< User custom input format
 
         bool          loaded = false;
         int           audioStream = -1;
@@ -328,37 +342,6 @@ class MediaPlayerPrivate : public QObject {
 class VideoFramePrivate : public AVFrame {
 
 };
-
-class GraphicsVideoItemPrivate : public QObject {
-    Q_OBJECT
-    public:
-        GraphicsVideoItemPrivate(GraphicsVideoItem *parent) : QObject(parent), videoItem(parent) {
-
-        }
-
-        GraphicsVideoItem *videoItem;
-        VideoSink sink;
-        QImage image;
-
-        QSizeF size {0.0, 0.0};
-
-        void _on_VideoFrameChanged(const VideoFrame &frame);
-};
-
-class VideoWidgetPrivate : public QObject {
-    Q_OBJECT
-    public:
-        VideoWidgetPrivate(VideoWidget *parent) : QObject(parent), videoWidget(parent) {
-
-        }
-
-        VideoWidget *videoWidget;
-        VideoSink sink;
-        QImage image;
-
-        void _on_VideoFrameChanged(const VideoFrame &frame);
-};
-
 
 inline AudioOutput *DemuxerThread::audioOutput() const noexcept {
     return player->audioOutput;

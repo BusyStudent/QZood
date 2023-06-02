@@ -31,6 +31,13 @@
       </widget>
      </item>
      <item>
+      <widget class="QPushButton" name="danLimitButton">
+       <property name="text">
+        <string>DanLimit</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QPushButton" name="muteButton">
        <property name="text">
         <string>Mute</string>

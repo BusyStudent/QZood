@@ -14,12 +14,16 @@ class VideoCanvas final : public QOpenGLWidget {
 
         void attachPlayer(NekoMediaPlayer *player);
 
-        void setDanmakuOpacity(double op);
+        void setDanmakuOpacity(qreal op);
         void setDanmakuFont(const QFont &font);
         void setDanmakuList(const DanmakuList &d);
         void setDanmakuPosition(qreal position);
+        void setDanmakuVisible(bool visible);
+        void setDanmakuTracksLimit(qreal limit);
 
         qreal danmakuOpacity() const;
+        QFont danmakuFont() const;
+        qreal danmakuTracksLimit() const;
     protected:
         void paintGL() override;
         void resizeGL(int w, int h) override;

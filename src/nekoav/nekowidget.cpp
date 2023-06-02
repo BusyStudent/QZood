@@ -1,10 +1,39 @@
 #define NEKO_SOURCE
 #include "nekoav.hpp"
-#include "nekoprivate.hpp"
 #include <QPainter>
 #include <mutex>
 
 namespace NekoAV {
+
+
+class GraphicsVideoItemPrivate : public QObject {
+    public:
+        GraphicsVideoItemPrivate(GraphicsVideoItem *parent) : QObject(parent), videoItem(parent) {
+
+        }
+
+        GraphicsVideoItem *videoItem;
+        VideoSink sink;
+        QImage image;
+
+        QSizeF size {0.0, 0.0};
+
+        void _on_VideoFrameChanged(const VideoFrame &frame);
+};
+
+class VideoWidgetPrivate : public QObject {
+    public:
+        VideoWidgetPrivate(VideoWidget *parent) : QObject(parent), videoWidget(parent) {
+
+        }
+
+        VideoWidget *videoWidget;
+        VideoSink sink;
+        QImage image;
+
+        void _on_VideoFrameChanged(const VideoFrame &frame);
+};
+
 
 
 VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent), d(new VideoWidgetPrivate(this)) {

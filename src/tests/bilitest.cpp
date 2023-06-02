@@ -124,6 +124,9 @@ ZOOD_TEST(Network, Bilibili) {
             ui.bigOutEdit->setPlainText(ret);
         });
     });
+    QObject::connect(ui.timelineButton, &QPushButton::clicked, [=]() {
+        bili->fetchTimeline();
+    });
 
 
     return root;

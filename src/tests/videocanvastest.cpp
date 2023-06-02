@@ -13,6 +13,9 @@
 
 
 ZOOD_TEST(Player, VideoCanvas) {
+    qDebug() << "Supported video formats" << NekoMediaPlayer::supportedMediaTypes();
+    qDebug() << "Supported protocols" << NekoMediaPlayer::supportedProtocols();
+
     auto root = new QWidget;
     auto vcanvas = new VideoCanvas;
     auto audio = new NekoAudioOutput(root);
@@ -112,13 +115,13 @@ ZOOD_TEST(Player, VideoCanvas) {
         player->setPosition(pos);
     });
     QObject::connect(player, &NekoMediaPlayer::positionChanged, [=](qint64 position) {
+        if (form.progressSlider->isSliderDown()) {
+            return;
+        }
         form.progressSlider->setRange(0, player->duration());
         form.progressSlider->setValue(position);
     });
-    QObject::connect(player, &NekoMediaPlayer::positionChanged, [=](qint64 position) {
-        form.progressSlider->setRange(0, player->duration());
-        form.progressSlider->setValue(position);
-    });
+
     QObject::connect(player, &NekoMediaPlayer::errorOccurred, [=](NekoMediaPlayer::Error error, const QString &errorString) {
         qDebug() << error;
 

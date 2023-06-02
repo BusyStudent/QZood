@@ -28,7 +28,7 @@ class BiliEpisode final {
         QString id; //< ID of episode, juat number, like 1234
         QString bvid; //< BVID 
         QString cid; //< Cid of episode, juat number, like 1234
-        qreal   duration    = 0;
+        qreal   duration = 0;
 
         QString cover;
 
@@ -48,10 +48,29 @@ class BiliBangumi final {
 
         QList<BiliEpisode> episodes;
 };
+class BiliTimelineEpisode final {
+    public:
+        QString   pubTime;
+        QString   pubIndex; //< Index name
+        QString   title;
+
+        QString   cover;
+        QString   epCover;
+        QString   squareCover;
+
+        QString   episodeID; //< ID of episode, juat number, like 1234
+};
+class BiliTimelineDay final {
+    public:
+        QDateTime date;
+        int       dayOfWeek;
+        QList<BiliTimelineEpisode> episodes;
+};
 
 using BiliBangumiList = QList<BiliBangumi>;
+using BiliTimeline    = QList<BiliTimelineDay>;   
 
-class BiliClient final : public QObject{
+class BiliClient final : public QObject {
     Q_OBJECT
     public:
         BiliClient(QObject *parent = nullptr);
@@ -128,6 +147,15 @@ class BiliClient final : public QObject{
          * @return NetResult<BiliBangumiList> 
          */
         NetResult<BiliBangumiList> searchBangumi(const QString &what);
+        /**
+         * @brief Get the timeline data for the bangumi
+         * 
+         * @param kind
+         * @param before 
+         * @param after 
+         * @return NetResult<BiliTimeline> 
+         */
+        NetResult<BiliTimeline>    fetchTimeline(int kind = 1, int before = 7, int after = 7);
         /**
          * @brief Convert bvid or avid to cid
          * 

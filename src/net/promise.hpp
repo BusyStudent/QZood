@@ -90,7 +90,9 @@ class NetPromise {
          * @return NetPromise& 
          */
         NetPromise &cancel() {
-            helper->disconnect();
+            if (helper.get()) {
+                helper->disconnect();
+            }
             return *this;
         }
         NetPromise &moveToThread(QThread *thread) {
@@ -105,6 +107,11 @@ class NetPromise {
          */
         static NetPromise Alloc() {
             return std::make_shared<NetPromiseHelper>();
+        }
+        static NetPromise AllocWithResult(const T &value) {
+            auto v = Alloc();
+            v.putLater(value);
+            return v;
         }
 
         NetPromise &operator =(const NetPromise &) = default;

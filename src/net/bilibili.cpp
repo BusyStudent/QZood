@@ -374,6 +374,68 @@ NetResult<BiliBangumi> BiliClient::fetchBangumiInternal(const QString &seasonID,
 
     return result;
 }
+NetResult<BiliTimeline> BiliClient::fetchTimeline(int kind, int before, int after) {
+    auto url = QString("https://api.bilibili.com/pgc/web/timeline?types=%1&before=%2&after=%3").arg(
+        QString::number(kind), 
+        QString::number(before), 
+        QString::number(after)
+    );
+    auto result = NetResult<BiliTimeline>::Alloc();
+    fetchFile(url).then([result](const Result<QByteArray> &data) mutable {
+        if (!data) {
+            result.putResult(std::nullopt);
+            return;
+        }
+        auto json = QJsonDocument::fromJson(data.value());
+        if (json.isNull()) {
+            result.putResult(std::nullopt);
+            return;
+        }
+
+        qDebug() << json;
+
+        // Begin Parse
+        if (json["code"] != 0) {
+            qDebug() << json["message"];
+
+            result.putResult(std::nullopt);
+            return;
+        }
+        BiliTimeline timeline;
+
+        for (auto _day : json["result"].toArray()) {
+            BiliTimelineDay day;
+            auto data = _day.toObject();
+
+            day.dayOfWeek = data["day_of_week"].toInt();
+            day.date =  QDateTime::fromString(data["date"].toString());
+
+            for (auto _ep : data["episodes"].toArray()) {
+                BiliTimelineEpisode ep;
+                auto data = _ep.toObject();
+
+                ep.pubTime = data["pub_time"].toString();
+                ep.pubIndex = data["pub_index"].toString();
+
+                ep.epCover = data["ep_cover"].toString();
+                ep.squareCover = data["square_cover"].toString();
+                ep.cover = data["cover"].toString();
+
+                ep.title = data["title"].toString();
+
+                ep.episodeID = QString::number(data["episode_id"].toInteger());
+
+                day.episodes.push_back(ep);
+            }
+
+            timeline.push_back(day);
+        }
+
+        result.putResult(timeline);
+    });
+
+    return result;
+}
 void BiliClient::fetchCookie() {
     // TODO Get cookie here
     fetchFile("https://www.bilibili.com").then(this, [this](const Result<QByteArray> &) {

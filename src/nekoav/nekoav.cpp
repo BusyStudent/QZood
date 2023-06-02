@@ -1,6 +1,8 @@
 #define NEKO_SOURCE
 #include "nekoav.hpp"
 #include "nekoprivate.hpp"
+#include <QAbstractEventDispatcher>
+#include <QIODevice>
 
 namespace NekoAV {
 
@@ -31,11 +33,11 @@ void PacketQueue::flush() {
     packetsDuration = 0;
 }
 
-size_t PacketQueue::size() {
+size_t PacketQueue::size() const {
     std::lock_guard locker(mutex);
     return packets.size();
 }
-int64_t PacketQueue::duration() {
+int64_t PacketQueue::duration() const {
     std::lock_guard locker(mutex);
     return packetsDuration;
 }
@@ -50,6 +52,8 @@ AVPacket *PacketQueue::get(bool block) {
         }
 
         mutex.unlock();
+
+        qDebug() << "PacketQueue waiting for more packets...";
 
         std::unique_lock lock(condMutex);
         cond.wait(lock);
@@ -82,7 +86,7 @@ AudioThread::AudioThread(DemuxerThread *parent, AVStream *stream, AVCodecContext
         ctxt->sample_rate,
         ctxt->channels
     );
-    audioOutput->pause(0);
+    audioOutput->pause(true);
 }
 AudioThread::~AudioThread() {
     audioOutput->close();
@@ -291,6 +295,7 @@ VideoThread::VideoThread(DemuxerThread *parent, AVStream *stream, AVCodecContext
     );
 
     start();
+    pause(true);
 }
 VideoThread::~VideoThread() {
     queue.flush();
@@ -477,6 +482,7 @@ DemuxerThread::~DemuxerThread() {
     wait();
 
     avformat_close_input(&formatCtxt);
+    av_free(ioBuffer);
 }
 void DemuxerThread::run() {
     if (!load()) {
@@ -485,10 +491,18 @@ void DemuxerThread::run() {
     if (prepareWorker()) {
         runDemuxer();
     }
+    
+    // Settings some status
+    Q_EMIT ffmpegPositionChanged(0.0);
+    player->setMediaStatus(MediaStatus::NoMedia);
+    player->setPlaybackState(PlaybackState::StoppedState);
 
     // Cleanup
     delete audioThread;
     delete videoThread;
+
+    audioThread = nullptr;
+    videoThread = nullptr;
 
     avformat_close_input(&formatCtxt);
 }
@@ -503,6 +517,61 @@ bool DemuxerThread::load() {
     }
 
     // Set interrupt handler
+    formatCtxt->interrupt_callback.callback = [](void *_self) -> int {
+        auto self = static_cast<DemuxerThread *>(_self);
+        
+        // Distach event if
+        self->eventDispatcher()->processEvents(QEventLoop::AllEvents);
+        return self->quit;
+    };
+    formatCtxt->interrupt_callback.opaque = this;
+
+    // Set ADIOContext if
+    if (player->ioDevice) {
+        auto ioDevice = player->ioDevice;
+
+        // Alloc memory for 
+        ioBufferSize = 32 * 1024; //< 32K
+        ioBuffer = (uint8_t*) av_malloc(ioBufferSize);
+
+        ioCtxt = avio_alloc_context(
+            ioBuffer,
+            ioBufferSize,
+            ioDevice->isWritable(),
+            ioDevice,
+            ioDevice->isReadable() ? [](void *opaque, uint8_t *buf, int buf_size) -> int {
+                auto dev = static_cast<QIODevice *>(opaque);
+                auto n = dev->read((char *)buf, buf_size);
+
+                return n;
+            } : nullptr,
+            ioDevice->isWritable() ? [](void *opaque, uint8_t *buf, int buf_size) -> int {
+                auto dev = static_cast<QIODevice *>(opaque);
+                auto n = dev->write((char*)buf, buf_size);
+
+                return n;
+            } : nullptr,
+            !ioDevice->isSequential() ? [](void *opaque, int64_t offset, int whence) -> int64_t {
+                auto dev = static_cast<QIODevice *>(opaque);
+                auto pos = dev->pos();                
+
+                // Get Current pos;
+                if (pos < 0) {
+                    return -1;
+                }
+                switch (whence) {
+                    case SEEK_SET : pos = offset; break;
+                    case SEEK_CUR : pos += offset; break;
+                    case SEEK_END : pos = dev->size() + offset; break;
+                }
+                if (dev->seek(pos)) {
+                    return 0;
+                }
+                return -1;
+            } : nullptr
+        );
+        formatCtxt->pb = ioCtxt;
+    }
 
     // Try open
     auto stdstr = player->url.toUtf8();
@@ -511,7 +580,7 @@ bool DemuxerThread::load() {
     errcode = avformat_open_input(
         &formatCtxt,
         stdstr.data(),
-        nullptr,
+        player->inputFormat,
         &player->options
     );
     if (errcode < 0) {
@@ -601,20 +670,12 @@ bool DemuxerThread::prepareCodec(int streamid) {
 
 }
 bool DemuxerThread::runDemuxer() {
-    if (player->loops == Loops::Infinite) {
-        // Run inf until quit or error
-        while (runDemuxerOnce()) { }
-        return true;
-    }
-    // for (int i = 0;i <) {
-        runDemuxerOnce();
-    // }
-    return true;
-}
-bool DemuxerThread::runDemuxerOnce() {
     if (packet == nullptr) {
         packet = av_packet_alloc();
     }
+
+    // Start all worker
+    doPause(false);
 
     int eof = false;
     while (true) {
@@ -635,79 +696,53 @@ bool DemuxerThread::runDemuxerOnce() {
         }
         if (player->playbackState == PlaybackState::PausedState) {
             // If paused state
-            if (audioThread) {
-                audioThread->pause(true);
-            }
-            if (videoThread) {
-                videoThread->pause(true);
-            }
+            doPause(true);
             while (player->playbackState == PlaybackState::PausedState) {
-                waitForEvent(10ms);
+                // In paused state, still read frame
                 if (hasSeek || quit) {
                     goto mainloop;
                 }
+                if (!readFrame(&eof)) {
+                    // Failed to read frame
+                    return false;
+                }
+                if (tooMuchPackets()) {
+                    waitForEvent(10ms);
+                }
             }
+            doPause(false);
             continue;
         }
         if (player->playbackState == PlaybackState::StoppedState) {
             // If Stopped state, stop the thread and return false.
             quit = true;
         }
-        if (player->playbackState == PlaybackState::PlayingState) {
-            // If Stopped state, stop the thread and return false.
-            if (audioThread) {
-                audioThread->pause(false);
-            }
-            if (videoThread) {
-                videoThread->pause(false);
-            }
-        }
+        // if (player->playbackState == PlaybackState::PlayingState) {
+        //     // If Stopped state, stop the thread and return false.
+        //     if (audioThread) {
+        //         audioThread->pause(false);
+        //     }
+        //     if (videoThread) {
+        //         videoThread->pause(false);
+        //     }
+        // }
 
         // Check too much packet
-        if (videoThread) {
-            if (videoThread->packetQueue().size() > bufferedPacketsLimit) {
-                if (waitForEvent(20ms)) {
-                    continue;
-                }
+        if (tooMuchPackets()) {
+            if (waitForEvent(20ms)) {
+                continue;
             }
         }
-        if (audioThread) {
-            if (audioThread->packetQueue().size() > bufferedPacketsLimit) {
-                if (waitForEvent(20ms)) {
-                    continue;
-                }
-            }
+        if (!readFrame(&eof)) {
+            // Failed to read frame
+            return false;
         }
-
-        errcode = av_read_frame(formatCtxt, packet);
-        if (errcode < 0) {
-            if (errcode == AVERROR_EOF) {
-                // 
-                eof = true;
-            }
-            else {
-                // Error
-                return sendError(errcode);
-            }
-        }
-        else {
-            // Dispatch here
-            if (packet->stream_index == player->audioStream && audioThread) {
-                audioThread->packetQueue().put(av_packet_clone(packet));
-            }
-            else if (packet->stream_index == player->videoStream && videoThread) {
-                videoThread->packetQueue().put(av_packet_clone(packet));
-            }
-            else {
-                av_packet_unref(packet);
-            }
-        }
-
 
         // Dosomething like wait if
         if (eof) {
             // Wait here
             if (audioThread) {
+                // detect Bug for seeking
                 audioThread->packetQueue().put(EofPacket); //< Tell him no more packet
                 while (!audioThread->idle() && !quit) {
                     while (waitForEvent(10ms) || hasSeek) {
@@ -737,6 +772,56 @@ bool DemuxerThread::runDemuxerOnce() {
     }
     return true;
 }
+bool DemuxerThread::readFrame(int *eof) {
+    errcode = av_read_frame(formatCtxt, packet);
+    if (errcode < 0) {
+        if (errcode == AVERROR_EOF) {
+            // 
+            *eof = true;
+        }
+        else {
+            // Error
+            return sendError(errcode);
+        }
+    }
+    else {
+        // Dispatch here
+        if (packet->stream_index == player->audioStream && audioThread) {
+            audioThread->packetQueue().put(av_packet_clone(packet));
+        }
+        else if (packet->stream_index == player->videoStream && videoThread) {
+            videoThread->packetQueue().put(av_packet_clone(packet));
+        }
+        av_packet_unref(packet);
+    }
+    return true;
+}
+bool DemuxerThread::tooMuchPackets() {
+    if (audioThread) {
+        if (audioThread->packetQueue().size() > bufferedPacketsLimit) {
+            return true;
+        }
+    }
+    if (videoThread) {
+        if (videoThread->packetQueue().size() > bufferedPacketsLimit) {
+            return true;
+        }
+    }
+    return false;
+}
+bool DemuxerThread::tooLessPackets() {
+    if (audioThread) {
+        if (audioThread->packetQueue().size() < bufferedPacketsLessThreshold) {
+            return true;
+        }
+    }
+    if (videoThread) {
+        if (videoThread->packetQueue().size() < bufferedPacketsLessThreshold) {
+            return true;
+        }
+    }
+    return false;
+}
 bool DemuxerThread::sendError(int errc) {
     qDebug() << FFErrorToString(errc);
     Q_EMIT ffmpegErrorOccurred(errc);
@@ -761,10 +846,12 @@ bool DemuxerThread::doSeek() {
         int64_t pos = seekPosition / av_q2d(formatCtxt->streams[player->audioStream]->time_base);
         errcode = av_seek_frame(formatCtxt, player->audioStream, pos, AVSEEK_FLAG_BACKWARD);
         if (errcode < 0) {
+            qDebug() << "DemuxerThread failed to seek audioStream ";
             return sendError(errcode);
         }
     }
-    if (videoThread) {
+    if (videoThread && formatCtxt->streams[player->audioStream]->nb_frames >= 2) {
+        // We didnot seek if it is a audio cover
         restoreVideo = !videoThread->isPaused();
         videoThread->pause(true);
         videoThread->packetQueue().flush();
@@ -773,6 +860,7 @@ bool DemuxerThread::doSeek() {
         int64_t pos = seekPosition / av_q2d(formatCtxt->streams[player->videoStream]->time_base);
         errcode = av_seek_frame(formatCtxt, player->videoStream, pos, AVSEEK_FLAG_BACKWARD);
         if (errcode < 0) {
+            qDebug() << "DemuxerThread failed to seek videoStream ";
             return sendError(errcode);
         }
     }
@@ -809,12 +897,36 @@ void DemuxerThread::requestSeek(qreal pos) {
 
     wakeUp();
 }
+void DemuxerThread::doPause(bool v) {
+    if (audioThread) {
+        audioThread->pause(v);
+    }
+    if (videoThread) {
+        videoThread->pause(v);
+    }
+}
 qreal DemuxerThread::position() const {
     if (audioThread) {
         return audioThread->clock();
     }
     qDebug() << "DemuxerThread::position warning no audioThread";
     return 0.0;
+}
+qreal DemuxerThread::bufferedDuration() const {
+    if (!audioThread && !videoThread) {
+        return 0.0;
+    }
+    
+    qreal duration = std::numeric_limits<qreal>::max();
+    if (audioThread) {
+        auto ts = audioThread->packetQueue().duration();
+        duration = qMin(ts * av_q2d(formatCtxt->streams[player->audioStream]->time_base), duration);
+    }
+    if (videoThread) {
+        auto ts = videoThread->packetQueue().duration();
+        duration = qMin(ts * av_q2d(formatCtxt->streams[player->videoStream]->time_base), duration);
+    }
+    return duration;
 }
 
 // MediaPlayerPrivate here
@@ -840,12 +952,12 @@ void MediaPlayerPrivate::load() {
                 this, &MediaPlayerPrivate::demuxerErrorOccurred, 
                 Qt::QueuedConnection
         );
-        connect(demuxerThread, &DemuxerThread::ffmpegPositionChanged, 
-                this, &MediaPlayerPrivate::demuxerPositionChanged, 
-                Qt::QueuedConnection
-        );
         connect(demuxerThread, &DemuxerThread::ffmpegMediaLoaded, 
                 this, &MediaPlayerPrivate::demuxerMediaLoaded, 
+                Qt::QueuedConnection
+        );
+        connect(demuxerThread, &DemuxerThread::ffmpegPositionChanged, 
+                this, &MediaPlayerPrivate::demuxerPositionChanged, 
                 Qt::QueuedConnection
         );
 
@@ -879,7 +991,16 @@ void MediaPlayerPrivate::setMediaStatus(MediaStatus s) {
     }
     mediaStatus = s;
 
-    Q_EMIT player->mediaStatusChanged(mediaStatus);
+    auto cb = [this]() {
+        Q_EMIT player->mediaStatusChanged(mediaStatus);
+    };
+
+    if (QThread::currentThread() != thread()) {
+        QMetaObject::invokeMethod(this, cb, Qt::QueuedConnection);
+    }
+    else {
+        cb();
+    }
 }
 void MediaPlayerPrivate::setPlaybackState(PlaybackState s) {
     if (s == playbackState) {
@@ -890,8 +1011,18 @@ void MediaPlayerPrivate::setPlaybackState(PlaybackState s) {
     if (demuxerThread) {
         demuxerThread->wakeUp();
     }
-    Q_EMIT player->playingChanged(playbackState == PlaybackState::PlayingState);
-    Q_EMIT player->playbackStateChanged(playbackState);
+
+    auto cb = [this]() {
+        Q_EMIT player->playingChanged(playbackState == PlaybackState::PlayingState);
+        Q_EMIT player->playbackStateChanged(playbackState);
+    };
+
+    if (QThread::currentThread() != thread()) {
+        QMetaObject::invokeMethod(this, cb, Qt::QueuedConnection);
+    }
+    else {
+        cb();
+    }
 }
 void MediaPlayerPrivate::demuxerErrorOccurred(int errcode) {
     auto str = FFErrorToString(errcode);
@@ -899,6 +1030,32 @@ void MediaPlayerPrivate::demuxerErrorOccurred(int errcode) {
 
     switch (errcode) {
         // TODO 
+
+        // Resource
+        case AVERROR_PROTOCOL_NOT_FOUND:
+        case AVERROR_INVALIDDATA: 
+            reason = Error::ResourceError;
+            break;
+
+        case AVERROR_DEMUXER_NOT_FOUND:
+        case AVERROR_DECODER_NOT_FOUND:
+        case AVERROR_MUXER_NOT_FOUND:
+            reason = Error::FormatError;
+            break;
+        
+        // Network
+        case AVERROR_HTTP_BAD_REQUEST:
+        case AVERROR_HTTP_NOT_FOUND:
+        case AVERROR_HTTP_OTHER_4XX:
+        case AVERROR_HTTP_SERVER_ERROR:
+            reason = Error::NetworkError;
+            break;
+
+        // Network AccessDeniedError
+        case AVERROR_HTTP_UNAUTHORIZED:
+        case AVERROR_HTTP_FORBIDDEN:
+            reason = Error::AccessDeniedError;
+            break;
     }
 
     // Release demuxer
@@ -953,9 +1110,6 @@ void MediaPlayer::setPosition(qreal pos) {
 void MediaPlayer::setPlaybackRate(qreal) {
 
 }
-void MediaPlayer::setSourceDevice(QIODevice *dev, const QUrl &url) {
-    stop();
-}
 auto MediaPlayer::duration() const -> qreal {
     auto ctxt = d->formatContext();
     if (!ctxt) {
@@ -987,6 +1141,16 @@ auto MediaPlayer::isSeekable() const -> bool {
     }
     return ctxt->iformat->read_seek || ctxt->iformat->read_seek2;
 }
+auto MediaPlayer::isPlaying() const -> bool {
+    return d->playbackState == PlayingState;
+}
+auto MediaPlayer::isLoaded() const -> bool {
+    return d->demuxerThread && 
+           mediaStatus() != NoMedia && 
+           mediaStatus() != InvalidMedia && 
+           mediaStatus() != LoadingMedia
+    ;
+}
 auto MediaPlayer::hasAudio() const -> bool {
     return d->audioStream >= 0;
 }
@@ -996,16 +1160,91 @@ auto MediaPlayer::hasVideo() const -> bool {
 auto MediaPlayer::loops() const -> int {
     return d->loops;
 }
+auto MediaPlayer::source() const -> QUrl {
+    return d->url;
+}
+auto MediaPlayer::sourceDevice() const -> const QIODevice * {
+    return d->ioDevice;
+}
+auto MediaPlayer::videoSink() const -> VideoSink * {
+    return d->videoSink;
+}
+auto MediaPlayer::audioOutput() const -> AudioOutput * {
+    return d->audioOutput;
+}
+auto MediaPlayer::bufferedDuration() const -> qreal {
+    if (d->demuxerThread) {
+        return d->demuxerThread->bufferedDuration();
+    }
+    return 0.0;
+}
+
+static auto getTracks(AVFormatContext *ctxt, AVMediaType type) -> QList<MediaMetaData> {
+    if (!ctxt) {
+        return { };
+    }
+    QList<MediaMetaData> tracks;
+    for (int idx = 0; idx < ctxt->nb_streams; idx++) {
+        if (ctxt->streams[idx]->codecpar->codec_type != type) {
+            continue;
+        }
+        MediaMetaData data;
+        AVDictionary *metadata = ctxt->streams[idx]->metadata;
+        AVDictionaryEntry *cur = av_dict_get(metadata, nullptr, nullptr, 0);
+        while (cur) {
+            data.insert(cur->key, cur->value);
+
+            cur = av_dict_get(metadata, nullptr, cur, 0);
+        }
+
+        tracks.push_back(data);
+    }
+
+    return tracks;
+}
+
+auto MediaPlayer::videoTracks() const -> QList<MediaMetaData> {
+    return getTracks(d->formatContext(), AVMEDIA_TYPE_VIDEO);
+}
+auto MediaPlayer::audioTracks() const -> QList<MediaMetaData> {
+    return getTracks(d->formatContext(), AVMEDIA_TYPE_AUDIO);
+}
+auto MediaPlayer::subtitleTracks() const -> QList<MediaMetaData> {
+    return getTracks(d->formatContext(), AVMEDIA_TYPE_SUBTITLE);
+}
+auto MediaPlayer::metaData() const -> MediaMetaData {
+    auto ctxt = d->formatContext();
+    if (!ctxt) {
+        return { };
+    }
+
+    MediaMetaData data;
+    AVDictionary *metadata = ctxt->metadata;
+    AVDictionaryEntry *cur = av_dict_get(metadata, nullptr, nullptr, 0);
+    while (cur) {
+        data.insert(cur->key, cur->value);
+
+        cur = av_dict_get(metadata, nullptr, cur, 0);
+    }
+
+    return data;
+}
 
 // Settings
 void MediaPlayer::setSource(const QUrl &url) {
     stop();
+    d->ioDevice = nullptr;
     if (url.isLocalFile()) {
         d->url = url.toLocalFile();
     }
     else {
         d->url = url.toString();
     }
+}
+void MediaPlayer::setSourceDevice(QIODevice *dev, const QUrl &url) {
+    stop();
+    d->ioDevice = dev;
+    d->url = url.toLocalFile();
 }
 void MediaPlayer::setAudioOutput(AudioOutput *output) {
     d->audioOutput = output;
@@ -1033,6 +1272,31 @@ void MediaPlayer::setHttpReferer(const QString &referer) {
 void MediaPlayer::clearOptions() {
     av_dict_free(&d->options);
 }
+QStringList MediaPlayer::supportedMediaTypes() {
+    QStringList types;
+
+    void *op = nullptr;
+    auto i = av_demuxer_iterate(&op);
+    while (i) {
+        types.push_back(i->name);
+
+        i = av_demuxer_iterate(&op);
+    }
+    return types;
+}
+QStringList MediaPlayer::supportedProtocols() {
+    QStringList protocols;
+
+    void *op = nullptr;
+    auto p = avio_enum_protocols(&op, 0);
+    while (p) {
+        protocols.push_back(p);
+
+        p = avio_enum_protocols(&op, 0);
+    }
+
+    return protocols;
+}
 
 
 // Video Sink
@@ -1044,13 +1308,26 @@ VideoSink::~VideoSink() {
 }
 void  VideoSink::putVideoFrame(const VideoFrame &f) {
     frame = f;
+    if (frame.isNull()) {
+        *mark = false;
+        mark = std::make_shared<bool>(false);
+    }
     if (size.width() != frame.width() || size.height() != frame.height()) {
         size.setWidth(frame.width());
         size.setHeight(frame.height());
 
-        Q_EMIT videoSizeChanged();
+
+        QMetaObject::invokeMethod(this, [this]() {
+            Q_EMIT videoSizeChanged();
+        }, Qt::QueuedConnection);
     }
-    Q_EMIT videoFrameChanged(frame);
+    QMetaObject::invokeMethod(this, [this, m = mark]() {
+        if (!m) {
+            qDebug() << "VideoSink::putVideoFrame cancelled call";
+            return;
+        }
+        Q_EMIT videoFrameChanged(frame);
+    }, Qt::QueuedConnection);
 }
 QSize VideoSink::videoSize() const {
     return size;
@@ -1108,6 +1385,28 @@ int    VideoFrame::bytesPerLine(int plane) const {
     }
     // Q_ASSERT(plane < planeCount());
     return d->linesize[plane];
+}
+QImage VideoFrame::toImage() const {
+    QImage image(width(), height(), QImage::Format_RGBA8888);
+
+    int w = width();
+    int h = height();
+    int pitch = bytesPerLine(0);
+    uchar *pixels = bits(0);
+
+    uchar *dst = image.bits();
+    int    dstPitch = image.bytesPerLine();
+
+    // Update it
+    for (int y = 0; y < image.height(); y++) {
+        for (int x = 0; x < image.width(); x++) {
+            *((uint32_t*)   &dst[y * dstPitch + x * 4]) = *(
+                (uint32_t*) &pixels[y * pitch + x * 4]
+            );
+        }
+    }
+
+    return image;
 }
 VideoPixelFormat VideoFrame::pixelFormat() const {
     if (isNull()) {

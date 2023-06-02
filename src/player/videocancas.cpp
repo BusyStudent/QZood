@@ -50,9 +50,29 @@ void VideoCanvas::setDanmakuPosition(qreal position) {
     }
     update();
 }
+void VideoCanvas::setDanmakuTracksLimit(qreal limit) {
+    d->danmakuTracksLimit = std::clamp(limit, 0.0, 1.0);
+    d->resizeTracks();
+}
+void VideoCanvas::setDanmakuVisible(bool visible) {
+    d->danmakuVisible = visible;
+}
 void VideoCanvas::setDanmakuOpacity(qreal op) {
     d->danmakuOpacity = op;
     update();    
+}
+void VideoCanvas::setDanmakuFont(const QFont &font) {
+    d->danmakuFont = font;
+    update();
+}
+qreal VideoCanvas::danmakuTracksLimit() const {
+    return d->danmakuTracksLimit;
+}
+qreal VideoCanvas::danmakuOpacity() const {
+    return d->danmakuOpacity;
+}
+QFont VideoCanvas::danmakuFont() const {
+    return d->danmakuFont;
 }
 void VideoCanvas::paintGL() {
     QPainter painter(this);
@@ -103,16 +123,16 @@ void VideoCanvasPrivate::paint(QPainter &painter) {
         
         if (danmakuIter != danmakuList.cend()) {
             painter.drawText(0, 0, videoCanvas->width(), videoCanvas->height(), Qt::AlignBottom,
-                QString::asprintf("Tracks %d Progress %lf to %lf Danmaku %lf %s", 
-                    int(danmakuTracks.size()), player->position(), player->duration(),
+                QString::asprintf("Tracks %d Progress %.1lf to %.1lf buffered %.1lf Danmaku %.1lf %s", 
+                    int(danmakuTracks.size()), player->position(), player->duration(), player->bufferedDuration(),
                     danmakuIter->position, danmakuIter->text.toUtf8().constData()
                 )
             );
         }
         else {
             painter.drawText(0, 0, videoCanvas->width(), videoCanvas->height(), Qt::AlignBottom,
-                QString::asprintf("Tracks %d Progress %lf to %lf", 
-                    int(danmakuTracks.size()), player->position(), player->duration()
+                QString::asprintf("Tracks %d Progress %.1lf to %.1lf buffered %.1lf", 
+                    int(danmakuTracks.size()), player->position(), player->duration(), player->bufferedDuration()
                 )
             );
         }
@@ -122,6 +142,10 @@ void VideoCanvasPrivate::paint(QPainter &painter) {
     paintDanmaku(painter);
 }
 void VideoCanvasPrivate::paintDanmaku(QPainter &painter) {
+    if (!danmakuVisible) {
+        return;
+    }
+
     painter.save();
     painter.setOpacity(painter.opacity() * danmakuOpacity);
     for (auto &tracks : danmakuTracks) {
@@ -155,6 +179,7 @@ void VideoCanvasPrivate::paintDanmaku(QPainter &painter) {
 void VideoCanvasPrivate::resizeTracks() {
     qreal height = videoCanvas->height();
     int num = height / (DanmakuItem::Medium * danmakuScale + danmakuSpacing);
+    num *= danmakuTracksLimit;
     danmakuTracks.resize(num);
 }
 void VideoCanvasPrivate::timerEvent(QTimerEvent *event) {

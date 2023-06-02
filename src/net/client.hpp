@@ -44,8 +44,8 @@ class VideoInterface {
          * @param video 
          * @return NetResultPtr<VideoList> 
          */
-        virtual NetResultPtr<VideoList> searchVideo(const QString& video) = 0;
-        virtual QString                 name()                            = 0;
+        virtual NetResult<QList<VideoList>> searchVideo(const QString& video) = 0;
+        virtual QString                     name()                            = 0;
     protected:
         virtual ~VideoInterface() = default;
 };

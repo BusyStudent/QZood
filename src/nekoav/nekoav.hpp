@@ -66,9 +66,18 @@ class NEKO_API VideoFrame {
         void   lock() const;
         void   unlock() const;
 
+        QImage toImage() const;
+
         static VideoFrame fromAVFrame(void *avf);
     private:
         VideoFramePrivate *d = nullptr;
+};
+
+class NEKO_API MediaMetaData : public QMap<QString, QString>{
+    public:
+        using QMap<QString, QString>::QMap;
+
+        static constexpr auto Title = "title";
 };
 
 class NEKO_API GraphicsVideoItem : public QGraphicsObject {
@@ -125,6 +134,7 @@ class NEKO_API VideoSink  : public QObject {
     private:
         VideoFrame frame;
         QSize      size = {0, 0};
+        std::shared_ptr<bool> mark = std::make_shared<bool>(true);
 };
 
 /**
@@ -157,6 +167,7 @@ class NEKO_API AudioOutput : public QObject {
     private:
         QScopedPointer<AudioOutputPrivate> d;
 };
+
 
 class NEKO_API MediaPlayer : public QObject {
     Q_OBJECT
@@ -199,9 +210,9 @@ class NEKO_API MediaPlayer : public QObject {
         explicit MediaPlayer(QObject *parent = nullptr);
         ~MediaPlayer();
 
-        // QList<QMediaMetaData> audioTracks() const;
-        // QList<QMediaMetaData> videoTracks() const;
-        // QList<QMediaMetaData> subtitleTracks() const;
+        QList<MediaMetaData> audioTracks() const;
+        QList<MediaMetaData> videoTracks() const;
+        QList<MediaMetaData> subtitleTracks() const;
 
         int activeAudioTrack() const;
         int activeVideoTrack() const;
@@ -219,10 +230,10 @@ class NEKO_API MediaPlayer : public QObject {
         // QObject *videoOutput() const;
 
         void setVideoSink(VideoSink *sink);
-        // QVideoSink *videoSink() const;
+        VideoSink *videoSink() const;
 
         QUrl source() const;
-        // const QIODevice *sourceDevice() const;
+        const QIODevice *sourceDevice() const;
 
         PlaybackState playbackState() const;
         MediaStatus mediaStatus() const;
@@ -234,6 +245,7 @@ class NEKO_API MediaPlayer : public QObject {
         bool hasVideo() const;
 
         float bufferProgress() const;
+        qreal bufferedDuration() const;
         // QMediaTimeRange bufferedTimeRange() const;
 
         bool isSeekable() const;
@@ -249,6 +261,19 @@ class NEKO_API MediaPlayer : public QObject {
         QString errorString() const;
 
         bool isAvailable() const;
+
+        MediaMetaData metaData() const;
+
+        void setOption(const QString &key, const QString &value);
+        void clearOptions();
+
+        void setHttpUseragent(const QString &useragent);
+        void setHttpReferer(const QString &referer);
+
+        void setInputFormat(void *avInputFormat);
+
+        static QStringList supportedMediaTypes();
+        static QStringList supportedProtocols();
     public Q_SLOTS:
         void play();
         void pause();
@@ -261,10 +286,6 @@ class NEKO_API MediaPlayer : public QObject {
 
         void setSource(const QUrl &source);
         void setSourceDevice(QIODevice *device, const QUrl &sourceUrl = QUrl());
-        void setOption(const QString &key, const QString &value);
-        void setHttpUseragent(const QString &useragent);
-        void setHttpReferer(const QString &referer);
-        void clearOptions();
     Q_SIGNALS:
         void sourceChanged(const QUrl &media);
         void playbackStateChanged(PlaybackState newState);
@@ -303,6 +324,7 @@ class NEKO_API MediaPlayer : public QObject {
 NEKO_USING(GraphicsVideoItem);
 NEKO_USING(AudioSampleFormat);
 NEKO_USING(VideoPixelFormat);
+NEKO_USING(MediaMetaData);
 NEKO_USING(VideoFrame);
 NEKO_USING(VideoSink);
 NEKO_USING(VideoWidget);

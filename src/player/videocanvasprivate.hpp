@@ -50,7 +50,9 @@ class VideoCanvasPrivate final : public QObject {
         qreal               danmakuAliveTime = 10.0; //< Alive of a danmaku
         qreal               danmakuSpacing = 6.0; //< Spacing 
         qreal               danmakuOpacity = 0.8; //< Opacity
+        qreal               danmakuTracksLimit = 1.0; //< Limit Ratio
         bool                danmakuPlaying = false; //< Is danmaku playing?
+        bool                danmakuVisible = true; //< Is danmaku visible?
         DanmakuList         danmakuList; //< The list of danmaku to display.
         DanmakuTracks       danmakuTracks; //< The list of QGraphicsTextItem to display.  Each QTextItem is a danmaku.
         DanmakuTrack        danmakuTopBottomTrack; //< Botttom danmaku
