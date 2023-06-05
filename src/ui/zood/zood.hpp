@@ -13,6 +13,10 @@
 extern HomeWidget;
 extern VideoView;
 
+namespace Ui {
+class Zood;
+}
+
 class Zood : public CustomizeTitleWidget {
     Q_OBJECT
     public:
@@ -31,7 +35,7 @@ class Zood : public CustomizeTitleWidget {
         void editTextChanged(const QString &);
 
     private:
-        void* ui = nullptr;
+        Ui::Zood* ui = nullptr;
         HomeWidget *homePage;
         QLineEdit* searchEdit = nullptr;
         QCompleter* searchCompleter = nullptr;

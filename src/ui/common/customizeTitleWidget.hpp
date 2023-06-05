@@ -23,6 +23,7 @@ class CustomizeTitleWidget : public QWidget {
   void mouseMoveEvent(QMouseEvent *event) override;
   void mouseReleaseEvent(QMouseEvent *event) override;
   void leaveEvent(QEvent *event) override;
+  void mouseDoubleClickEvent(QMouseEvent *event) override;
 
  public:
   void showMinimized();
@@ -51,4 +52,5 @@ class CustomizeTitleWidget : public QWidget {
   QPoint move_pos;
   bool flag_resizing = false;
   bool flag_pressed = false;
+  bool flag_moving = false;
 };

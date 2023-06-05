@@ -30,35 +30,49 @@ void CustomizeTitleWidget::mousePressEvent(QMouseEvent *event) {
   QWidget::mousePressEvent(event);
 }
 
+void CustomizeTitleWidget::mouseDoubleClickEvent(QMouseEvent *event) {
+    if (isMaximized()) {
+        showNormal();
+    } else {
+        showMaximized();
+    }
+    QWidget::mouseDoubleClickEvent(event);
+}
+
 void CustomizeTitleWidget::mouseMoveEvent(QMouseEvent *event) {
   if (flag_pressed) {
     move_pos = event->globalPos() - press_pos;
     press_pos += move_pos;
   }
 
-  if (windowState() != Qt::WindowMaximized) {
+  if (windowState() != Qt::WindowMaximized && !flag_moving) {
     updateRegion(event);
   }
 
   if (flag_pressed && !flag_resizing) {
+    flag_moving = true;
+    if (isMaximized()) {
+        showNormal();
+        move(cursor().pos() - QPoint{geometry().width(), 100} / 2);
+    }
     move(mapToGlobal(move_pos));
   }
   QWidget::mouseMoveEvent(event);
 }
 
 void CustomizeTitleWidget::mouseReleaseEvent(QMouseEvent *event) {
-  if (event->button() == Qt::LeftButton) {
     flag_pressed = false;
     flag_resizing = false;
+    flag_moving = false;
     setCursor(Qt::ArrowCursor);
-  }
 
-  QWidget::mouseReleaseEvent(event);
+    QWidget::mouseReleaseEvent(event);
 }
 
 void CustomizeTitleWidget::leaveEvent(QEvent *event) {
   flag_pressed = false;
   flag_resizing = false;
+  flag_moving = false;
   setCursor(Qt::ArrowCursor);
 
   QWidget::leaveEvent(event);
@@ -185,11 +199,16 @@ void CustomizeTitleWidget::resizeRegion(int marginTop, int marginBottom,
 }
 void CustomizeTitleWidget::showMinimized() { QWidget::showMinimized(); }
 void CustomizeTitleWidget::showMaximized() {
-  QWidget::showMaximized();
+    layout()->setContentsMargins(0, 0, 0, 0);
+    QWidget::showMaximized();
 }
-void CustomizeTitleWidget::showFullScreen() { QWidget::showFullScreen(); }
+void CustomizeTitleWidget::showFullScreen() { 
+    layout()->setContentsMargins(0, 0, 0, 0);
+    QWidget::showFullScreen();
+}
 void CustomizeTitleWidget::showNormal() {
-  QWidget::showNormal();
+    layout()->setContentsMargins(5, 5, 5, 5);
+    QWidget::showNormal();
 }
 
 void CustomizeTitleWidget::createShadow(QWidget* container_widget) {

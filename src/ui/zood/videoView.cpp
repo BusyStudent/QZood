@@ -2,57 +2,52 @@
 #include "ui_videoView.h"
 #include "videoView.hpp"
 
-VideoView::VideoView(QWidget* parent) : QWidget(parent), ui(new Ui::videoView()) {
-    auto videoView = static_cast<Ui::videoView*>(ui);
-    videoView->setupUi(this);
+VideoView::VideoView(QWidget* parent) : QWidget(parent), ui(new Ui::VideoView()) {
+    ui->setupUi(this);
 
-    videoView->videoIcon->installEventFilter(this);
-    videoView->videoTitle->installEventFilter(this);
-    videoView->videoExtraInfo->installEventFilter(this);
-    videoView->videoSource->installEventFilter(this);
+    ui->videoIcon->installEventFilter(this);
+    ui->videoTitle->installEventFilter(this);
+    ui->videoExtraInfo->installEventFilter(this);
+    ui->videoSource->installEventFilter(this);
 }
 
 void VideoView::setTitle(const QString& str, const QString& tooltip) {
-    auto videoView = static_cast<Ui::videoView*>(ui);
-    QFontMetrics fontWidth(videoView->videoTitle->font());
+    QFontMetrics fontWidth(ui->videoTitle->font());
     QString elideNote = fontWidth.elidedText(str, Qt::ElideRight, 185);
-    videoView->videoTitle->setText(elideNote);
+    ui->videoTitle->setText(elideNote);
     if (tooltip.isEmpty()) {
-        videoView->videoTitle->setToolTip(str);
+        ui->videoTitle->setToolTip(str);
     } else {
-        videoView->videoTitle->setToolTip(tooltip);
+        ui->videoTitle->setToolTip(tooltip);
     }
 }
 
 void VideoView::setExtraInformation(const QString& str, const QString& tooltip) {
-    auto videoView = static_cast<Ui::videoView*>(ui);
-    QFontMetrics fontWidth(videoView->videoExtraInfo->font());
+    QFontMetrics fontWidth(ui->videoExtraInfo->font());
     QString elideNote = fontWidth.elidedText(str, Qt::ElideRight, 185);
-    videoView->videoExtraInfo->setText(elideNote);
+    ui->videoExtraInfo->setText(elideNote);
     if (tooltip.isEmpty()) {
-        videoView->videoExtraInfo->setToolTip(str);
+        ui->videoExtraInfo->setToolTip(str);
     } else {
-        videoView->videoExtraInfo->setToolTip(tooltip);
+        ui->videoExtraInfo->setToolTip(tooltip);
     }
 }
 
 void VideoView::setSourceInformation(const QString& str, const QString& tooltip) {
-    auto videoView = static_cast<Ui::videoView*>(ui);
-    QFontMetrics fontWidth(videoView->videoSource->font());
+    QFontMetrics fontWidth(ui->videoSource->font());
     QString elideNote = fontWidth.elidedText(str, Qt::ElideRight, 185);
-    videoView->videoSource->setText(elideNote);
+    ui->videoSource->setText(elideNote);
     if (tooltip.isEmpty()) {
-        videoView->videoSource->setToolTip(str);
+        ui->videoSource->setToolTip(str);
     } else {
-        videoView->videoSource->setToolTip(tooltip);
+        ui->videoSource->setToolTip(tooltip);
     }
 }
 
 void VideoView::setImage(const QImage& image, const QString& tooltip) {
-    auto videoView = static_cast<Ui::videoView*>(ui);
-    videoView->videoIcon->setPixmap(QPixmap::fromImage(image.scaled({185,100}, Qt::KeepAspectRatio)));
-    videoView->videoIcon->setAlignment(Qt::AlignCenter);
-    videoView->videoIcon->setToolTip(tooltip);
+    ui->videoIcon->setPixmap(QPixmap::fromImage(image.scaled({185,100}, Qt::KeepAspectRatio)));
+    ui->videoIcon->setAlignment(Qt::AlignCenter);
+    ui->videoIcon->setToolTip(tooltip);
 }
 
 void VideoView::setVideoId(const int videoId) {
@@ -61,15 +56,14 @@ void VideoView::setVideoId(const int videoId) {
 
 bool VideoView::eventFilter(QObject* obj, QEvent *event) {
     if (event->type() == QEvent::MouseButtonPress) {
-        auto videoView = static_cast<Ui::videoView*>(ui);
-        if (obj == videoView->videoIcon) {
+        if (obj == ui->videoIcon) {
             clickedImage(videoId);
-        } else if (obj == videoView->videoTitle) {
-            clickedTitle(videoId, videoView->videoTitle->text());
-        } else if (obj == videoView->videoExtraInfo) {
-            clickedExtraInformation(videoId, videoView->videoExtraInfo->text());
-        } else if (obj == videoView->videoSource) {
-            clickedSourceInformation(videoId, videoView->videoSource->text());
+        } else if (obj == ui->videoTitle) {
+            clickedTitle(videoId, ui->videoTitle->text());
+        } else if (obj == ui->videoExtraInfo) {
+            clickedExtraInformation(videoId, ui->videoExtraInfo->text());
+        } else if (obj == ui->videoSource) {
+            clickedSourceInformation(videoId, ui->videoSource->text());
         }
     }
 

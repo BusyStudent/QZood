@@ -13,31 +13,30 @@
 
 Zood::Zood(QWidget *parent) : CustomizeTitleWidget(parent), ui(new Ui::Zood()) {
     // 得到设计器生成的类指针。
-    auto zood = static_cast<Ui::Zood *>(ui);
     // 设置设计器设计的UI布局。
-    zood->setupUi(this);
+    ui->setupUi(this);
     // 应用自定义窗口基类定义的容器shadow
-    createShadow(zood->containerWidget);
+    createShadow(ui->containerWidget);
     
     homePage = new HomeWidget();
-    zood->centerWidget->addWidget(homePage);
+    ui->centerWidget->addWidget(homePage);
 
-    connect(zood->homeButton, &QToolButton::clicked, this, [this, zood](){
-        zood->centerWidget->setCurrentWidget(homePage);
+    connect(ui->homeButton, &QToolButton::clicked, this, [this](){
+        ui->centerWidget->setCurrentWidget(homePage);
     });
 
     // 连接默认窗口按钮的功能
-    connect(zood->minimizeButton, &QToolButton::clicked, this, [this](){
+    connect(ui->minimizeButton, &QToolButton::clicked, this, [this](){
         showMinimized();
     });
-    connect(zood->maximizeButton, &QToolButton::clicked, this, [this, zood](){
+    connect(ui->maximizeButton, &QToolButton::clicked, this, [this](){
         if (isMaximized()) {
             showNormal();
         } else {
             showMaximized();
         }
     });
-    connect(zood->closeButton, &QToolButton::clicked, this, [this](){
+    connect(ui->closeButton, &QToolButton::clicked, this, [this](){
         close();
     });
 
@@ -48,23 +47,23 @@ Zood::Zood(QWidget *parent) : CustomizeTitleWidget(parent), ui(new Ui::Zood()) {
 
     searchEdit->setClearButtonEnabled(true);//添加清除按钮
 
-    searchEdit->addAction(zood->actionSearch, QLineEdit::ActionPosition::LeadingPosition);
+    searchEdit->addAction(ui->actionSearch, QLineEdit::ActionPosition::LeadingPosition);
 
-    connect(zood->actionSearch, &QAction::triggered, searchEdit, [this](bool checked) {
+    connect(ui->actionSearch, &QAction::triggered, searchEdit, [this](bool checked) {
         // TODO(llhsdmd@qq.com): 单击搜索按钮，进入搜索结果界面并加载搜索结果。
     });
-    connect(searchEdit, &QLineEdit::textEdited, this, [this, zood](const QString &text) {
+    connect(searchEdit, &QLineEdit::textEdited, this, [this](const QString &text) {
         if (text.isEmpty()) {
         } else {
-            zood->searchBox->clear();
-            zood->searchBox->addItem(text);
+            ui->searchBox->clear();
+            ui->searchBox->addItem(text);
             editTextChanged(text);
         }
     });
 
-    zood->searchBox->installEventFilter(this);
-    zood->searchBox->setLineEdit(searchEdit);
-    zood->searchBox->setCompleter(searchCompleter);
+    ui->searchBox->installEventFilter(this);
+    ui->searchBox->setLineEdit(searchEdit);
+    ui->searchBox->setCompleter(searchCompleter);
     
     auto string_list_model = new QStringListModel();
     searchCompleter->setModel(string_list_model);
@@ -97,37 +96,34 @@ Zood::Zood(QWidget *parent) : CustomizeTitleWidget(parent), ui(new Ui::Zood()) {
 }
 
 void Zood::setPredictStringList(QStringList indicator) {
-    auto zood = static_cast<Ui::Zood *>(ui);
     auto model = static_cast<QStringListModel *>(searchCompleter->model());
 
     model->removeRows(0, model->rowCount());
     model->setStringList(indicator);
 
-    zood->searchBox->addItems(indicator);
+    ui->searchBox->addItems(indicator);
     auto view = searchCompleter->popup();
     view->move(view->pos() + QPoint(0, 5));
 }
 
 void Zood::resizeEvent(QResizeEvent *event) {
     static bool is_maximized = false;
-    auto zood = static_cast<Ui::Zood *>(ui);
 	if (isMaximized() && !is_maximized) {
         is_maximized = true;
-		zood->maximizeButton->setIcon(QIcon(":/icons/minimize.png"));
+		ui->maximizeButton->setIcon(QIcon(":/icons/minimize.png"));
 	} else if (is_maximized) {
         is_maximized = false;
-		zood->maximizeButton->setIcon(QIcon(":/icons/maximize.png"));
+		ui->maximizeButton->setIcon(QIcon(":/icons/maximize.png"));
 	}
 }
 
 bool Zood::eventFilter(QObject *obj, QEvent *e) {
-    auto zood = static_cast<Ui::Zood *>(ui);
-    if (obj == zood->searchBox) {
+    if (obj == ui->searchBox) {
         if (e->type() == QEvent::FocusIn) {
-            QPropertyAnimation *animation = new QPropertyAnimation(zood->searchBox, "geometry");
+            QPropertyAnimation *animation = new QPropertyAnimation(ui->searchBox, "geometry");
             animation->setDuration(500); // 设置动画持续时间为0.5秒
-            auto rect = zood->searchBox->geometry();
-            auto container_rect = zood->searchBoxLayout->geometry();
+            auto rect = ui->searchBox->geometry();
+            auto container_rect = ui->searchBoxLayout->geometry();
             animation->setStartValue(rect); // 设置起始值为左对齐
             animation->setEndValue(QRect{(container_rect.width() - rect.width()) / 2, rect.y(), rect.width(), rect.height()}); // 设置结束值为居中对齐
             animation->setEasingCurve(QEasingCurve::InOutQuad); // 设置缓动曲线为InOutQuad
@@ -135,10 +131,10 @@ bool Zood::eventFilter(QObject *obj, QEvent *e) {
             // 启动动画
             animation->start();
         } else if (e->type() == QEvent::FocusOut) {
-            QPropertyAnimation *animation = new QPropertyAnimation(zood->searchBox, "geometry");
+            QPropertyAnimation *animation = new QPropertyAnimation(ui->searchBox, "geometry");
             animation->setDuration(500); // 设置动画持续时间为1秒
-            auto rect = zood->searchBox->geometry();
-            auto container_rect = zood->searchBoxContainer->geometry();
+            auto rect = ui->searchBox->geometry();
+            auto container_rect = ui->searchBoxContainer->geometry();
             animation->setStartValue(rect); // 设置起始值为左对齐
             animation->setEndValue(QRect{(container_rect.width() - rect.width()), rect.y(), rect.width(), rect.height()}); // 设置结束值为居中对齐
             animation->setEasingCurve(QEasingCurve::InOutQuad); // 设置缓动曲线为InOutQuad

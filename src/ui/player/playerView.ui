@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PlayerView</class>
+ <widget class="QWidget" name="PlayerView">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>905</width>
+    <height>689</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QWidget#videoPlayContainer, QToolButton {
+	background: transparent;
+}
+
+QLabel#winTitle, QLabel#videoTitle, QLabel#videoTimeLabel {
+	color: white;
+}
+QWidget#titleBar {
+	border-top-left-radius: 10px;
+	border-top-right-radius: 10px;
+	background: #404040;
+}
+QWidget#videovVcanvas {
+	border-bottom-left-radius: 10px;
+}
+QListWidget#playlist, QWidget#extraAreaContainer  {
+	background-color: #404040;
+	border-bottom-right-radius: 15px;
+}
+QListWidget#playlist::item {
+	color: #F0F0F0;
+	border-radius: 5px;
+}
+QListWidget#playlist::item:selected {
+	background: #66b2ff;
+	outline: 0px;
+}</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <property name="leftMargin">
+    <number>5</number>
+   </property>
+   <property name="topMargin">
+    <number>5</number>
+   </property>
+   <property name="rightMargin">
+    <number>5</number>
+   </property>
+   <property name="bottomMargin">
+    <number>5</number>
+   </property>
+   <item>
+    <widget class="QWidget" name="containerWidget" native="true">
+     <layout class="QVBoxLayout" name="verticalLayout_4">
+      <property name="spacing">
+       <number>0</number>
+      </property>
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <item>
+       <widget class="QWidget" name="titleBar" native="true">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="styleSheet">
+         <string notr="true"/>
+        </property>
+        <layout class="QHBoxLayout" name="horizontalLayout_3">
+         <item>
+          <widget class="QLabel" name="winTitle">
+           <property name="text">
+            <string>QZood</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="videoTitle">
+           <property name="text">
+            <string/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_2">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QToolButton" name="miniPlayerButton">
+           <property name="text">
+            <string/>
+           </property>
+           <property name="icon">
+            <iconset resource="../../../resources/resources.qrc">
+             <normaloff>:/icons/mini_windows_white.png</normaloff>:/icons/mini_windows_white.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="onTopButton">
+           <property name="text">
+            <string/>
+           </property>
+           <property name="icon">
+            <iconset resource="../../../resources/resources.qrc">
+             <normaloff>:/icons/pin_on.png</normaloff>:/icons/pin_on.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="minimizeButton">
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../../../resources/resources.qrc">
+             <normaloff>:/icons/minus_white.png</normaloff>:/icons/minus_white.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="maximizeButton">
+           <property name="text">
+            <string/>
+           </property>
+           <property name="icon">
+            <iconset resource="../../../resources/resources.qrc">
+             <normaloff>:/icons/maximize_white.png</normaloff>:/icons/maximize_white.png</iconset>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="closeButton">
+           <property name="text">
+            <string>...</string>
+           </property>
+           <property name="icon">
+            <iconset resource="../../../resources/resources.qrc">
+             <normaloff>:/icons/close_white.png</normaloff>:/icons/close_white.png</iconset>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSplitter" name="splitter">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="opaqueResize">
+         <bool>true</bool>
+        </property>
+        <property name="handleWidth">
+         <number>0</number>
+        </property>
+        <widget class="QWidget" name="videoPlayContainer" native="true">
+         <property name="enabled">
+          <bool>true</bool>
+         </property>
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="minimumSize">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true"/>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_3">
+          <property name="spacing">
+           <number>0</number>
+          </property>
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <spacer name="verticalSpacer">
+            <property name="orientation">
+             <enum>Qt::Vertical</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>888</height>
+             </size>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QWidget" name="extraAreaContainer" native="true">
+         <layout class="QVBoxLayout" name="verticalLayout_5">
+          <property name="spacing">
+           <number>0</number>
+          </property>
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QWidget" name="listToolContainer" native="true">
+            <layout class="QHBoxLayout" name="horizontalLayout_4">
+             <item alignment="Qt::AlignRight|Qt::AlignVCenter">
+              <widget class="QToolButton" name="listViewMode">
+               <property name="toolTip">
+                <string>列表视图</string>
+               </property>
+               <property name="text">
+                <string/>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../resources/resources.qrc">
+                 <normaloff>:/icons/list_text_white.png</normaloff>:/icons/list_text_white.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item alignment="Qt::AlignRight|Qt::AlignVCenter">
+              <widget class="QToolButton" name="playOrder">
+               <property name="toolTip">
+                <string>播放顺序</string>
+               </property>
+               <property name="text">
+                <string/>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../resources/resources.qrc">
+                 <normaloff>:/icons/order_down_white.png</normaloff>:/icons/order_down_white.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item alignment="Qt::AlignRight|Qt::AlignVCenter">
+              <widget class="QToolButton" name="addVideo">
+               <property name="toolTip">
+                <string>添加视频</string>
+               </property>
+               <property name="text">
+                <string/>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../resources/resources.qrc">
+                 <normaloff>:/icons/plus_white.png</normaloff>:/icons/plus_white.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item alignment="Qt::AlignRight|Qt::AlignVCenter">
+              <widget class="QToolButton" name="clearListButton">
+               <property name="text">
+                <string/>
+               </property>
+               <property name="icon">
+                <iconset resource="../../../resources/resources.qrc">
+                 <normaloff>:/icons/trash_white.png</normaloff>:/icons/trash_white.png</iconset>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QListWidget" name="playlist">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>0</height>
+             </size>
+            </property>
+            <item>
+             <property name="text">
+              <string>新建项目</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>新建项目12</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources>
+  <include location="../../../resources/resources.qrc"/>
+ </resources>
+ <connections>
+  <connection>
+   <sender>clearListButton</sender>
+   <signal>clicked()</signal>
+   <receiver>playlist</receiver>
+   <slot>clear()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>877</x>
+     <y>69</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>695</x>
+     <y>387</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>
