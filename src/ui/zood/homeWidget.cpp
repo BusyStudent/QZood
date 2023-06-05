@@ -29,13 +29,16 @@ QScrollBar::sub-line:horizontal {
 }
 )";
 
-HomeWidget::HomeWidget(QWidget* parent) : QScrollArea(parent), ui(new Ui::homeView()) {
+HomeWidget::HomeWidget(QWidget* parent) : QScrollArea(parent), ui(new Ui::HomeView()) {
     contents = new QWidget();
-    auto homeView = static_cast<Ui::homeView*>(ui);
-    homeView->setupUi(contents);
+    ui->setupUi(contents);
 
     setWidget(contents);
-    setObjectName("homeWidget");
+    setObjectName("HomeWidget");
+    setStyleSheet(R"(QScrollArea#HomeWidget{
+        border:none;
+        background: transparent;
+        })");
 
     _setupUi();
 
@@ -59,40 +62,39 @@ HomeWidget::HomeWidget(QWidget* parent) : QScrollArea(parent), ui(new Ui::homeVi
         },
         Qt::ConnectionType::QueuedConnection);
 
-    homeView->timeTab->setCurrentRow(0);
-    homeView->recommend->installEventFilter(this);
+    ui->timeTab->setCurrentRow(0);
+    ui->recommend->installEventFilter(this);
 }
 
 void HomeWidget::refresh(const QList<videoData>& dataList,const DisplayArea area) {
-    auto homeView = static_cast<Ui::homeView*>(ui);
     switch (area)
     {
     case DisplayArea::Recommend:
-        _refresh(homeView->recommend, dataList);
+        _refresh(ui->recommend, dataList);
         break;
     case DisplayArea::Monday:
-        _refresh(homeView->mondayContents, dataList);
+        _refresh(ui->mondayContents, dataList);
         break;
     case DisplayArea::Tuesday:
-        _refresh(homeView->tuesdayContents, dataList);
+        _refresh(ui->tuesdayContents, dataList);
         break;
     case DisplayArea::Wednesday:
-        _refresh(homeView->wednesdayContents, dataList);
+        _refresh(ui->wednesdayContents, dataList);
         break;
     case DisplayArea::Thursday:
-        _refresh(homeView->thursdayContents, dataList);
+        _refresh(ui->thursdayContents, dataList);
         break;
     case DisplayArea::Friday:
-        _refresh(homeView->fridayContents, dataList);
+        _refresh(ui->fridayContents, dataList);
         break;
     case DisplayArea::Saturday:
-        _refresh(homeView->saturdayContents, dataList);
+        _refresh(ui->saturdayContents, dataList);
         break;
     case DisplayArea::Sunday:
-        _refresh(homeView->sundayContents, dataList);
+        _refresh(ui->sundayContents, dataList);
         break;
     case DisplayArea::New:
-        _refresh(homeView->recentlyUpdatedContents, dataList);
+        _refresh(ui->recentlyUpdatedContents, dataList);
         break;
     }
 }
@@ -114,38 +116,37 @@ void HomeWidget::_refresh(QWidget* container, const QList<videoData>& dataList) 
 }
 
 void HomeWidget::_setupUi() {
-    auto homeView = static_cast<Ui::homeView*>(ui);
     // 设置推荐区域为流式布局
-    homeView->recommend->setLayout(new FlowLayout());
+    ui->recommend->setLayout(new FlowLayout());
 
     // 设置主界面滑动条不显示
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
     // 设置更新栏滑动条款式
-    homeView->mondayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    homeView->mondayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
+    ui->mondayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->mondayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
     
-    homeView->tuesdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    homeView->tuesdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
+    ui->tuesdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->tuesdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
     
-    homeView->wednesdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    homeView->wednesdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
+    ui->wednesdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->wednesdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
 
-    homeView->thursdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    homeView->thursdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
+    ui->thursdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->thursdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
     
-    homeView->fridayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    homeView->fridayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
+    ui->fridayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->fridayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
     
-    homeView->saturdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    homeView->saturdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
+    ui->saturdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->saturdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
     
-    homeView->sundayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    homeView->sundayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
+    ui->sundayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->sundayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
     
-    homeView->recentlyUpdatedContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    homeView->recentlyUpdatedContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
+    ui->recentlyUpdatedContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    ui->recentlyUpdatedContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
 }
 
 QList<VideoView *> HomeWidget::_addItems(QWidget* container, int count) {
@@ -171,12 +172,11 @@ void HomeWidget::resizeEvent(QResizeEvent *event) {
 }
 
 bool HomeWidget::eventFilter(QObject *obj,QEvent *event) {
-    auto homeView = static_cast<Ui::homeView*>(ui);
-    if (obj == homeView->recommend && event->type() == QEvent::Type::Resize) {
-        auto width = homeView->recommend->size().width();
-        auto preferred_height = homeView->recommend->layout()->heightForWidth(width); 
+    if (obj == ui->recommend && event->type() == QEvent::Type::Resize) {
+        auto width = ui->recommend->size().width();
+        auto preferred_height = ui->recommend->layout()->heightForWidth(width); 
         preferred_height = std::max(preferred_height, 200);
-        contents->setFixedHeight(preferred_height + homeView->recommend->geometry().y() + 3);
+        contents->setFixedHeight(preferred_height + ui->recommend->geometry().y() + 3);
     }
 
     return QScrollArea::eventFilter(obj, event);
@@ -202,11 +202,6 @@ void HomeWidget::wheelEvent(QWheelEvent *event) {
     QScrollArea::wheelEvent(event);
 }
 
-bool HomeWidget::viewportEvent(QEvent *event) {
-
-    return QScrollArea::viewportEvent(event);
-}
-
 
 VideoView* HomeWidget::addItem(const DisplayArea& area) {
     auto result = addItems(area, 1);
@@ -217,35 +212,34 @@ VideoView* HomeWidget::addItem(const DisplayArea& area) {
 }
 
 QList<VideoView *> HomeWidget::addItems(const DisplayArea& area, int count) {
-    auto homeView = static_cast<Ui::homeView*>(ui);
     switch (area)
     {
     case DisplayArea::Recommend:
-        return _addItems(homeView->recommend, count);
+        return _addItems(ui->recommend, count);
         break;
     case DisplayArea::Monday:
-        return _addItems(homeView->mondayContents, count);
+        return _addItems(ui->mondayContents, count);
         break;
     case DisplayArea::Tuesday:
-        return _addItems(homeView->tuesdayContents, count);
+        return _addItems(ui->tuesdayContents, count);
         break;
     case DisplayArea::Wednesday:
-        return _addItems(homeView->wednesdayContents, count);
+        return _addItems(ui->wednesdayContents, count);
         break;
     case DisplayArea::Thursday:
-        return _addItems(homeView->thursdayContents, count);
+        return _addItems(ui->thursdayContents, count);
         break;
     case DisplayArea::Friday:
-        return _addItems(homeView->fridayContents, count);
+        return _addItems(ui->fridayContents, count);
         break;
     case DisplayArea::Saturday:
-        return _addItems(homeView->saturdayContents, count);
+        return _addItems(ui->saturdayContents, count);
         break;
     case DisplayArea::Sunday:
-        return _addItems(homeView->sundayContents, count);
+        return _addItems(ui->sundayContents, count);
         break;
     case DisplayArea::New:
-        return _addItems(homeView->recentlyUpdatedContents, count);
+        return _addItems(ui->recentlyUpdatedContents, count);
         break;
     }
     return QList<VideoView *>();

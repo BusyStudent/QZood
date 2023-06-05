@@ -5,6 +5,10 @@
 
 #include "videoView.hpp"
 
+namespace Ui {
+class HomeView;
+}
+
 class HomeWidget : public QScrollArea {
     Q_OBJECT
     public:
@@ -34,7 +38,6 @@ class HomeWidget : public QScrollArea {
         void mouseReleaseEvent(QMouseEvent *event) override;
         void mouseDoubleClickEvent(QMouseEvent *event) override;
         void wheelEvent(QWheelEvent *event) override;
-        bool viewportEvent(QEvent *event) override;
 
     Q_SIGNALS:
         void refreshRequest(const DisplayArea area);
@@ -45,10 +48,10 @@ class HomeWidget : public QScrollArea {
 
     private:
         void _refresh(QWidget* container, const QList<videoData>& dataList);
-        QList<VideoView *> _addItems(QWidget* container, int count);
+        QList<VideoView* > _addItems(QWidget* container, int count);
         void _setupUi();
 
     private:
-        void *ui;
+        Ui::HomeView* ui;
         QWidget* contents;
 };

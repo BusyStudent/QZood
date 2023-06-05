@@ -10,6 +10,10 @@ struct videoData {
     QImage image;
 };
 
+namespace Ui {
+class VideoView;
+}
+
 class VideoView : public QWidget {
     Q_OBJECT
     public:
@@ -33,6 +37,6 @@ class VideoView : public QWidget {
         bool eventFilter(QObject* obj, QEvent *event) override;
 
     private:
-        void *ui;
+        Ui::VideoView *ui;
         int videoId = -1;
 };
