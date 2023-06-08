@@ -1,6 +1,8 @@
 #include "promise.hpp"
 #include <QDateTime>
 
+#include "../danmaku.hpp"
+
 class Episode;
 class Bangumi;
 class TimelineItem;
@@ -14,6 +16,43 @@ using TimelineItemPtr = RefPtr<TimelineItem>;
 
 class Episode : public DynRefable {
     public:
+        /**
+         * @brief Get title of the episode
+         * 
+         * @return QString 
+         */
+        virtual QString title() = 0;
+        /**
+         * @brief Get the icon of the episode
+         * 
+         * @return NetResult<QImage> 
+         */
+        virtual NetResult<QImage> icon() = 0;
+
+        /**
+         * @brief Get the avliable source of the episode
+         * 
+         * @return QStringList 
+         */
+        virtual QStringList sourcesList() = 0;
+        /**
+         * @brief Get the recommended source of the episode
+         * 
+         * @return QString 
+         */
+        virtual QString     recommendedSource() = 0;
+        /**
+         * @brief Get details video url of sourceString
+         * 
+         * @param sourceString 
+         * @return NetResult<QString> 
+         */
+        virtual NetResult<QString> fetchVideo(const QString &sourceString) = 0;
+
+
+        virtual QStringList danmakuSourceList() = 0;
+        virtual NetResult<DanmakuList> fetchDanmaku(const QString &what) = 0;
+
 
 };
 

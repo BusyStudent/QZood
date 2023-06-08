@@ -167,6 +167,9 @@ class VideoThread : public QThread {
         bool isPaused() const {
             return paused;
         }
+        qreal clock() const {
+            return videoClock;
+        }
 
         PacketQueue &packetQueue() noexcept {
             return queue;
@@ -234,6 +237,7 @@ class DemuxerThread : public QThread {
          */
         qreal position() const;
         qreal bufferedDuration() const;
+        float bufferProgress() const;
 
         AVFormatContext *formatContext() const noexcept {
             return formatCtxt;
@@ -241,6 +245,7 @@ class DemuxerThread : public QThread {
         AudioOutput     *audioOutput() const noexcept;
         VideoSink       *videoSink() const  noexcept;
     Q_SIGNALS:
+        void ffmpegBufferProgressChanged(float progress);
         void ffmpegMediaStatusChanged(MediaStatus status);
         void ffmpegPlaybackStateChanged(PlaybackState state);
         void ffmpegPositionChanged(qreal pos);
@@ -253,9 +258,11 @@ class DemuxerThread : public QThread {
         bool sendError(int avcode);
         bool runDemuxer();
         bool readFrame(int *eof);
-        bool tooMuchPackets();
-        bool tooLessPackets();
+        bool tooMuchPackets() const;
+        bool tooLessPackets() const;
+        bool hasEnoughPackets() const;
         bool waitForEvent(std::chrono::milliseconds ms);
+        bool isPictureStream(int idx) const;
         void doUpdateClock();
         bool doSeek();
 
@@ -279,7 +286,12 @@ class DemuxerThread : public QThread {
 
         // Buffering     
         int                 bufferedPacketsLimit = 4000;
-        int                 bufferedPacketsLessThreshold = 1000;
+        int                 bufferedPacketsLessThreshold = 100;
+        int                 bufferedPacketsEnough = (bufferedPacketsLimit + bufferedPacketsLessThreshold) / 2;
+        float               prevBufferProgress = 0.0f;
+
+        // Stream info
+        bool                isLocalSource = false; //< If source is local, no need to buffering
 
         std::condition_variable cond;
         std::mutex              condMutex;
@@ -333,7 +345,11 @@ class MediaPlayerPrivate : public QObject {
 
         MediaStatus   mediaStatus = MediaStatus::NoMedia;
         PlaybackState playbackState = PlaybackState::StoppedState;
+
+        Error         error = Error::NoError;
+        QString       errorString;
     private:
+        void demuxerBufferProgressChanged(float progress);
         void demuxerErrorOccurred(int errcode);
         void demuxerPositionChanged(qreal pos);
         void demuxerMediaLoaded();

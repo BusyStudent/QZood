@@ -22,6 +22,9 @@ target("zood")
     add_frameworks("QtOpenGL", "QtOpenGLWidgets")
     add_frameworks("QtNetwork")
 
+    -- WebEngine
+    add_frameworks("QtWebEngineCore", "QtWebChannel");
+
 	add_deps("ui", "nekoav")
 	add_files("./resources/resources.qrc")
 

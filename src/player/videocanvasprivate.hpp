@@ -47,7 +47,7 @@ class VideoCanvasPrivate final : public QObject {
         int                 danmakuTimer = 0;
         qreal               danmakuFps   = 60;
         qreal               danmakuScale = 0.8; //< Scale factor for danmaku.  1.0 = 100% scale.  0.0 = normal scale.
-        qreal               danmakuAliveTime = 10.0; //< Alive of a danmaku
+        qreal               danmakuAliveTime = 8.0; //< Alive of a danmaku
         qreal               danmakuSpacing = 6.0; //< Spacing 
         qreal               danmakuOpacity = 0.8; //< Opacity
         qreal               danmakuTracksLimit = 1.0; //< Limit Ratio

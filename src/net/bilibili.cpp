@@ -158,8 +158,6 @@ NetResult<QByteArray> BiliClient::fetchDanmakuXml(const QString &cid) {
     return fetchFile(QString("https://api.bilibili.com/x/v1/dm/list.so?oid=%1").arg(cid));
 }
 NetResult<QByteArray> BiliClient::fetchFile(const QString &url) {
-    qDebug() << "BiliClient::fetchFile " << url;
-
     QNetworkRequest request;
 
     // Mark request
@@ -170,6 +168,12 @@ NetResult<QByteArray> BiliClient::fetchFile(const QString &url) {
     auto reply = manager.get(request);
 
     connect(reply, &QNetworkReply::finished, this, [this, reply, result]() mutable {
+        qDebug() << "BiliClient::fetchFile " 
+                 << reply->url().toString() 
+                 << " Status code: " 
+                 << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+        ;
+
         Result<QByteArray> data;
 
         reply->deleteLater();
@@ -216,6 +220,7 @@ NetResult<QString> BiliClient::convertToCid(const QString &bvid) {
                 else {
                     // Error
                     ZOOD_QLOG("Failed to fetch message %1", doc["message"].toString());
+                    qDebug() << doc;
                 }
             }
         }
@@ -355,6 +360,7 @@ NetResult<BiliBangumi> BiliClient::fetchBangumiInternal(const QString &seasonID,
 
                     eps.bvid = object["bvid"].toString();
                     eps.cid = QString::number(object["cid"].toInteger());
+                    eps.id = QString::number(object["id"].toInteger());
                     eps.duration = object["duration"].toInteger();
 
                     eps.cover = object["cover"].toString();

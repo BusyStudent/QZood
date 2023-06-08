@@ -96,21 +96,8 @@ ZOOD_TEST(Network, BiliPlay) {
             play.muteButton->setText("Mute");
         }
     });
-    QObject::connect(play.loadButton, &QPushButton::clicked, [=]() mutable {
-        auto url = QInputDialog::getText(root, "Enter a URL", "URL");
-        if (url.isNull()) {
-            return;
-        }
-        auto result = bili->parseUrl(url);
-        if (result.bvid.isNull()) {
-            return;
-        }
-        // DanmakuList empty;
-        player->stop();
-        canvas->setDanmakuList(DanmakuList());
-
-        // Begin fecth
-        bili->convertToCid(result.bvid).then([=](const Result<QString> &cid) mutable {
+    auto playByBVID = [=](const QString &bvid) {
+        bili->convertToCid(bvid).then([=](const Result<QString> &cid) mutable {
             if (!cid) {
                 return;
             }
@@ -120,7 +107,7 @@ ZOOD_TEST(Network, BiliPlay) {
                     canvas->setDanmakuList(dan.value());
                 }
             });
-            bili->fetchVideoSource(cid.value(), result.bvid).then([=](const Result<BiliVideoSource> &src) mutable {
+            bili->fetchVideoSource(cid.value(), bvid).then([=](const Result<BiliVideoSource> &src) mutable {
                 if (src) {
                     player->setHttpReferer("https://www.bilibili.com");
                     player->setHttpUseragent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537");
@@ -129,6 +116,40 @@ ZOOD_TEST(Network, BiliPlay) {
                 }
             });
         });
+    };
+    QObject::connect(play.loadButton, &QPushButton::clicked, [=]() mutable {
+        auto url = QInputDialog::getText(root, "Enter a URL", "URL");
+        if (url.isNull()) {
+            return;
+        }
+        auto result = bili->parseUrl(url);
+        if (!result.episodeID.isNull()) {
+            // DanmakuList empty;
+            player->stop();
+            canvas->setDanmakuList(DanmakuList());
+            bili->fetchBangumiByEpisodeID(result.episodeID).then([=](const Result<BiliBangumi>& b) {
+                if (!b) {
+                    return;
+                }
+                for (auto &ep : b.value().episodes) {
+                    if (result.episodeID == ep.id) {
+                        playByBVID(ep.bvid);
+                    }
+                }
+            });
+            return;
+        }
+        if (result.bvid.isNull()) {
+        }
+        // DanmakuList empty;
+        player->stop();
+        canvas->setDanmakuList(DanmakuList());
+
+        // Begin fecth
+        playByBVID(result.bvid);
+    });
+    QObject::connect(player, &NekoMediaPlayer::bufferProgressChanged, [=](float n) {
+        ZOOD_QLOG("MediaPlayer status changed to %1", n);
     });
     QObject::connect(player, &NekoMediaPlayer::seekableChanged, [=](bool v) {
         play.progressSlider->setEnabled(v);

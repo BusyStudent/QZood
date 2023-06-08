@@ -40,6 +40,9 @@ void VideoCanvas::setDanmakuList(const DanmakuList &list) {
 }
 void VideoCanvas::setDanmakuPosition(qreal position) {
     d->clearTracks();
+    if (d->danmakuList.empty()) {
+        return;
+    }
 
     d->danmakuIter = d->danmakuList.begin();
     while (d->danmakuIter->position < position && d->danmakuIter != d->danmakuList.cend()) {
@@ -306,6 +309,11 @@ void VideoCanvasPrivate::addDanmaku() {
                 }
                 y += qMax(height, iter->h);
                 y += danmakuSpacing;
+
+                if (danmakuTracksLimit != 1.0 && y + iter->h >= danmakuTracksLimit * videoCanvas->height()) {
+                    // Drop on out of limits
+                    return;
+                }
             }
             // Check if out of the bounds
             if (y + height <= videoCanvas->height()) {
@@ -324,8 +332,9 @@ void VideoCanvasPrivate::addDanmaku() {
         }
         // Drop
     }
-    else if (dan.isBottom()) {
+    else if (dan.isBottom() && danmakuTracksLimit == 1.0) {
         // form Bottom to top (end to begin)
+        // Drop  if it has limit
         item.w = width;
         item.h = height;
         qreal x = 0;

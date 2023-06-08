@@ -613,6 +613,20 @@ bool DemuxerThread::load() {
 
     Q_EMIT ffmpegMediaLoaded();
 
+    // Check the URL if is network stream
+    if (stdstr.startsWith("http")) {
+        // TODO : Add more checking
+        isLocalSource = false;
+    }
+    else {
+        isLocalSource = true;
+    }
+
+    // If not playing just load, waiting for it
+    while (player->playbackState != PlaybackState::PlayingState) {
+        waitForEvent(1h);
+    }
+
     // Done
     return true;
 }
@@ -702,15 +716,19 @@ bool DemuxerThread::runDemuxer() {
                 if (hasSeek || quit) {
                     goto mainloop;
                 }
+                if (tooMuchPackets()) {
+                    waitForEvent(10ms);
+                    continue;
+                }
                 if (!readFrame(&eof)) {
                     // Failed to read frame
                     return false;
                 }
-                if (tooMuchPackets()) {
-                    waitForEvent(10ms);
-                }
             }
-            doPause(false);
+            if (player->mediaStatus != MediaStatus::BufferingMedia) {
+                // Not buffering media, restore it
+                doPause(false);
+            }
             continue;
         }
         if (player->playbackState == PlaybackState::StoppedState) {
@@ -794,9 +812,44 @@ bool DemuxerThread::readFrame(int *eof) {
         }
         av_packet_unref(packet);
     }
+
+    if (isLocalSource) {
+        return true;
+    }
+
+    // Check buffering here
+    if (player->mediaStatus == MediaStatus::BufferingMedia) {
+        if (hasEnoughPackets() || *eof) {
+            // End of buffering
+            qDebug() << "DemuxerThread leave buffering";
+            player->setMediaStatus(MediaStatus::BufferedMedia);
+            if (player->playbackState == PlaybackState::PlayingState) {
+                // Restore playing
+                doPause(false);
+            }
+        }
+        else {
+            // Buffering progressing
+            float curProgress = bufferProgress();
+            if ((curProgress - prevBufferProgress) > 0.1) {
+                prevBufferProgress = curProgress;
+
+                // TODO : Do notify the player
+                Q_EMIT ffmpegBufferProgressChanged(curProgress);
+            }
+        }
+    }
+    else {
+        if (tooLessPackets()) {
+            prevBufferProgress = 0.0f; //< Clear buffering progress
+            qDebug() << "DemuxerThread enter buffering";
+            player->setMediaStatus(MediaStatus::BufferingMedia);
+            doPause(true);
+        }
+    }
     return true;
 }
-bool DemuxerThread::tooMuchPackets() {
+bool DemuxerThread::tooMuchPackets() const {
     if (audioThread) {
         if (audioThread->packetQueue().size() > bufferedPacketsLimit) {
             return true;
@@ -809,7 +862,7 @@ bool DemuxerThread::tooMuchPackets() {
     }
     return false;
 }
-bool DemuxerThread::tooLessPackets() {
+bool DemuxerThread::tooLessPackets() const {
     if (audioThread) {
         if (audioThread->packetQueue().size() < bufferedPacketsLessThreshold) {
             return true;
@@ -821,6 +874,19 @@ bool DemuxerThread::tooLessPackets() {
         }
     }
     return false;
+}
+bool DemuxerThread::hasEnoughPackets() const {
+    if (audioThread) {
+        if (audioThread->packetQueue().size() < bufferedPacketsEnough) {
+            return false;
+        }
+    }
+    if (videoThread) {
+        if (videoThread->packetQueue().size() < bufferedPacketsEnough) {
+            return false;
+        }
+    }
+    return true;
 }
 bool DemuxerThread::sendError(int errc) {
     qDebug() << FFErrorToString(errc);
@@ -850,7 +916,7 @@ bool DemuxerThread::doSeek() {
             return sendError(errcode);
         }
     }
-    if (videoThread && formatCtxt->streams[player->audioStream]->nb_frames >= 2) {
+    if (videoThread) {
         // We didnot seek if it is a audio cover
         restoreVideo = !videoThread->isPaused();
         videoThread->pause(true);
@@ -885,7 +951,12 @@ void DemuxerThread::doUpdateClock() {
         // Time to update
         curPosition = curPos;
 
-        qDebug() << "Demuxer Position changed to" << curPosition;
+        if (audioThread && videoThread) {
+            qDebug() << "Demuxer Position changed to" << curPosition << " A-V " << audioThread->clock() - videoThread->clock();  
+        }
+        else {
+            qDebug() << "Demuxer Position changed to" << curPosition;
+        }
 
         // Update position
         Q_EMIT ffmpegPositionChanged(curPosition);
@@ -928,6 +999,30 @@ qreal DemuxerThread::bufferedDuration() const {
     }
     return duration;
 }
+float DemuxerThread::bufferProgress() const {
+    if (!audioThread && !videoThread) {
+        return 0.0;
+    }
+
+    size_t packets = std::numeric_limits<size_t>::max();
+    if (audioThread) {
+        packets = qMin(packets, audioThread->packetQueue().size());
+    }
+    if (videoThread) {
+        packets = qMin(packets, videoThread->packetQueue().size());
+    }
+
+    return double(packets - bufferedPacketsLessThreshold) / double(bufferedPacketsEnough);
+}
+bool DemuxerThread::isPictureStream(int idx) const {
+    // TODO : Improve
+    auto stream = formatCtxt->streams[idx];
+    return (stream->disposition & AV_DISPOSITION_STILL_IMAGE) || 
+           (stream->nb_frames <= 1 && stream->attached_pic.data) ||
+           (stream->codecpar->codec_id = AV_CODEC_ID_JPEG2000) ||
+           (stream->codecpar->codec_id = AV_CODEC_ID_PNG)
+    ;
+}
 
 // MediaPlayerPrivate here
 MediaPlayerPrivate::~MediaPlayerPrivate() {
@@ -958,6 +1053,10 @@ void MediaPlayerPrivate::load() {
         );
         connect(demuxerThread, &DemuxerThread::ffmpegPositionChanged, 
                 this, &MediaPlayerPrivate::demuxerPositionChanged, 
+                Qt::QueuedConnection
+        );
+        connect(demuxerThread, &DemuxerThread::ffmpegBufferProgressChanged, 
+                this, &MediaPlayerPrivate::demuxerBufferProgressChanged,  
                 Qt::QueuedConnection
         );
 
@@ -1024,9 +1123,12 @@ void MediaPlayerPrivate::setPlaybackState(PlaybackState s) {
         cb();
     }
 }
+void MediaPlayerPrivate::demuxerBufferProgressChanged(float progress) {
+    Q_EMIT player->bufferProgressChanged(progress);
+}
 void MediaPlayerPrivate::demuxerErrorOccurred(int errcode) {
-    auto str = FFErrorToString(errcode);
-    auto reason = Error::UnknownError;
+    errorString = FFErrorToString(errcode);
+    error = Error::UnknownError;
 
     switch (errcode) {
         // TODO 
@@ -1034,13 +1136,13 @@ void MediaPlayerPrivate::demuxerErrorOccurred(int errcode) {
         // Resource
         case AVERROR_PROTOCOL_NOT_FOUND:
         case AVERROR_INVALIDDATA: 
-            reason = Error::ResourceError;
+            error = Error::ResourceError;
             break;
 
         case AVERROR_DEMUXER_NOT_FOUND:
         case AVERROR_DECODER_NOT_FOUND:
         case AVERROR_MUXER_NOT_FOUND:
-            reason = Error::FormatError;
+            error = Error::FormatError;
             break;
         
         // Network
@@ -1048,13 +1150,13 @@ void MediaPlayerPrivate::demuxerErrorOccurred(int errcode) {
         case AVERROR_HTTP_NOT_FOUND:
         case AVERROR_HTTP_OTHER_4XX:
         case AVERROR_HTTP_SERVER_ERROR:
-            reason = Error::NetworkError;
+            error = Error::NetworkError;
             break;
 
         // Network AccessDeniedError
         case AVERROR_HTTP_UNAUTHORIZED:
         case AVERROR_HTTP_FORBIDDEN:
-            reason = Error::AccessDeniedError;
+            error = Error::AccessDeniedError;
             break;
     }
 
@@ -1063,10 +1165,14 @@ void MediaPlayerPrivate::demuxerErrorOccurred(int errcode) {
     demuxerThread = nullptr;
 
     updateMediaInfo();
-    Q_EMIT player->errorOccurred(reason, str);
+    Q_EMIT player->errorChanged();
+    Q_EMIT player->errorOccurred(error, errorString);
 }
 void MediaPlayerPrivate::demuxerMediaLoaded() {
     updateMediaInfo();
+
+    error = Error::NoError;
+    Q_EMIT player->errorChanged();
 }
 void MediaPlayerPrivate::demuxerPositionChanged(qreal pos) {
     Q_EMIT player->positionChanged(pos);
@@ -1178,6 +1284,18 @@ auto MediaPlayer::bufferedDuration() const -> qreal {
     }
     return 0.0;
 }
+auto MediaPlayer::bufferProgress() const -> float {
+    if (!d->demuxerThread) {
+        return 0.0;
+    }
+    return d->demuxerThread->bufferProgress();
+}
+auto MediaPlayer::errorString() const -> QString {
+    return d->errorString;
+}
+auto MediaPlayer::error() const -> Error {
+    return d->error;
+}
 
 static auto getTracks(AVFormatContext *ctxt, AVMediaType type) -> QList<MediaMetaData> {
     if (!ctxt) {
@@ -1230,6 +1348,45 @@ auto MediaPlayer::metaData() const -> MediaMetaData {
     return data;
 }
 
+auto MediaPlayer::activeAudioTrack() const -> int {
+    if (!isLoaded()) {
+        return -1;
+    }
+    return d->audioStream;
+}
+auto MediaPlayer::activeVideoTrack() const -> int {
+    if (!isLoaded()) {
+        return -1;
+    }
+    return d->videoStream;
+}
+auto MediaPlayer::activeSubtitleTrack() const -> int {
+    return -1;
+}
+
+
+// TODO : Runtime changed this track & subtitle support
+void MediaPlayer::setActiveAudioTrack(int t)  {
+    // Check if loaded
+    if (!isLoaded() || isPlaying()) {
+        return;
+    }
+    d->audioStream = t;
+}
+void MediaPlayer::setActiveVideoTrack(int t)  {
+    // Check if loaded
+    if (!isLoaded() || isPlaying()) {
+        return;
+    }
+    d->videoStream = t;
+}
+void MediaPlayer::setActiveSubtitleTrack(int t)  {
+    // Check if loaded
+    if (!isLoaded() || isPlaying()) {
+        return;
+    }
+}
+
 // Settings
 void MediaPlayer::setSource(const QUrl &url) {
     stop();
@@ -1268,6 +1425,9 @@ void MediaPlayer::setHttpUseragent(const QString &useragent) {
 }
 void MediaPlayer::setHttpReferer(const QString &referer) {
     av_dict_set(&d->options, "referer", referer.toUtf8().data(), 0);
+}
+void MediaPlayer::setInputFormat(void *i) {
+    d->inputFormat = static_cast<AVInputFormat*>(i);
 }
 void MediaPlayer::clearOptions() {
     av_dict_free(&d->options);

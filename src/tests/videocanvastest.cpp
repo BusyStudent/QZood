@@ -96,6 +96,9 @@ ZOOD_TEST(Player, VideoCanvas) {
     QObject::connect(player, &NekoMediaPlayer::mediaStatusChanged, [=](NekoMediaPlayer::MediaStatus s) {
         ZOOD_QLOG("MediaPlayer status changed to %1", QMetaEnum::fromType<NekoMediaPlayer::MediaStatus>().valueToKey(s));
     });
+    QObject::connect(player, &NekoMediaPlayer::bufferProgressChanged, [=](float n) {
+        ZOOD_QLOG("MediaPlayer status changed to %1", n);
+    });
     QObject::connect(player, &NekoMediaPlayer::seekableChanged, [=](bool v) {
         form.progressSlider->setEnabled(v);
     });
