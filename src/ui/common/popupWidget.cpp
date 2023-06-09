@@ -11,43 +11,19 @@ PopupWidget::PopupWidget(QWidget* parent, Qt::WindowFlags f) : QWidget(parent, Q
     hide();
 }
 
-void PopupWidget::setParent(QWidget *parent) {
-    if (parent != nullptr) {
-        parent->installEventFilter(this);
-    }
-    QWidget::setParent(parent);
-}
-void PopupWidget::setParent(QWidget *parent, Qt::WindowFlags f) {
-    if (parent != nullptr) {
-        parent->installEventFilter(this);
-    }
-    QWidget::setParent(parent, f);
-}
-
 void PopupWidget::enterEvent(QEnterEvent* event) {
     stopHideTimer();
     QWidget::enterEvent(event);
 }
 
-bool PopupWidget::eventFilter(QObject* obj, QEvent* event) {
-    if (obj == parent() && event->type() == QEvent::MouseButtonPress) {
-        if (!rect().contains(static_cast<QMouseEvent*>(event)->pos())) {
-            hideLater(100);
-        }
-    }
-    return QWidget::eventFilter(obj, event);
-}
-
-void PopupWidget::leaveEvent(QEvent* event) {
-    if (hide_after_leave) {
-        hideLater();
-    }
-    QWidget::leaveEvent(event);
-}
-
-void PopupWidget::show() {
+void PopupWidget::hideEvent(QHideEvent *event) {
     stopHideTimer();
+    emit hided();
+    QWidget::hideEvent(event);
+}
 
+void PopupWidget::showEvent(QShowEvent *event) {
+    stopHideTimer();
     if (auto_layout && attach_widget != nullptr) {
         // 计算容器（父窗口或屏幕），贴靠对象，自身在容器坐标系下的矩阵
         QRect containerRect, attachWidgetGeometry, selfRect;
@@ -93,20 +69,30 @@ void PopupWidget::show() {
 
         move(topLeft);
     }
-
-    QWidget::show();
     emit showed();
+    QWidget::showEvent(event);
+}
+
+bool PopupWidget::eventFilter(QObject* obj, QEvent* event) {
+    if (obj == parent() && event->type() == QEvent::MouseButtonPress) {
+        if (!rect().contains(static_cast<QMouseEvent*>(event)->pos())) {
+            qDebug() << "mouse button press outside";
+            hideLater(100);
+        }
+    }
+    return QWidget::eventFilter(obj, event);
+}
+
+void PopupWidget::leaveEvent(QEvent* event) {
+    if (hide_after_leave) {
+        hideLater();
+    }
+    QWidget::leaveEvent(event);
 }
 
 void PopupWidget::hideLater(int msec) {
     msec = msec == -1 ? defualt_hide_after_time : msec;
     timer->start(msec);
-}
-
-void PopupWidget::hide() {
-    stopHideTimer();
-    QWidget::hide();
-    emit hided();
 }
 
 void PopupWidget::stopHideTimer() {

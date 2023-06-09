@@ -26,7 +26,9 @@ void CustomizeTitleWidget::mousePressEvent(QMouseEvent *event) {
   if (event->button() == Qt::LeftButton) {
     flag_pressed = true;
     press_pos = event->globalPos();
+    diff_pos = press_pos - window()->pos();
   }
+
   QWidget::mousePressEvent(event);
 }
 
@@ -36,28 +38,23 @@ void CustomizeTitleWidget::mouseDoubleClickEvent(QMouseEvent *event) {
     } else {
         showMaximized();
     }
+
     QWidget::mouseDoubleClickEvent(event);
 }
 
 void CustomizeTitleWidget::mouseMoveEvent(QMouseEvent *event) {
-  if (flag_pressed) {
-    move_pos = event->globalPos() - press_pos;
-    press_pos += move_pos;
-  }
-
-  if (windowState() != Qt::WindowMaximized && !flag_moving) {
-    updateRegion(event);
-  }
-
-  if (flag_pressed && !flag_resizing) {
-    flag_moving = true;
-    if (isMaximized()) {
-        showNormal();
-        move(cursor().pos() - QPoint{geometry().width(), 100} / 2);
+    if (flag_pressed) {
+        move_pos = event->globalPos() - press_pos;
+        press_pos += move_pos;
     }
-    move(mapToGlobal(move_pos));
-  }
-  QWidget::mouseMoveEvent(event);
+
+    if (windowState() != Qt::WindowMaximized && !movingStatus()) {
+        updateRegion(event);
+    }
+
+    flag_moving = !resizingStatus();
+
+    QWidget::mouseMoveEvent(event);
 }
 
 void CustomizeTitleWidget::mouseReleaseEvent(QMouseEvent *event) {
@@ -79,123 +76,112 @@ void CustomizeTitleWidget::leaveEvent(QEvent *event) {
 }
 
 void CustomizeTitleWidget::updateRegion(QMouseEvent *event) {
-  QRect mainRect = geometry();
+    QRect mainRect = window()->geometry();
 
-  int marginTop = event->globalY() - mainRect.y();
-  int marginBottom = mainRect.y() + mainRect.height() - event->globalY();
-  int marginLeft = event->globalX() - mainRect.x();
-  int marginRight = mainRect.x() + mainRect.width() - event->globalX();
+    int marginTop = event->globalY() - mainRect.y();
+    int marginBottom = mainRect.y() + mainRect.height() - event->globalY();
+    int marginLeft = event->globalX() - mainRect.x();
+    int marginRight = mainRect.x() + mainRect.width() - event->globalX();
 
-  if (!flag_resizing) {
-    if ((marginRight >= MARGIN_MIN_SIZE && marginRight <= MARGIN_MAX_SIZE) &&
-        ((marginBottom <= MARGIN_MAX_SIZE) &&
-         marginBottom >= MARGIN_MIN_SIZE)) {
-      m_direction = BOTTOMRIGHT;
-      setCursor(Qt::SizeFDiagCursor);
-    } else if ((marginTop >= MARGIN_MIN_SIZE && marginTop <= MARGIN_MAX_SIZE) &&
-               (marginRight >= MARGIN_MIN_SIZE &&
-                marginRight <= MARGIN_MAX_SIZE)) {
-      m_direction = TOPRIGHT;
-      setCursor(Qt::SizeBDiagCursor);
-    } else if ((marginLeft >= MARGIN_MIN_SIZE &&
-                marginLeft <= MARGIN_MAX_SIZE) &&
-               (marginTop >= MARGIN_MIN_SIZE && marginTop <= MARGIN_MAX_SIZE)) {
-      m_direction = TOPLEFT;
-      setCursor(Qt::SizeFDiagCursor);
-    } else if ((marginLeft >= MARGIN_MIN_SIZE &&
-                marginLeft <= MARGIN_MAX_SIZE) &&
-               (marginBottom >= MARGIN_MIN_SIZE &&
-                marginBottom <= MARGIN_MAX_SIZE)) {
-      m_direction = BOTTOMLEFT;
-      setCursor(Qt::SizeBDiagCursor);
-    } else if (marginBottom <= MARGIN_MAX_SIZE &&
-               marginBottom >= MARGIN_MIN_SIZE) {
-      m_direction = DOWN;
-      setCursor(Qt::SizeVerCursor);
-    } else if (marginLeft <= MARGIN_MAX_SIZE - 1 &&
-               marginLeft >= MARGIN_MIN_SIZE - 1) {
-      m_direction = LEFT;
-      setCursor(Qt::SizeHorCursor);
-    } else if (marginRight <= MARGIN_MAX_SIZE &&
-               marginRight >= MARGIN_MIN_SIZE) {
-      m_direction = RIGHT;
-      setCursor(Qt::SizeHorCursor);
-    } else if (marginTop <= MARGIN_MAX_SIZE && marginTop >= MARGIN_MIN_SIZE) {
-      m_direction = UP;
-      setCursor(Qt::SizeVerCursor);
-    } else {
-      if (!flag_pressed) {
-        setCursor(Qt::ArrowCursor);
-      }
+    if (!resizingStatus()) {
+        m_direction = NONE;
+        if ((marginRight >= MARGIN_MIN_SIZE && 
+             marginRight <= MARGIN_MAX_SIZE) &&
+           ((marginBottom <= MARGIN_MAX_SIZE) &&
+             marginBottom >= MARGIN_MIN_SIZE)) {
+            m_direction = BOTTOMRIGHT;
+            setCursor(Qt::SizeFDiagCursor);
+        } else if ((marginTop >= MARGIN_MIN_SIZE && 
+                    marginTop <= MARGIN_MAX_SIZE) &&
+                   (marginRight >= MARGIN_MIN_SIZE &&
+                    marginRight <= MARGIN_MAX_SIZE)) {
+            m_direction = TOPRIGHT;
+            setCursor(Qt::SizeBDiagCursor);
+        } else if ((marginLeft >= MARGIN_MIN_SIZE &&
+                    marginLeft <= MARGIN_MAX_SIZE) &&
+                   (marginTop >= MARGIN_MIN_SIZE && 
+                    marginTop <= MARGIN_MAX_SIZE)) {
+            m_direction = TOPLEFT;
+            setCursor(Qt::SizeFDiagCursor);
+        } else if ((marginLeft >= MARGIN_MIN_SIZE &&
+                    marginLeft <= MARGIN_MAX_SIZE) &&
+                   (marginBottom >= MARGIN_MIN_SIZE &&
+                    marginBottom <= MARGIN_MAX_SIZE)) {
+            m_direction = BOTTOMLEFT;
+            setCursor(Qt::SizeBDiagCursor);
+        } else if (marginBottom <= MARGIN_MAX_SIZE &&
+                   marginBottom >= MARGIN_MIN_SIZE) {
+            m_direction = DOWN;
+            setCursor(Qt::SizeVerCursor);
+        } else if (marginLeft <= MARGIN_MAX_SIZE &&
+                   marginLeft >= MARGIN_MIN_SIZE) {
+            m_direction = LEFT;
+            setCursor(Qt::SizeHorCursor);
+        } else if (marginRight <= MARGIN_MAX_SIZE &&
+                   marginRight >= MARGIN_MIN_SIZE) {
+            m_direction = RIGHT;
+            setCursor(Qt::SizeHorCursor);
+        } else if (marginTop <= MARGIN_MAX_SIZE && 
+                   marginTop >= MARGIN_MIN_SIZE) {
+            m_direction = UP;
+            setCursor(Qt::SizeVerCursor);
+        } else {
+            setCursor(Qt::ArrowCursor);
+        }
     }
-  }
 
-  if (NONE != m_direction) {
-    flag_resizing = true;
-    resizeRegion(marginTop, marginBottom, marginLeft, marginRight);
-  }
+    flag_resizing = flag_pressed ? flag_resizing : (NONE != m_direction);
+
+    if (resizingStatus()) {
+        resizeRegion(marginTop, marginBottom, marginLeft, marginRight);
+        event->accept();
+    }
 }
+
 void CustomizeTitleWidget::resizeRegion(int marginTop, int marginBottom,
                                         int marginLeft, int marginRight) {
-  if (flag_pressed && flag_resizing) {
-    switch (m_direction) {
-      case BOTTOMRIGHT: {
-        QRect rect = geometry();
-        rect.setBottomRight(rect.bottomRight() + move_pos);
-        setGeometry(rect);
-      } break;
-      case TOPRIGHT: {
-        if (marginLeft > minimumWidth() && marginBottom > minimumHeight()) {
-          QRect rect = geometry();
-          rect.setTopRight(rect.topRight() + move_pos);
-          setGeometry(rect);
-        }
-      } break;
-      case TOPLEFT: {
-        if (marginRight > minimumWidth() && marginBottom > minimumHeight()) {
-          QRect rect = geometry();
-          rect.setTopLeft(rect.topLeft() + move_pos);
-          setGeometry(rect);
-        }
-      } break;
-      case BOTTOMLEFT: {
-        if (marginRight > minimumWidth() && marginTop > minimumHeight()) {
-          QRect rect = geometry();
-          rect.setBottomLeft(rect.bottomLeft() + move_pos);
-          setGeometry(rect);
-        }
-      } break;
-      case RIGHT: {
-        QRect rect = geometry();
-        rect.setWidth(rect.width() + move_pos.x());
-        setGeometry(rect);
-      } break;
-      case DOWN: {
-        QRect rect = geometry();
-        rect.setHeight(rect.height() + move_pos.y());
-        setGeometry(rect);
-      } break;
-      case LEFT: {
-        if (marginRight > minimumWidth()) {
-          QRect rect = geometry();
-          rect.setLeft(rect.x() + move_pos.x());
-          setGeometry(rect);
-        }
-      } break;
-      case UP: {
-        if (marginBottom > minimumHeight()) {
-          QRect rect = geometry();
-          rect.setTop(rect.y() + move_pos.y());
-          setGeometry(rect);
-        }
-      } break;
-      default: {
-      } break;
+    if (NONE == m_direction) {
+        return;
     }
-  } else {
-    flag_resizing = false;
-    m_direction = NONE;
-  }
+    QRect rect = frameGeometry();
+    switch (m_direction) {
+        case BOTTOMRIGHT: {
+            rect.setBottomRight(rect.bottomRight() + move_pos);
+        } break;
+        case TOPRIGHT: {
+        if (marginLeft > minimumWidth() && marginBottom > minimumHeight()) {
+            rect.setTopRight(rect.topRight() + move_pos);
+        }
+        } break;
+        case TOPLEFT: {
+        if (marginRight > minimumWidth() && marginBottom > minimumHeight()) {
+            rect.setTopLeft(rect.topLeft() + move_pos);
+        }
+        } break;
+        case BOTTOMLEFT: {
+        if (marginRight > minimumWidth() && marginTop > minimumHeight()) {
+            rect.setBottomLeft(rect.bottomLeft() + move_pos);
+        }
+        } break;
+        case RIGHT: {
+            rect.setWidth(rect.width() + move_pos.x());
+        } break;
+        case DOWN: {
+            rect.setHeight(rect.height() + move_pos.y());
+        } break;
+        case LEFT: {
+        if (marginRight > minimumWidth()) {
+            rect.setLeft(rect.x() + move_pos.x());
+        }
+        } break;
+        case UP: {
+        if (marginBottom > minimumHeight()) {
+            rect.setTop(rect.y() + move_pos.y());
+        }
+        } break;
+    }
+    setGeometry(rect);
+
 }
 void CustomizeTitleWidget::showMinimized() { QWidget::showMinimized(); }
 void CustomizeTitleWidget::showMaximized() {

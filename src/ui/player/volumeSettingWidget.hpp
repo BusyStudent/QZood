@@ -13,6 +13,7 @@ class VolumeSettingWidget : public PopupWidget{
 
     Q_SIGNALS:
         void valueChanged(int value);
+        void sliderMoved(int position);
     
     public Q_SLOTS:
         void setValue(int value);

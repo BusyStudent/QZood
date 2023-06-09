@@ -15,6 +15,7 @@ Zood::Zood(QWidget *parent) : CustomizeTitleWidget(parent), ui(new Ui::Zood()) {
     // 得到设计器生成的类指针。
     // 设置设计器设计的UI布局。
     ui->setupUi(this);
+    setWindowTitle("QZood");
     // 应用自定义窗口基类定义的容器shadow
     createShadow(ui->containerWidget);
     
@@ -115,6 +116,17 @@ void Zood::resizeEvent(QResizeEvent *event) {
         is_maximized = false;
 		ui->maximizeButton->setIcon(QIcon(":/icons/maximize.png"));
 	}
+
+    CustomizeTitleWidget::resizeEvent(event);
+}
+
+void Zood::mouseMoveEvent(QMouseEvent* event) {
+    if (movingStatus() && ui->topBarWidget->geometry().contains(event->pos())) {
+        window()->move(event->globalPos() - diff_pos);
+        event->accept();
+    }
+
+    CustomizeTitleWidget::mouseMoveEvent(event);
 }
 
 bool Zood::eventFilter(QObject *obj, QEvent *e) {

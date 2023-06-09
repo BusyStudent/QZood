@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>905</width>
+    <width>904</width>
     <height>689</height>
    </rect>
   </property>
@@ -18,9 +18,18 @@
 	background: transparent;
 }
 
-QLabel#winTitle, QLabel#videoTitle, QLabel#videoTimeLabel {
+QLabel#winTitle, QLabel#videoTitle {
 	color: white;
 }
+
+QToolButton#onTopButton {
+	image: url(:/icons/pin_on.png);
+}
+
+QToolButton#onTopButton:checked {
+	image: url(:/icons/pin_off.png);
+}
+
 QWidget#titleBar {
 	border-top-left-radius: 10px;
 	border-top-right-radius: 10px;
@@ -144,9 +153,8 @@ QListWidget#playlist::item:selected {
            <property name="text">
             <string/>
            </property>
-           <property name="icon">
-            <iconset resource="../../../resources/resources.qrc">
-             <normaloff>:/icons/pin_on.png</normaloff>:/icons/pin_on.png</iconset>
+           <property name="checkable">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
@@ -343,16 +351,6 @@ QListWidget#playlist::item:selected {
               <height>0</height>
              </size>
             </property>
-            <item>
-             <property name="text">
-              <string>新建项目</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>新建项目12</string>
-             </property>
-            </item>
            </widget>
           </item>
          </layout>

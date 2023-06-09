@@ -27,17 +27,15 @@ class PopupWidget : public QWidget {
         inline bool defualtHideTime() { return defualt_hide_after_time; }
 
     public:
-        void setParent(QWidget *parent);
-        void setParent(QWidget *parent, Qt::WindowFlags f);
         void enterEvent(QEnterEvent* event) override;
         void leaveEvent(QEvent* event) override;
         bool eventFilter(QObject* obj, QEvent* event) override;
+        void hideEvent(QHideEvent *event) override;
+        void showEvent(QShowEvent *event) override;
 
     public Q_SLOTS:
-        void show();
         void hideLater(int msec = -1); 
         void stopHideTimer();
-        void hide();
 
     Q_SIGNALS:
         void showed();

@@ -39,7 +39,6 @@ void FullSettingWidget::_setupUi() {
     // ====================播放设置====================
     // 播放速度去value / 10倍。
     ui->playbackRateBar->setRange(5, 30);
-
     connect(ui->playbackRateBar, &QSlider::valueChanged, this, [this](int value){
         ui->playbackRateBar->setToolTip(QString::number(_playbackRate(value), 'g', 2));
     });
@@ -55,11 +54,15 @@ void FullSettingWidget::_setupUi() {
     connect(ui->playbackRate3, &QPushButton::clicked, this, [this](bool chlicked){
         ui->playbackRateBar->setValue(30);
     });
-    
 
     // ====================画面设置====================
-
+    // TODO(llhsdmd@gmail.com) : 画面设置ui功能实现
 }
+
+void FullSettingWidget::setSkipStep(int value) {
+    // TODO(llhsdmd@gmail.com) : 设置视频跳过步长
+}
+
 
 void FullSettingWidget::_setup() {
     // ====================播放设置====================
@@ -70,4 +73,8 @@ void FullSettingWidget::_setup() {
 void FullSettingWidget::show() {
     PopupWidget::show();
     ui->settingList->setFocus();
+}
+
+void FullSettingWidget::setPlaybackRate(double value) {
+    ui->playbackRateBar->setValue(_playbackRate(value));
 }

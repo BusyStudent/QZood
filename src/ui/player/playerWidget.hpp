@@ -3,6 +3,7 @@
 #include <QWidget>
 #include <QToolButton>
 #include <QMenu>
+#include <QTimer>
 
 #include "../common/customizeTitleWidget.hpp"
 #include "../common/popupWidget.hpp"
@@ -19,9 +20,13 @@ class VideoSettingWidget : public PopupWidget {
     Q_OBJECT
     public:
         VideoSettingWidget(QWidget* parent = nullptr);
-    
+
+    public Q_SLOTS:
+        void showLog(const QString& info);
+
     private:
         Ui::VideoSettingView* ui;
+        QTimer* timer;
 
     friend class PlayerWidget;
 };
@@ -37,14 +42,23 @@ class PlayerWidget : public CustomizeTitleWidget {
         void mouseMoveEvent(QMouseEvent* event) override;
         bool eventFilter(QObject* obj,QEvent* event) override;
         void leaveEvent(QEvent* event) override;
+        void dragEnterEvent(QDragEnterEvent *event) override;
+        void dropEvent(QDropEvent *event) override;
+        void showEvent(QShowEvent* evnt) override;
 
     public Q_SLOTS:
-        // void clearPlayList();
+        void clearPlayList();
+        void playVideo(const QString& url);
         // void addVideoToPlayList();
 
     private:
         void _setupUi();
+        void _setupProgressBar();
+        void _setupVolumeSetting();
+        void _setupVideoPlay();
+        void _setupPlayList();
         bool _doLater(std::function<void()> func);
+
     private:
         Ui::PlayerView* ui;
         VideoWidget* videoWidget;

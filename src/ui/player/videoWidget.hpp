@@ -8,21 +8,46 @@ class VideoWidget : public QWidget{
     Q_OBJECT
     public:
         VideoWidget(QWidget* parent = nullptr);
+        ~VideoWidget();
         int duration();
         int position();
-        int volume();
+        inline int volume() { return audio->volume() * 100; }
+        inline bool isSeekable() { return player->isSeekable(); }
 
     public:
         void resizeEvent(QResizeEvent* event) override;
+        void dragEnterEvent(QDragEnterEvent *event) override;
+        void dropEvent(QDropEvent *event) override;
+        void mousePressEvent(QMouseEvent *event) override;
+        void mouseMoveEvent(QMouseEvent *event) override;
+        void mouseReleaseEvent(QMouseEvent *event) override;
+        void paintEvent(QPaintEvent* event) override;
+        void keyPressEvent(QKeyEvent *event) override;
 
     Q_SIGNALS:
-        void positionChanged(int sec);
+        void sourceChanged(const QUrl& url);
+
         void durationChanged(int sec);
+
+        void seekableChanged(bool seekable);
+
+        void positionChanged(int sec);
+        void bufferProgressChanged(int sec);
+
         void volumeChanged(int value);
+
+        void runError(const QString& errorMessage);
+        
+        void playing();
+        void paused();
+        void stoped();
+
+        void skipStepChange(int sec);
 
     public Q_SLOTS:
         void setVolume(int value);
         void setPosition(int sec);
+        void setSkipStep(int sec);
         void playVideo(const QUrl& url);
         void playVideo(QIODevice* device);
         void pauseVideo();
@@ -34,4 +59,6 @@ class VideoWidget : public QWidget{
         VideoCanvas* vcanvas;
         NekoMediaPlayer* player;
         NekoAudioOutput* audio;
+
+        int skipStep = 5;
 };

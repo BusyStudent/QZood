@@ -30,6 +30,7 @@ class Zood : public CustomizeTitleWidget {
         void resizeEvent(QResizeEvent *event) override;
         bool eventFilter(QObject *obj, QEvent *e) override;
         void setPredictStringList(QStringList indicator);
+        void mouseMoveEvent(QMouseEvent* event) override;
 
     Q_SIGNALS:
         void editTextChanged(const QString &);

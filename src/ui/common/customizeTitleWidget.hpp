@@ -30,10 +30,15 @@ class CustomizeTitleWidget : public QWidget {
   void showMaximized();
   void showFullScreen();
   void showNormal();
+  inline bool resizingStatus() { return flag_resizing && flag_pressed; }
+  inline bool movingStatus() { return flag_moving && flag_pressed; }
+  inline void setResizingStatus(bool v) { flag_resizing = v; }
+  inline void setMovingStatus(bool v) { flag_moving = v; }
+
 
  private:
-  const int MARGIN_MIN_SIZE = 0;
-  const int MARGIN_MAX_SIZE = 10;
+  const int MARGIN_MIN_SIZE = -10;
+  const int MARGIN_MAX_SIZE = 5;
   enum MovingDirection {
     NONE,
     BOTTOMRIGHT,
@@ -46,10 +51,11 @@ class CustomizeTitleWidget : public QWidget {
     UP
   };
 
- private:
+ protected:
   MovingDirection m_direction = NONE;
   QPoint press_pos;
   QPoint move_pos;
+  QPoint diff_pos;
   bool flag_resizing = false;
   bool flag_pressed = false;
   bool flag_moving = false;

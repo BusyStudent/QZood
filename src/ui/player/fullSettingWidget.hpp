@@ -14,6 +14,7 @@ class FullSettingWidget : public PopupWidget {
     public Q_SLOTS:
         void show();
         void setPlaybackRate(double value);
+        void setSkipStep(int value);
 
     Q_SIGNALS:
         void playbackRateChanged(int value);
