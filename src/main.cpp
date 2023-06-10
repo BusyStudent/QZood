@@ -27,7 +27,7 @@ void OpenTerminal(QWidget *parent)
     hboxlayout->addWidget(widget);
 }
 #else
-void OpenTerminal(){ }
+void OpenTerminal(QWidget *parent) { }
 #endif
 
 int main(int argc, char **argv) {

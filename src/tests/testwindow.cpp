@@ -20,7 +20,13 @@
 #define CONSOLE_YELLOW  CONSOLE_GREEN | FOREGROUND_RED
 #define CONSOLE_LIGHTBLUE  CONSOLE_GREEN | FOREGROUND_BLUE
 #else
-
+#define SetConsoleColor(color)
+#define CONSOLE_RED     
+#define CONSOLE_GREEN   
+#define CONSOLE_BLUE    
+#define CONSOLE_DEFAULT 
+#define CONSOLE_YELLOW  
+#define CONSOLE_LIGHTBLUE 
 #endif
 
 struct TestTask {

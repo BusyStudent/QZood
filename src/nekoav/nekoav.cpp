@@ -539,19 +539,19 @@ bool DemuxerThread::load() {
             ioBufferSize,
             ioDevice->isWritable(),
             ioDevice,
-            ioDevice->isReadable() ? [](void *opaque, uint8_t *buf, int buf_size) -> int {
+            ioDevice->isReadable() ? +[](void *opaque, uint8_t *buf, int buf_size) -> int {
                 auto dev = static_cast<QIODevice *>(opaque);
                 auto n = dev->read((char *)buf, buf_size);
 
                 return n;
             } : nullptr,
-            ioDevice->isWritable() ? [](void *opaque, uint8_t *buf, int buf_size) -> int {
+            ioDevice->isWritable() ? +[](void *opaque, uint8_t *buf, int buf_size) -> int {
                 auto dev = static_cast<QIODevice *>(opaque);
                 auto n = dev->write((char*)buf, buf_size);
 
                 return n;
             } : nullptr,
-            !ioDevice->isSequential() ? [](void *opaque, int64_t offset, int whence) -> int64_t {
+            !ioDevice->isSequential() ? +[](void *opaque, int64_t offset, int whence) -> int64_t {
                 auto dev = static_cast<QIODevice *>(opaque);
                 auto pos = dev->pos();                
 
