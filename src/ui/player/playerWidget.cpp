@@ -8,8 +8,26 @@
 #include <QMimeData>
 #include <QTime>
 
+static QString timeFormat(int sec) {
+    if (sec < 60 * 60) {
+        return QString("%1:%2").
+            arg(sec / 60, 2, 10, QLatin1Char('0')).
+            arg(sec % 60, 2, 10, QLatin1Char('0'));
+    } else {
+        return QString("%1:%2:%3").
+            arg(sec / 3600).
+            arg((sec % 3600) / 60, 2, 10, QLatin1Char('0')).
+            arg(sec % 60, 2, 10, QLatin1Char('0'));
+    }
+}
+
 VideoSettingWidget::VideoSettingWidget(QWidget* parent) : PopupWidget(parent), ui(new Ui::VideoSettingView) {
     ui->setupUi(this);
+
+    videoProgressBar = new CustomSlider();
+    videoProgressBar->setObjectName("videoProgressBar");
+    static_cast<QVBoxLayout*>(layout())->insertWidget(1, videoProgressBar);
+
     timer = new QTimer(this);
     timer->setSingleShot(true);
 
@@ -23,6 +41,11 @@ VideoSettingWidget::VideoSettingWidget(QWidget* parent) : PopupWidget(parent), u
             }, Qt::QueuedConnection);
         }
     });
+
+    connect(videoProgressBar, &CustomSlider::tipBeforeShow, this, [this](QLabel *label, int value){
+        label->setText(timeFormat(value));
+        label->updateGeometry();
+    }, Qt::ConnectionType::DirectConnection);
 }
 
 void VideoSettingWidget::showLog(const QString& info) {
@@ -112,7 +135,9 @@ void PlayerWidget::leaveEvent(QEvent* event) {
 }
 
 void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
-    if (ui->videoPlayContainer->geometry().contains(event->pos())) {
+    auto topLeft = ui->videoPlayContainer->mapToGlobal(QPoint(0, 0));
+    auto bottomRight = ui->videoPlayContainer->mapToGlobal(QPoint(ui->videoPlayContainer->size().width(), ui->videoPlayContainer->size().height()));
+    if (QRect(topLeft, bottomRight).contains(event->globalPos())) {
         QMetaObject::invokeMethod(this, [this](){
             videoSetting->show();
             videoSetting->hideLater(5000);
@@ -129,38 +154,22 @@ void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void PlayerWidget::_setupProgressBar() {
-    videoSetting = new VideoSettingWidget();
-    ui->videoPlayContainer->layout()->addWidget(videoSetting);
-    videoSetting->show();
-    videoSetting->ui->videoProgressBar->setDisabled(true);
+    videoSetting->videoProgressBar->setDisabled(true);
 
 
     connect(videoWidget, &VideoWidget::durationChanged, this, [this](int sec){
-        videoSetting->ui->videoProgressBar->setRange(0, sec);
+        videoSetting->videoProgressBar->setRange(0, sec);
     });
 
     connect(videoWidget, &VideoWidget::stoped, this, [this](){
-        videoSetting->ui->videoProgressBar->setDisabled(true);
+        videoSetting->videoProgressBar->setDisabled(true);
     });
 
     connect(videoWidget, &VideoWidget::seekableChanged, this, [this](bool v) {
-        videoSetting->ui->videoProgressBar->setEnabled(v);
+        videoSetting->videoProgressBar->setEnabled(v);
     });
 
-    auto timeFormat = [](int sec) -> QString {
-        if (sec < 60 * 60) {
-            return QString("%1:%2").
-                arg(sec / 60, 2, 10, QLatin1Char('0')).
-                arg(sec % 60, 2, 10, QLatin1Char('0'));
-        } else {
-            return QString("%1:%2:%3").
-                arg(sec / 3600).
-                arg((sec % 3600) / 60, 2, 10, QLatin1Char('0')).
-                arg(sec % 60, 2, 10, QLatin1Char('0'));
-        }
-    };
-
-    connect(videoWidget, &VideoWidget::positionChanged, this, [this, timeFormat](int value){
+    connect(videoWidget, &VideoWidget::positionChanged, this, [this](int value){
         auto total = timeFormat(videoWidget->duration());
         auto current = timeFormat(value);
         if (total.length() > current.length()) {
@@ -170,13 +179,13 @@ void PlayerWidget::_setupProgressBar() {
         }
         videoSetting->ui->videoTimeLabel->setText(current + "/" + total);
 
-        if (videoSetting->ui->videoProgressBar->isSliderDown()) {
+        if (videoSetting->videoProgressBar->isSliderDown()) {
             return;
         }
-        videoSetting->ui->videoProgressBar->setValue(value);
+        videoSetting->videoProgressBar->setValue(value);
     });
 
-    connect(videoSetting->ui->videoProgressBar, &QSlider::sliderMoved, videoWidget, [this](int position){
+    connect(videoSetting->videoProgressBar, &QSlider::sliderMoved, videoWidget, [this](int position){
         videoWidget->setPosition(position);
     });
 }
@@ -251,6 +260,9 @@ void PlayerWidget::_setupPlayList() {
 
 
 void PlayerWidget::_setupVideoPlay() {
+    videoWidget->lower();
+    videoWidget->setWindowFlag(Qt::WindowTransparentForInput, true);
+    videoWidget->setAttribute(Qt::WA_PaintOnScreen);
     // 连接播放按钮的行为
     videoSetting->ui->playerButton->setCheckable(false);
     videoSetting->ui->playerButton->setChecked(false);
@@ -297,10 +309,16 @@ void PlayerWidget::_setupUi() {
         }
     });
     
-    // 设置视频播放核心控件
+    // 实例化视频播放核心控件
     videoWidget = new VideoWidget(ui->videoPlayContainer);
     videoWidget->resize(ui->videoPlayContainer->size());
     ui->videoPlayContainer->installEventFilter(this);
+
+    // 实例化视频播放进度条及设置栏
+    videoSetting = new VideoSettingWidget();
+    ui->videoPlayContainer->layout()->addWidget(videoSetting);
+    videoSetting->show();
+
 
     // 设置可以自动隐藏的进度条栏
     _setupProgressBar();

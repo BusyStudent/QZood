@@ -11,18 +11,15 @@ class VideoWidget : public QWidget{
         ~VideoWidget();
         int duration();
         int position();
-        inline int volume() { return audio->volume() * 100; }
+        inline int volume() { return (audio->volume() + 0.005) * 100; }
         inline bool isSeekable() { return player->isSeekable(); }
 
     public:
         void resizeEvent(QResizeEvent* event) override;
         void dragEnterEvent(QDragEnterEvent *event) override;
         void dropEvent(QDropEvent *event) override;
-        void mousePressEvent(QMouseEvent *event) override;
-        void mouseMoveEvent(QMouseEvent *event) override;
-        void mouseReleaseEvent(QMouseEvent *event) override;
-        void paintEvent(QPaintEvent* event) override;
         void keyPressEvent(QKeyEvent *event) override;
+        bool eventFilter(QObject* obj, QEvent* event) override;
 
     Q_SIGNALS:
         void sourceChanged(const QUrl& url);

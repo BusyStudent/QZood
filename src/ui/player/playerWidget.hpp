@@ -10,6 +10,7 @@
 #include "volumeSettingWidget.hpp"
 #include "videoWidget.hpp"
 #include "fullSettingWidget.hpp"
+#include "../common/customSlider.hpp"
 
 namespace Ui {
 class PlayerView;
@@ -27,6 +28,7 @@ class VideoSettingWidget : public PopupWidget {
     private:
         Ui::VideoSettingView* ui;
         QTimer* timer;
+        CustomSlider* videoProgressBar;
 
     friend class PlayerWidget;
 };

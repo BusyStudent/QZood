@@ -63,7 +63,8 @@ QLabel#volumeValue {
 QWidget#container {
 	border: 1px solid #404040;
 	background: #404040;
-}</string>
+}
+</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="spacing">

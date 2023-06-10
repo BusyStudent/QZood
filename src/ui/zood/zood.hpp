@@ -10,9 +10,6 @@
 #include <QCompleter>
 #include <QLineEdit>
 
-class HomeWidget;
-class VideoView;
-
 namespace Ui {
 class Zood;
 }

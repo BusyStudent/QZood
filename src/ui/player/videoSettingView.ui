@@ -129,13 +129,6 @@ QLabel#videoTimeLabel {
     </widget>
    </item>
    <item>
-    <widget class="QSlider" name="videoProgressBar">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item>
     <widget class="QWidget" name="settingBar" native="true">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Preferred" vsizetype="Preferred">

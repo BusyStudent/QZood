@@ -47,7 +47,7 @@ QGroupBox {
 	border: none;
 }
 QPushButton {
-	border: 1px solid white;
+	border: none;
 	padding: 4px;
 }
 QPushButton:hover {
@@ -175,7 +175,7 @@ QToolButton:hover, QToolButton:checked {
       </sizepolicy>
      </property>
      <property name="currentIndex">
-      <number>4</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="playSetting">
       <property name="sizePolicy">

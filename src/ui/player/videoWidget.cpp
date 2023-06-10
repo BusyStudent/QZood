@@ -4,14 +4,16 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QMimeData>
+#include <QApplication>
 
 VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent) {
+    setMinimumSize(100,75);
     audio = new NekoAudioOutput();
     player = new NekoMediaPlayer();
     player->setAudioOutput(audio);
     vcanvas = new VideoCanvas(this);
-    vcanvas->attachPlayer(player);
     vcanvas->lower();
+    vcanvas->attachPlayer(player);
     vcanvas->resize(size());
     vcanvas->installEventFilter(this);
 
@@ -24,7 +26,7 @@ VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent) {
     });
 
     connect(audio, &NekoAudioOutput::volumeChanged, this, [this](float value){
-        emit volumeChanged(value * 100);
+        emit volumeChanged((value + 0.005) * 100);
     });
 
     connect(player, &NekoMediaPlayer::errorOccurred, this, [this](NekoMediaPlayer::Error error, const QString &errorString){
@@ -63,6 +65,7 @@ VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent) {
     // 设置窗口属性
     setAcceptDrops(true); // 支持从文件夹拖拽
     setFocusPolicy(Qt::StrongFocus); // 支持快捷键输入
+    setAttribute(Qt::WA_TranslucentBackground);
 }
 
 void VideoWidget::dragEnterEvent(QDragEnterEvent *event) {
@@ -92,31 +95,15 @@ void VideoWidget::resizeEvent(QResizeEvent* event) {
     vcanvas->resize(size());
 }
 
-void VideoWidget::paintEvent(QPaintEvent* event) {
-    if (parentWidget() != nullptr) {
-        parentWidget()->update();
+bool VideoWidget::eventFilter(QObject* obj, QEvent* event) {
+    if (obj == vcanvas && event->type() == QEvent::Paint) {
+        qDebug() << "[VideoWidget]: vcanvas paint";
+        update();
     }
-
-}
-
-
-void VideoWidget::mousePressEvent(QMouseEvent *event) {
-    if (event->button() == Qt::MouseButton::LeftButton) {
-        
-    }
-
-    QWidget::mousePressEvent(event);
-}
-void VideoWidget::mouseMoveEvent(QMouseEvent *event) {
-    QWidget::mouseMoveEvent(event);
-}
-
-void VideoWidget::mouseReleaseEvent(QMouseEvent *event) {
-    QWidget::mouseReleaseEvent(event);
+    return QWidget::eventFilter(obj, event);
 }
 
 void VideoWidget::setVolume(int value) {
-    qDebug() << "setVolume : " << value;
     value = std::clamp(value, 0, 100);
     audio->setVolume((float) value / 100.0);
 }
@@ -148,14 +135,20 @@ void VideoWidget::keyPressEvent(QKeyEvent *event) {
     } else if(event->key() == Qt::Key_Right) {
         setPosition(position() + skipStep);
     } else if(event->key() == Qt::Key_Up) {
+        qDebug() << "[videoWidget][volume ++][before] : \n" << "volume : " << volume() << "\n audio->volume : " << audio->volume() << "\n audio->volume * 100 : " << audio->volume() * 100.0;
         setVolume(volume() + 10);
+        qDebug() << "[videoWidget][volume ++][after] : \n" << "volume : " << volume() << "\n audio->volume : " << audio->volume();
     } else if(event->key() == Qt::Key_Down) {
+        qDebug() << "[videoWidget][volume --][befor] : \n" << "volume : " << volume() << "\n audio->volume : " << audio->volume() << "\n audio->volume * 100 : " << audio->volume() * 100.0;
         setVolume(volume() - 10);
+        qDebug() << "[videoWidget][volume --][after] : \n" << "volume : " << volume() << "\n audio->volume : " << audio->volume();
     } else if (event->key() == Qt::Key_Space) {
         if (player->hasVideo()) {
             player->isPlaying() ? player->pause() : player->play();
         }
     }
+
+    QWidget::keyPressEvent(event);
 }
 
 void VideoWidget::setSkipStep(int sec) {
