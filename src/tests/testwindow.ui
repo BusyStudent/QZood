@@ -22,6 +22,9 @@
   <property name="windowTitle">
    <string>Unit Test</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true"/>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -75,6 +78,11 @@
          <height>0</height>
         </size>
        </property>
+       <property name="styleSheet">
+        <string notr="true">QTreeWidget{
+	border: none;
+}</string>
+       </property>
        <property name="autoScrollMargin">
         <number>16</number>
        </property>
@@ -103,26 +111,32 @@
       </widget>
      </widget>
     </item>
+    <item>
+     <widget class="Line" name="line">
+      <property name="cursor">
+       <cursorShape>ArrowCursor</cursorShape>
+      </property>
+      <property name="mouseTracking">
+       <bool>false</bool>
+      </property>
+      <property name="autoFillBackground">
+       <bool>true</bool>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">QWidget{
+	color: #C0C0C0;
+}</string>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Plain</enum>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
-  <widget class="QMenuBar" name="menubar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>884</width>
-     <height>22</height>
-    </rect>
-   </property>
-   <widget class="QMenu" name="menuFile">
-    <property name="title">
-     <string>File</string>
-    </property>
-    <addaction name="actionClose"/>
-   </widget>
-   <addaction name="menuFile"/>
-  </widget>
-  <widget class="QStatusBar" name="statusbar"/>
   <widget class="QDockWidget" name="movableWidget">
    <property name="enabled">
     <bool>true</bool>
@@ -135,8 +149,8 @@
    </property>
    <property name="minimumSize">
     <size>
-     <width>156</width>
-     <height>100</height>
+     <width>222</width>
+     <height>237</height>
     </size>
    </property>
    <property name="mouseTracking">
@@ -210,7 +224,7 @@ QTabBar::tab:hover {
        <property name="currentIndex">
         <number>0</number>
        </property>
-       <widget class="QWidget" name="tabWidgetPage1" native="true">
+       <widget class="QWidget" name="tabWidgetPage1">
         <attribute name="title">
          <string/>
         </attribute>
@@ -259,7 +273,7 @@ QTabBar::tab:hover {
          </item>
         </layout>
        </widget>
-       <widget class="QWidget" name="tabWidgetPage2" native="true">
+       <widget class="QWidget" name="tabWidgetPage2">
         <attribute name="title">
          <string/>
         </attribute>
@@ -289,6 +303,7 @@ QTabBar::tab:hover {
     </layout>
    </widget>
   </widget>
+  <widget class="QStatusBar" name="statusbar"/>
   <action name="actionClose">
    <property name="text">
     <string>Close</string>
