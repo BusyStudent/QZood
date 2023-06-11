@@ -59,10 +59,6 @@ void PlayerWidget::playVideo(const QString& url) {
     videoWidget->playVideo(url);
 }
 
-void PlayerWidget::showEvent(QShowEvent* event) {
-    this->setAttribute(Qt::WA_Mapped);
-}
-
 void PlayerWidget::clearPlayList() {
     ui->playlist->clear();
 }
@@ -72,7 +68,7 @@ PlayerWidget::PlayerWidget(QWidget* parent) : CustomizeTitleWidget(parent), ui(n
     _setupUi();
     setWindowTitle("QZoodPlayer");
 
-    createShadow(ui->containerWidget);
+    // createShadow(ui->containerWidget);
 
     connect(ui->minimizeButton, &QToolButton::clicked, this, [this](){
         showMinimized();
@@ -89,14 +85,70 @@ PlayerWidget::PlayerWidget(QWidget* parent) : CustomizeTitleWidget(parent), ui(n
     });
 }
 
-void PlayerWidget::dragEnterEvent(QDragEnterEvent *event) {
+void PlayerWidget::_setupUi() {
+    // 设置默认划分比例
+    ui->splitter->setStretchFactor(0, 10);
+    ui->splitter->setStretchFactor(1, 1);
 
-    CustomizeTitleWidget::dragEnterEvent(event);
+    // 设置窗口置顶功能
+    connect(ui->onTopButton, &QToolButton::clicked, this, [this, flags = windowFlags()]() mutable {
+        if (ui->onTopButton->isChecked()) {
+            flags = windowFlags();
+            setWindowFlags(flags | Qt::WindowStaysOnTopHint);
+            show();
+        } else {
+            setWindowFlags(flags);
+            show();
+        }
+    });
+    
+    // 实例化视频播放核心控件
+    videoWidget = new VideoWidget(ui->videoPlayContainer);
+    videoWidget->resize(ui->videoPlayContainer->size());
+    ui->videoPlayContainer->installEventFilter(this);
+
+    // 实例化视频播放进度条及设置栏
+    videoSetting = new VideoSettingWidget();
+    ui->videoPlayContainer->layout()->addWidget(videoSetting);
+    videoSetting->show();
+
+    // 设置可以自动隐藏的进度条栏
+    _setupProgressBar();
+
+    // 设置音量调节控件
+    _setupVolumeSetting();
+    
+    // 链接视频信号
+    _setupVideoPlay();
+
+    // 设置控件
+    videoSetting->ui->settingButton->installEventFilter(this);
+    settings = new FullSettingWidget(ui->videoPlayContainer);
+    settings->setAssociateWidget(videoSetting->ui->settingButton, PopupWidget::TOP);
+    settings->setHideAfterLeave(false);
+    connect(videoSetting, &VideoSettingWidget::hided, settings, &FullSettingWidget::hide);
+    connect(settings, &FullSettingWidget::showed, this, [this](){
+        videoSetting->show();
+        videoSetting->setDefualtHideTime(std::numeric_limits<int>::max());
+    });
+    connect(settings, &FullSettingWidget::hided, this, [this](){
+        videoSetting->setDefualtHideTime(100);
+        videoSetting->hideLater(5000);
+    });
+    connect(videoSetting->ui->settingButton, &QToolButton::clicked, settings, [this](){
+        if (settings->isHidden()) {
+            settings->show();
+            settings->hideLater(5000);
+        } else {
+            settings->hide();
+        }
+    });
 }
 
-void PlayerWidget::dropEvent(QDropEvent *event) {
+void PlayerWidget::showEvent(QShowEvent* event) {
+    this->setAttribute(Qt::WA_Mapped);
 
-    CustomizeTitleWidget::dropEvent(event);
+    CustomizeTitleWidget::showEvent(event);
 }
 
 void PlayerWidget::resizeEvent(QResizeEvent *event) {
@@ -117,7 +169,7 @@ bool PlayerWidget::eventFilter(QObject* obj,QEvent* event) {
         if(event->type() == QEvent::Type::Resize) {
             videoWidget->resize(ui->videoPlayContainer->size());
         }
-    } else if (obj == videoSetting->ui->voiceSettingButton) {
+    } else if (videoSetting != nullptr && obj == videoSetting->ui->voiceSettingButton) {
         if (event->type() == QEvent::Enter) {
             volumeSetting->show();
         } else if (event->type() == QEvent::Leave) {
@@ -129,7 +181,9 @@ bool PlayerWidget::eventFilter(QObject* obj,QEvent* event) {
 }
 
 void PlayerWidget::leaveEvent(QEvent* event) {
-    videoSetting->hideLater();
+    if (videoSetting != nullptr) {
+        videoSetting->hideLater();
+    }
 
     CustomizeTitleWidget::leaveEvent(event);
 }
@@ -138,10 +192,12 @@ void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
     auto topLeft = ui->videoPlayContainer->mapToGlobal(QPoint(0, 0));
     auto bottomRight = ui->videoPlayContainer->mapToGlobal(QPoint(ui->videoPlayContainer->size().width(), ui->videoPlayContainer->size().height()));
     if (QRect(topLeft, bottomRight).contains(event->globalPos())) {
-        QMetaObject::invokeMethod(this, [this](){
-            videoSetting->show();
-            videoSetting->hideLater(5000);
-        });
+        if (videoSetting != nullptr) {
+            QMetaObject::invokeMethod(this, [this](){
+                videoSetting->show();
+                videoSetting->hideLater(5000);
+            }, Qt::QueuedConnection);
+        }
     }
 
     if (movingStatus() && ui->titleBar->geometry().contains(event->pos())) {
@@ -289,68 +345,6 @@ void PlayerWidget::_setupVideoPlay() {
     });
 
     // TODO(llhsdmd@gmail.com) : 切换集数，
-}
-
-
-void PlayerWidget::_setupUi() {
-    // 设置默认划分比例
-    ui->splitter->setStretchFactor(0, 10);
-    ui->splitter->setStretchFactor(1, 1);
-
-    // 设置窗口置顶功能
-    connect(ui->onTopButton, &QToolButton::clicked, this, [this, flags = windowFlags()]() mutable {
-        if (ui->onTopButton->isChecked()) {
-            flags = windowFlags();
-            setWindowFlags(flags | Qt::WindowStaysOnTopHint);
-            show();
-        } else {
-            setWindowFlags(flags);
-            show();
-        }
-    });
-    
-    // 实例化视频播放核心控件
-    videoWidget = new VideoWidget(ui->videoPlayContainer);
-    videoWidget->resize(ui->videoPlayContainer->size());
-    ui->videoPlayContainer->installEventFilter(this);
-
-    // 实例化视频播放进度条及设置栏
-    videoSetting = new VideoSettingWidget();
-    ui->videoPlayContainer->layout()->addWidget(videoSetting);
-    videoSetting->show();
-
-
-    // 设置可以自动隐藏的进度条栏
-    _setupProgressBar();
-
-    // 设置音量调节控件
-    _setupVolumeSetting();
-    
-    // 链接视频信号
-    _setupVideoPlay();
-
-    // 设置控件
-    videoSetting->ui->settingButton->installEventFilter(this);
-    settings = new FullSettingWidget(ui->videoPlayContainer);
-    settings->setAssociateWidget(videoSetting->ui->settingButton, PopupWidget::TOP);
-    settings->setHideAfterLeave(false);
-    connect(videoSetting, &VideoSettingWidget::hided, settings, &FullSettingWidget::hide);
-    connect(settings, &FullSettingWidget::showed, this, [this](){
-        videoSetting->show();
-        videoSetting->setDefualtHideTime(std::numeric_limits<int>::max());
-    });
-    connect(settings, &FullSettingWidget::hided, this, [this](){
-        videoSetting->setDefualtHideTime(100);
-        videoSetting->hideLater(5000);
-    });
-    connect(videoSetting->ui->settingButton, &QToolButton::clicked, settings, [this](){
-        if (settings->isHidden()) {
-            settings->show();
-            settings->hideLater(5000);
-        } else {
-            settings->hide();
-        }
-    });
 }
 
 bool PlayerWidget::_doLater(std::function<void()> func) {

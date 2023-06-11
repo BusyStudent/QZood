@@ -98,7 +98,7 @@ void VideoWidget::resizeEvent(QResizeEvent* event) {
 bool VideoWidget::eventFilter(QObject* obj, QEvent* event) {
     if (obj == vcanvas && event->type() == QEvent::Paint) {
         qDebug() << "[VideoWidget]: vcanvas paint";
-        update();
+        // update();
     }
     return QWidget::eventFilter(obj, event);
 }

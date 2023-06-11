@@ -40,4 +40,3 @@ target("zood")
 
     -- Tests
     add_files("./src/tests/*")
-	add_files("./src/ui/common/tests/*")

@@ -26,9 +26,9 @@ class VideoSettingWidget : public PopupWidget {
         void showLog(const QString& info);
 
     private:
-        Ui::VideoSettingView* ui;
-        QTimer* timer;
-        CustomSlider* videoProgressBar;
+        Ui::VideoSettingView* ui = nullptr;
+        QTimer* timer = nullptr;
+        CustomSlider* videoProgressBar = nullptr;
 
     friend class PlayerWidget;
 };
@@ -44,8 +44,6 @@ class PlayerWidget : public CustomizeTitleWidget {
         void mouseMoveEvent(QMouseEvent* event) override;
         bool eventFilter(QObject* obj,QEvent* event) override;
         void leaveEvent(QEvent* event) override;
-        void dragEnterEvent(QDragEnterEvent *event) override;
-        void dropEvent(QDropEvent *event) override;
         void showEvent(QShowEvent* evnt) override;
 
     public Q_SLOTS:
@@ -62,10 +60,10 @@ class PlayerWidget : public CustomizeTitleWidget {
         bool _doLater(std::function<void()> func);
 
     private:
-        Ui::PlayerView* ui;
-        VideoWidget* videoWidget;
-        VideoSettingWidget* videoSetting;
+        Ui::PlayerView* ui = nullptr;
+        VideoWidget* videoWidget = nullptr;
+        VideoSettingWidget* videoSetting = nullptr;
 
-        VolumeSettingWidget* volumeSetting;
-        FullSettingWidget* settings;
+        VolumeSettingWidget* volumeSetting = nullptr;
+        FullSettingWidget* settings = nullptr;
 };

@@ -6,15 +6,15 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>904</width>
-    <height>689</height>
+    <width>801</width>
+    <height>611</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">QWidget#videoPlayContainer, QToolButton {
+   <string notr="true">QToolButton {
 	background: transparent;
 }
 
@@ -69,7 +69,7 @@ QListWidget#playlist::item:selected {
    </property>
    <item>
     <widget class="QWidget" name="containerWidget" native="true">
-     <layout class="QVBoxLayout" name="verticalLayout_4">
+     <layout class="QVBoxLayout" name="verticalLayout_2">
       <property name="spacing">
        <number>0</number>
       </property>
@@ -205,9 +205,6 @@ QListWidget#playlist::item:selected {
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
-        <property name="opaqueResize">
-         <bool>true</bool>
-        </property>
         <property name="handleWidth">
          <number>0</number>
         </property>
@@ -254,7 +251,7 @@ QListWidget#playlist::item:selected {
             <property name="sizeHint" stdset="0">
              <size>
               <width>20</width>
-              <height>888</height>
+              <height>40</height>
              </size>
             </property>
            </spacer>
@@ -365,22 +362,5 @@ QListWidget#playlist::item:selected {
  <resources>
   <include location="../../../resources/resources.qrc"/>
  </resources>
- <connections>
-  <connection>
-   <sender>clearListButton</sender>
-   <signal>clicked()</signal>
-   <receiver>playlist</receiver>
-   <slot>clear()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>877</x>
-     <y>69</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>695</x>
-     <y>387</y>
-    </hint>
-   </hints>
-  </connection>
- </connections>
+ <connections/>
 </ui>
