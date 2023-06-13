@@ -7,6 +7,50 @@
 #include <climits>
 #include <QMimeData>
 #include <QTime>
+#include <QWindow>
+#include <QFileInfo>
+
+struct Video {
+    Episode* episode = nullptr;
+    QString filePath = "";
+    int type = 0;
+
+    static Video* createVideSource(const QString filepath) {
+        auto video = new Video();
+        video->filePath = filepath;
+        video->type = 1;
+        return video;
+    }
+    static Video* createVideSource(Episode* episode) {
+        auto video = new Video();
+        video->episode = episode;
+        video->type = 2;
+        return video;
+    }
+
+    QString videoTitle() {
+        switch(type) {
+            case 1: {
+                QFileInfo fileinfo(filePath);
+                return fileinfo.fileName();
+            } case 2: {
+                return episode->title();
+            }
+        }
+        return "";
+    }
+
+    QImage videoIcon() {
+        switch(type) {
+            case 1: {
+                return QImage();
+            } case 2: {
+                auto result = episode->icon();
+                return QImage();
+            }
+        }
+    }
+};
 
 static QString timeFormat(int sec) {
     if (sec < 60 * 60) {
@@ -53,22 +97,12 @@ void VideoSettingWidget::showLog(const QString& info) {
     ui->infoBoard->addItem(info);
 }
 
-void PlayerWidget::playVideo(const QString& url) {
-    // TODO(llhsdmd@gmail.com) : 设置播放的默认参数
-
-    videoWidget->playVideo(url);
-}
-
-void PlayerWidget::clearPlayList() {
-    ui->playlist->clear();
-}
-
 PlayerWidget::PlayerWidget(QWidget* parent) : CustomizeTitleWidget(parent), ui(new Ui::PlayerView()) {
     ui->setupUi(this);
     _setupUi();
     setWindowTitle("QZoodPlayer");
 
-    // createShadow(ui->containerWidget);
+    createShadow(ui->containerWidget);
 
     connect(ui->minimizeButton, &QToolButton::clicked, this, [this](){
         showMinimized();
@@ -92,16 +126,16 @@ void PlayerWidget::_setupUi() {
 
     // 设置窗口置顶功能
     connect(ui->onTopButton, &QToolButton::clicked, this, [this, flags = windowFlags()]() mutable {
+        QWindow* pWin = windowHandle();
         if (ui->onTopButton->isChecked()) {
             flags = windowFlags();
-            setWindowFlags(flags | Qt::WindowStaysOnTopHint);
-            show();
+            pWin->setFlags(flags | Qt::WindowStaysOnTopHint);
         } else {
-            setWindowFlags(flags);
-            show();
+            pWin->setFlags(flags);
         }
     });
-    
+    setAcceptDrops(true); // 支持从文件夹拖拽
+
     // 实例化视频播放核心控件
     videoWidget = new VideoWidget(ui->videoPlayContainer);
     videoWidget->resize(ui->videoPlayContainer->size());
@@ -120,6 +154,9 @@ void PlayerWidget::_setupUi() {
     
     // 链接视频信号
     _setupVideoPlay();
+
+    // 设置播放列表
+    _setupPlayList();
 
     // 设置控件
     videoSetting->ui->settingButton->installEventFilter(this);
@@ -145,12 +182,6 @@ void PlayerWidget::_setupUi() {
     });
 }
 
-void PlayerWidget::showEvent(QShowEvent* event) {
-    this->setAttribute(Qt::WA_Mapped);
-
-    CustomizeTitleWidget::showEvent(event);
-}
-
 void PlayerWidget::resizeEvent(QResizeEvent *event) {
     static bool is_maximized = false;
 	if (isMaximized() && !is_maximized) {
@@ -162,6 +193,31 @@ void PlayerWidget::resizeEvent(QResizeEvent *event) {
 	}
 
     CustomizeTitleWidget::resizeEvent(event);
+}
+
+void PlayerWidget::dragEnterEvent(QDragEnterEvent *event) {
+    event->acceptProposedAction();
+
+    QWidget::dragEnterEvent(event);
+}
+
+void PlayerWidget::dropEvent(QDropEvent *event) {
+    const QMimeData *mimeData = event->mimeData();
+
+    // 检查是否包含文件 URL
+    if (mimeData->hasUrls()) {
+        // 获取第一个文件 URL
+        QUrl fileUrl = mimeData->urls()[0];
+        
+        // 转换为本地文件路径
+        QString filePath = fileUrl.toLocalFile();
+        
+        auto video = Video::createVideSource(filePath);
+        _addVideoToList(video);
+        _playVideo(video);
+    }
+
+    QWidget::dropEvent(event);
 }
 
 bool PlayerWidget::eventFilter(QObject* obj,QEvent* event) {
@@ -201,7 +257,12 @@ void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
     }
 
     if (movingStatus() && ui->titleBar->geometry().contains(event->pos())) {
-        window()->move(event->globalPos() - diff_pos);
+        if (isMaximized()) {
+            showNormal();
+            move(event->globalPos() - ui->titleBar->rect().bottomRight() / 2);
+            diff_pos = ui->titleBar->rect().bottomRight() / 2;
+        }
+        move(event->globalPos() - diff_pos);
         event->accept();
     }
 
@@ -312,8 +373,37 @@ void PlayerWidget::_setupVolumeSetting() {
 
 void PlayerWidget::_setupPlayList() {
     // TODO(llhsdmd@gmail.com) : 
+    connect(ui->listViewMode, &QToolButton::clicked, this, [this](bool clicked){
+        switch (ui->playlist->viewMode()) {
+            case QListView::ViewMode::IconMode:
+                ui->playlist->setViewMode(QListView::ViewMode::ListMode);
+                ui->listViewMode->setIcon(QIcon(":/icons/list_text_white.png"));
+                break;
+            case QListView::ViewMode::ListMode:
+                ui->playlist->setViewMode(QListView::ViewMode::IconMode);
+                ui->listViewMode->setIcon(QIcon(":/icons/list_icon_white.png"));
+                break;
+        }
+    });
+    // connect();
 }
 
+void PlayerWidget::_playVideo(Video* episode) {
+    videoWidget->playVideo(episode->filePath);
+}
+
+void PlayerWidget::_addVideoToList(Video* video) {
+    QListWidgetItem *item = new QListWidgetItem(
+            QIcon(QPixmap::fromImage(video->videoIcon())), 
+            video->videoTitle());
+    
+    videos.insert(item, video);
+    ui->playlist->addItem(item);
+}
+
+QListWidgetItem* PlayerWidget::_nextVideo(){
+    return nullptr;
+}
 
 void PlayerWidget::_setupVideoPlay() {
     videoWidget->lower();

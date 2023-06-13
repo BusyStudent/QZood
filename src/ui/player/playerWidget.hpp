@@ -4,6 +4,7 @@
 #include <QToolButton>
 #include <QMenu>
 #include <QTimer>
+#include <QListWidgetItem>
 
 #include "../common/customizeTitleWidget.hpp"
 #include "../common/popupWidget.hpp"
@@ -11,11 +12,14 @@
 #include "videoWidget.hpp"
 #include "fullSettingWidget.hpp"
 #include "../common/customSlider.hpp"
+#include "../../net/datalayer.hpp"
 
 namespace Ui {
 class PlayerView;
 class VideoSettingView;
 }
+
+struct Video;
 
 class VideoSettingWidget : public PopupWidget {
     Q_OBJECT
@@ -33,7 +37,7 @@ class VideoSettingWidget : public PopupWidget {
     friend class PlayerWidget;
 };
 
-class PlayerWidget : public CustomizeTitleWidget {
+class PlayerWidget final : public CustomizeTitleWidget {
     Q_OBJECT
     public:
         PlayerWidget(QWidget* parent = nullptr);
@@ -44,12 +48,8 @@ class PlayerWidget : public CustomizeTitleWidget {
         void mouseMoveEvent(QMouseEvent* event) override;
         bool eventFilter(QObject* obj,QEvent* event) override;
         void leaveEvent(QEvent* event) override;
-        void showEvent(QShowEvent* evnt) override;
-
-    public Q_SLOTS:
-        void clearPlayList();
-        void playVideo(const QString& url);
-        // void addVideoToPlayList();
+        void dragEnterEvent(QDragEnterEvent* event) override;
+        void dropEvent(QDropEvent* event) override;
 
     private:
         void _setupUi();
@@ -57,6 +57,10 @@ class PlayerWidget : public CustomizeTitleWidget {
         void _setupVolumeSetting();
         void _setupVideoPlay();
         void _setupPlayList();
+        void _playVideo(Video* video);
+        void _addVideoToList(Video* video);
+        QListWidgetItem* _nextVideo();
+
         bool _doLater(std::function<void()> func);
 
     private:
@@ -66,4 +70,6 @@ class PlayerWidget : public CustomizeTitleWidget {
 
         VolumeSettingWidget* volumeSetting = nullptr;
         FullSettingWidget* settings = nullptr;
+
+        QMap<QListWidgetItem*, Video*> videos;
 };

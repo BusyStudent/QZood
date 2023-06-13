@@ -4,7 +4,7 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QMimeData>
-#include <QApplication>
+#include <QShortcut>
 
 VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent) {
     setMinimumSize(100,75);
@@ -62,45 +62,33 @@ VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent) {
         }
     });
 
-    // 设置窗口属性
-    setAcceptDrops(true); // 支持从文件夹拖拽
-    setFocusPolicy(Qt::StrongFocus); // 支持快捷键输入
-    setAttribute(Qt::WA_TranslucentBackground);
-}
-
-void VideoWidget::dragEnterEvent(QDragEnterEvent *event) {
-    event->acceptProposedAction();
-
-    QWidget::dragEnterEvent(event);
-}
-
-void VideoWidget::dropEvent(QDropEvent *event) {
-    const QMimeData *mimeData = event->mimeData();
-
-    // 检查是否包含文件 URL
-    if (mimeData->hasUrls()) {
-        // 获取第一个文件 URL
-        QUrl fileUrl = mimeData->urls()[0];
-        
-        // 转换为本地文件路径
-        QString filePath = fileUrl.toLocalFile();
-        
-        playVideo(filePath);
-    }
-
-    QWidget::dropEvent(event);
+    // 设置快捷键
+    QShortcut* keySpace = new QShortcut(Qt::Key_Space, this);
+    connect(keySpace, &QShortcut::activated, this, [this](){
+        if (player->hasVideo()) {
+            player->isPlaying() ? player->pause() : player->play();
+        }
+    });
+    QShortcut* keyLeft = new QShortcut(Qt::Key_Left, this);
+    connect(keyLeft, &QShortcut::activated, this, [this](){
+        setPosition(position() - skipStep);
+    });
+    QShortcut* keyRight = new QShortcut(Qt::Key_Right, this);
+    connect(keyRight, &QShortcut::activated, this, [this](){
+        setPosition(position() + skipStep);
+    });
+    QShortcut* keyUp = new QShortcut(Qt::Key_Up, this);
+    connect(keyUp, &QShortcut::activated, this, [this](){
+        setVolume(volume() + 10);
+    });
+    QShortcut* keyDown = new QShortcut(Qt::Key_Down, this);
+    connect(keyDown, &QShortcut::activated, this, [this](){
+        setVolume(volume() - 10);
+    });
 }
 
 void VideoWidget::resizeEvent(QResizeEvent* event) {
     vcanvas->resize(size());
-}
-
-bool VideoWidget::eventFilter(QObject* obj, QEvent* event) {
-    if (obj == vcanvas && event->type() == QEvent::Paint) {
-        qDebug() << "[VideoWidget]: vcanvas paint";
-        // update();
-    }
-    return QWidget::eventFilter(obj, event);
 }
 
 void VideoWidget::setVolume(int value) {
@@ -127,28 +115,6 @@ void VideoWidget::setPosition(int sec) {
     // vcanvas->setDanmakuPosition(sec);
 
     // TODO(BusyStudent): 字幕同弹幕一样
-}
-
-void VideoWidget::keyPressEvent(QKeyEvent *event) {
-    if (event->key() == Qt::Key_Left){
-        setPosition(position() - skipStep);
-    } else if(event->key() == Qt::Key_Right) {
-        setPosition(position() + skipStep);
-    } else if(event->key() == Qt::Key_Up) {
-        qDebug() << "[videoWidget][volume ++][before] : \n" << "volume : " << volume() << "\n audio->volume : " << audio->volume() << "\n audio->volume * 100 : " << audio->volume() * 100.0;
-        setVolume(volume() + 10);
-        qDebug() << "[videoWidget][volume ++][after] : \n" << "volume : " << volume() << "\n audio->volume : " << audio->volume();
-    } else if(event->key() == Qt::Key_Down) {
-        qDebug() << "[videoWidget][volume --][befor] : \n" << "volume : " << volume() << "\n audio->volume : " << audio->volume() << "\n audio->volume * 100 : " << audio->volume() * 100.0;
-        setVolume(volume() - 10);
-        qDebug() << "[videoWidget][volume --][after] : \n" << "volume : " << volume() << "\n audio->volume : " << audio->volume();
-    } else if (event->key() == Qt::Key_Space) {
-        if (player->hasVideo()) {
-            player->isPlaying() ? player->pause() : player->play();
-        }
-    }
-
-    QWidget::keyPressEvent(event);
 }
 
 void VideoWidget::setSkipStep(int sec) {

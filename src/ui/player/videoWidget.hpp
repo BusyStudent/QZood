@@ -16,10 +16,6 @@ class VideoWidget : public QWidget{
 
     public:
         void resizeEvent(QResizeEvent* event) override;
-        void dragEnterEvent(QDragEnterEvent *event) override;
-        void dropEvent(QDropEvent *event) override;
-        void keyPressEvent(QKeyEvent *event) override;
-        bool eventFilter(QObject* obj, QEvent* event) override;
 
     Q_SIGNALS:
         void sourceChanged(const QUrl& url);

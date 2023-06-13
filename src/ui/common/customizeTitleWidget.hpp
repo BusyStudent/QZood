@@ -24,6 +24,8 @@ class CustomizeTitleWidget : public QWidget {
   void mouseReleaseEvent(QMouseEvent *event) override;
   void leaveEvent(QEvent *event) override;
   void mouseDoubleClickEvent(QMouseEvent *event) override;
+  void paintEvent(QPaintEvent *event) override;
+  bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
 
  public:
   void showMinimized();
@@ -59,4 +61,5 @@ class CustomizeTitleWidget : public QWidget {
   bool flag_resizing = false;
   bool flag_pressed = false;
   bool flag_moving = false;
+  QWidget* containerWidget = nullptr;
 };
