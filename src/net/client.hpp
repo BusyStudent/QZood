@@ -1,57 +1,169 @@
 #pragma once
 
 #include <memory>
+#include <QList>
 #include "promise.hpp"
+#include "../danmaku.hpp"
 
-/**
- * @brief 
- * 
- */
-class VideoSource : public std::enable_shared_from_this<VideoSource> {
+class Episode;
+class Bangumi;
+class TimelineItem;
+
+using EpisodePtr = RefPtr<Episode>;
+using BangumiPtr = RefPtr<Bangumi>;
+using EpisodeList = QList<EpisodePtr>;
+using BangumiList = QList<BangumiPtr>;
+using TimelineItemPtr = RefPtr<TimelineItem>;
+using Timeline        = QList<TimelineItemPtr>;
+
+class Episode : public DynRefable {
     public:
+        /**
+         * @brief Get title of the episode
+         * 
+         * @return QString 
+         */
+        virtual QString title() = 0;
+        /**
+         * @brief Get the cover of the episode
+         * 
+         * @return NetResult<QImage> 
+         */
+        virtual NetResult<QImage> fetchCover() = 0;
 
         /**
-         * @brief Get detail url
+         * @brief Get the avliable source of the episode
          * 
+         * @return QStringList 
+         */
+        virtual QStringList sourcesList() = 0;
+        /**
+         * @brief Get the recommended source of the episode, if cannot decode, return empty String
+         * 
+         * @return QString 
+         */
+        virtual QString     recommendedSource();
+        /**
+         * @brief Get details video url of sourceString
+         * 
+         * @param sourceString 
          * @return NetResult<QString> 
          */
-        virtual NetResult<QString> url(size_t index = 0) = 0;
-    protected:
-        virtual ~VideoSource() = default;
+        virtual NetResult<QString> fetchVideo(const QString &sourceString) = 0;
+
+        /**
+         * @brief Get Danmaku Source of the episode (default not supported)
+         * 
+         * @return QStringList 
+         */
+        virtual QStringList danmakuSourceList();
+        /**
+         * @brief Get the danmaku by source (default not supported)
+         * 
+         * @param what 
+         * @return NetResult<DanmakuList> 
+         */
+        virtual NetResult<DanmakuList> fetchDanmaku(const QString &what);
 };
-/**
- * @brief Interface for Video 
- * 
- */
-class VideoList  : public std::enable_shared_from_this<VideoList> {
+
+class Bangumi : public DynRefable {
     public:
-        virtual NetResultPtr<VideoSource> fechVideoSource() = 0;
-        virtual NetResult<QImage>         cover() = 0;
-        virtual QString                   name() = 0;
-        virtual QString                   description() = 0;
-    protected:
-        virtual ~VideoList() = default;
+        /**
+         * @brief fetch episode list information of it
+         * 
+         * @return NetResult<EpisodeList> 
+         */
+        virtual NetResult<EpisodeList> fetchEpisodes() = 0;
+        /**
+         * @brief Get the list of available source (like QList(bilibili, 樱花动漫) or just self)
+         * 
+         * @return QStringList 
+         */
+        virtual QStringList availableSource() = 0;
+        /**
+         * @brief Get description of the bangumi, probably be null string
+         * 
+         * @return QString 
+         */
+        virtual QString     description() = 0;
+        /**
+         * @brief Get the title of the bangumi
+         * 
+         * @return QString 
+         */
+        virtual QString     title() = 0;
+        /**
+         * @brief Get the cover data
+         * 
+         * @return NetResult<QImage> 
+         */
+        virtual NetResult<QImage> fetchCover() = 0;
 };
+
+class TimelineItem : public DynRefable {
+    public:
+        /**
+         * @brief Get the date of the timelineItem
+         * 
+         * @return QDate 
+         */
+        virtual QDate date() = 0;
+        /**
+         * @brief Get the time of day of week
+         * 
+         * @return int 
+         */
+        virtual int   dayOfWeek() = 0;
+        /**
+         * @brief Get the list of bangumi that days
+         * 
+         * @return QList<RefPtr<Bangumi>> 
+         */
+        virtual NetResult<BangumiList> fetchBangumiList() = 0;
+};
+
 /**
  * @brief Interface for searching video sources
  * 
  */
-class VideoInterface {
+class VideoInterface : public QObject {
     public:
         /**
          * @brief Do search videos
          * 
          * @param video 
-         * @return NetResultPtr<VideoList> 
+         * @return NetResultPtr<BangumiList> 
          */
-        virtual NetResult<QList<VideoList>> searchVideo(const QString& video) = 0;
-        virtual QString                     name()                            = 0;
+        virtual NetResult<BangumiList> searchBangumi(const QString& video) = 0;
+        /**
+         * @brief Get the timeline
+         * 
+         * @return NetResult<Timeline> 
+         */
+        virtual NetResult<Timeline>    fetchTimeline()                        ;
+        virtual QString                name()                              = 0;
     protected:
         virtual ~VideoInterface() = default;
 };
 
+// --- IMPLEMENTATION
+inline QString Episode::recommendedSource() {
+    return QString();
+}
+inline QStringList Episode::danmakuSourceList() {
+    return QStringList();
+}
 
-#define ZOOD_VIDEO_INTERFACE(name) \
+inline NetResult<DanmakuList> Episode::fetchDanmaku(const QString &) {
+    return NetResult<DanmakuList>::Alloc().putLater(std::nullopt);;
+}
+
+inline NetResult<Timeline> VideoInterface::fetchTimeline() {
+    return NetResult<Timeline>::Alloc().putLater(std::nullopt);
+}
+
+
+#define ZOOD_REGISTER_VIDEO_INTERFACE(name)              \
     static bool video__init_##name = []() {              \
         RegisterVideoInterface([]() -> VideoInterface *{ \
             return new name();                           \

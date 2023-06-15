@@ -2,6 +2,8 @@
 #include "nekoav.hpp"
 #include <mutex>
 
+#define NEKOAV_DEBUG
+
 extern "C" {
 #if defined(NEKOAV_MINIAUDIO)
     #define  MA_IMPLEMENTATION
@@ -13,6 +15,10 @@ extern "C" {
 
     #if defined(NEKOAV_DEBUG)
         #define  MA_DEBUG_OUTPUT
+    #endif
+
+    #if defined(__WIN32)
+        #define  MA_NO_NEON
     #endif
 
     #include <miniaudio.h>
@@ -213,6 +219,7 @@ AudioOutput::AudioOutput(QObject *parent) : QObject(parent), d(new AudioOutputPr
 
 }
 AudioOutput::~AudioOutput() {
+    Q_EMIT deviceLost();
     d->close();
 }
 

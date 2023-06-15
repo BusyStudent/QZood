@@ -4,6 +4,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QImage>
 
 #if !defined(QZOOD_NO_PROTOBUF)
 #include "dm.pb.h"
@@ -12,7 +13,6 @@
 BiliClient::BiliClient(QObject *parent) : QObject(parent) {
     manager.setCookieJar(new QNetworkCookieJar(&manager));
 
-    // Try cookie
 }
 BiliClient::~BiliClient() {
 
@@ -105,6 +105,7 @@ NetResult<DanmakuList> BiliClient::fetchDanmakuProtobuf(const QString &cid, int 
                         list.push_back(item);
                     }
 
+                    SortDanmaku(&list);
                     danmaku = list;
                 }
                 else {
@@ -272,6 +273,16 @@ NetResult<BiliVideoSource> BiliClient::fetchVideoSource(const QString &cid, cons
 NetResult<BiliBangumiList> BiliClient::searchBangumi(const QString &name) {
     auto result = NetResult<BiliBangumiList>::Alloc();
     // Todo cookie here
+    if (!hasCookie) {
+        fetchFile("https://www.bilibili.com").then([result, name, this](const Result<QByteArray> &b) mutable {
+            hasCookie = true;
+            searchBangumi(name).then([result](const Result<BiliBangumiList> &r) mutable {
+                result.putResult(r);
+            });
+        });
+        return result;
+    }
+
     fetchFile(QString("https://api.bilibili.com/x/web-interface/search/type?search_type=media_bangumi&keyword=%1").arg(name)).then(this, [result](const Result<QByteArray> &data) mutable {
         Result<BiliBangumiList> list;
         if (!data) {
@@ -408,13 +419,21 @@ NetResult<BiliTimeline> BiliClient::fetchTimeline(int kind, int before, int afte
             return;
         }
         BiliTimeline timeline;
+        auto years = QDateTime::currentDateTime().date().year();
 
         for (auto _day : json["result"].toArray()) {
             BiliTimelineDay day;
             auto data = _day.toObject();
 
             day.dayOfWeek = data["day_of_week"].toInt();
-            day.date =  QDateTime::fromString(data["date"].toString());
+
+            auto dateString = data["date"].toString();
+            // Like 2-3
+            int month;
+            int dayt;
+            sscanf(dateString.toUtf8().constData(), "%d-%d", &month, &dayt);
+
+            day.date = QDate(years, month, dayt);
 
             for (auto _ep : data["episodes"].toArray()) {
                 BiliTimelineEpisode ep;
@@ -570,3 +589,200 @@ uint64_t BiliClient::bvidToAvid(const QString &bvid) {
 	return av;
 
 }
+
+
+// BilibiliWrapper
+namespace {
+
+constexpr auto BSourceName = "Bilibili";
+
+class BEpisode : public Episode {
+public:
+    BEpisode(BiliEpisode b, BiliClient &client) : data(b), client(client) { }
+
+    QString title() override {
+        return data.title;
+    }
+    NetResult<QImage> fetchCover() override {
+        auto r = NetResult<QImage>::Alloc();
+        client.fetchFile(data.cover).then([r](const Result<QByteArray> &b) mutable {
+            if (!b) {
+                r.putResult(std::nullopt);
+                return;
+            }
+            auto image = QImage::fromData(b.value());
+            if (image.isNull()) {
+                r.putResult(std::nullopt);
+                return;
+            }
+            r.putResult(image);
+        });
+        return r;
+    }
+    QStringList sourcesList() override {
+        return QStringList(BSourceName);
+    }
+    QStringList danmakuSourceList() override {
+        return QStringList(BSourceName);
+    }
+    NetResult<QString> fetchVideo(const QString &sourceString) override {
+        if (sourceString != BSourceName) {
+            return NetResult<QString>::Alloc().putLater(std::nullopt);
+        }
+        auto r = NetResult<QString>::Alloc();
+        client.fetchVideoSource(data.cid, data.bvid).then([r](const Result<BiliVideoSource> &s) mutable {
+            if (!s) {
+                r.putResult(std::nullopt);
+                return;
+            }
+            r.putResult(s.value().urls.first());
+        });
+        return r;
+    }
+    NetResult<DanmakuList> fetchDanmaku(const QString &sourceString) {
+        if (sourceString != BSourceName) {
+            return NetResult<DanmakuList>::Alloc().putLater(std::nullopt);
+        }
+        return client.fetchDanmaku(data.cid);
+    }
+private:
+    BiliEpisode data;
+    BiliClient &client;
+};
+
+class BBangumi : public Bangumi {
+public:
+    BBangumi(BiliBangumi b, BiliClient &client) : data(b), client(client) { }
+
+    NetResult<EpisodeList> fetchEpisodes() override {
+        EpisodeList list;
+        for (const auto &each : data.episodes) {
+            list.push_back(std::make_shared<BEpisode>(each, client));
+        }
+
+        return NetResult<EpisodeList>::Alloc().putLater(list);
+    }
+    NetResult<QImage> fetchCover() override {
+        auto r = NetResult<QImage>::Alloc();
+        client.fetchFile(data.cover).then([r](const Result<QByteArray> &b) mutable {
+            if (!b) {
+                r.putResult(std::nullopt);
+                return;
+            }
+            auto image = QImage::fromData(b.value());
+            if (image.isNull()) {
+                r.putResult(std::nullopt);
+                return;
+            }
+            r.putResult(image);
+        });
+        return r;
+    }
+    QStringList availableSource() override {
+        return QStringList(BSourceName);
+    }
+    QString description() override {
+        return data.evaluate;
+    }
+    QString title() override {
+        return data.title;
+    }
+private:
+    BiliBangumi data;
+    BiliClient &client;
+};
+class BTimelineItem : public TimelineItem, public QObject {
+public:
+    BTimelineItem(BiliTimelineDay b, BiliClient &client) : data(b), client(client) { }
+
+    QDate date() override {
+        return data.date;
+    }
+    int       dayOfWeek() override {
+        return data.dayOfWeek;
+    }
+    NetResult<BangumiList> fetchBangumiList() override {
+        if (requestLeft > 0) {
+            // Has current request
+            return pendingPromise;
+        }
+        if (requestLeft == 0) {
+            // Already fetched
+            return NetResult<BangumiList>::Alloc().putLater(outList);
+        }
+
+        auto r = NetResult<BangumiList>::Alloc();
+        pendingPromise = r;
+        requestLeft = data.episodes.size();
+
+        for (const auto &ep : data.episodes) {
+            client.fetchBangumiByEpisodeID(ep.episodeID)
+                .then(this, [this, r](const Result<BiliBangumi> &ban) mutable {
+                    if (ban) {
+                        outList.push_back(std::make_shared<BBangumi>(ban.value(), client));
+                    }
+                    requestLeft -= 1;
+
+                    if (requestLeft == 0) {
+                        // Done
+                        r.putResult(outList);
+
+                        // Unref the value we goted
+                        pendingPromise = NetResult<BangumiList>();
+                    }
+            });
+        }
+        return r;
+    }
+private:
+    BiliTimelineDay data;
+    BiliClient &client;
+    int requestLeft = -1;
+    BangumiList outList;
+
+    NetResult<BangumiList> pendingPromise;
+};
+
+class BClient : public VideoInterface {
+public:
+    QString name() override {
+        return BSourceName;
+    }
+    NetResult<BangumiList> searchBangumi(const QString &text) override {
+        auto r = NetResult<BangumiList>::Alloc();
+        client.searchBangumi(text).then(this, [r, this](const Result<BiliBangumiList> &bans) mutable {
+            if (!bans) {
+                r.putResult(std::nullopt);
+                return;
+            }
+            BangumiList outList;
+            for (const auto &each : bans.value()) {
+                outList.push_back(std::make_shared<BBangumi>(each, client));
+            }
+            r.putResult(outList);
+        });
+        return r;
+    }
+    NetResult<Timeline> fetchTimeline() override {
+        auto r = NetResult<Timeline>::Alloc();
+        client.fetchTimeline().then(this, [r, this](const Result<BiliTimeline> &t) mutable{
+            if (!t) {
+                r.putResult(std::nullopt);
+                return;
+            }
+            Timeline timeline;
+            for (const auto &each : t.value()) {
+                timeline.push_back(std::make_shared<BTimelineItem>(each, client));
+            }
+            r.putResult(timeline);
+        });
+        return r;
+    }
+private:
+    BiliClient client;
+};
+
+}
+
+
+ZOOD_REGISTER_VIDEO_INTERFACE(BClient);

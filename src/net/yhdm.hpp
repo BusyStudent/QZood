@@ -3,19 +3,31 @@
 #include "client.hpp"
 #include <QNetworkAccessManager>
 
-class YhdmTimelineItem {
-    public:
+#if 0
 
-};
-
-class YhdmClient : public QObject {
+class YhdmClient : public VideoInterface {
     Q_OBJECT
     public:
         YhdmClient(QObject *parent = nullptr);
         ~YhdmClient();
 
-        NetResult<YhdmTimelineItem> fetchTimeline();
+        /**
+         * @brief Do search videos
+         * 
+         * @param video 
+         * @return NetResultPtr<BangumiList> 
+         */
+        virtual NetResult<BangumiList> searchBangumi(const QString& video) override;
+        /**
+         * @brief Get the timeline
+         * 
+         * @return NetResult<Timeline> 
+         */
+        virtual NetResult<Timeline>    fetchTimeline()                      override;
+        virtual QString                name()                               override;
     private:
         QNetworkAccessManager manager;
         QStringList           urls = QStringList(QString("http://www.yinghuacd.com/"));
 };
+
+#endif

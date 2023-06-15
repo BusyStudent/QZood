@@ -49,9 +49,9 @@ enum class VideoPixelFormat {
 
 class NEKO_API VideoFrame {
     public:
-        VideoFrame() = default;
-        VideoFrame(const VideoFrame &) = default;
-        ~VideoFrame() = default;
+        VideoFrame();
+        VideoFrame(const VideoFrame &);
+        ~VideoFrame();
 
         int width() const;
         int height() const;
@@ -68,6 +68,8 @@ class NEKO_API VideoFrame {
 
         QImage toImage() const;
 
+        VideoFrame &operator =(const VideoFrame &);
+        
         static VideoFrame fromAVFrame(void *avf);
     private:
         VideoFramePrivate *d = nullptr;
@@ -126,12 +128,17 @@ class NEKO_API VideoSink  : public QObject {
         explicit VideoSink(QObject *parent = nullptr);
         ~VideoSink();
 
-        void putVideoFrame(const VideoFrame &frame);
-        QSize videoSize() const;
+        void setVideoFrame(const VideoFrame &frame);
+        void setSubtitleText(const QString &subtitle);
+        VideoFrame videoFrame() const;
+        QSize      videoSize() const;
+        QString    subtitleText() const;
     Q_SIGNALS:
         void videoFrameChanged(const VideoFrame &frame);
         void videoSizeChanged();
+        void subtitleTextChanged(const QString &);
     private:
+        QString    subtitle;
         VideoFrame frame;
         QSize      size = {0, 0};
         std::shared_ptr<bool> mark = std::make_shared<bool>(true);
@@ -164,6 +171,7 @@ class NEKO_API AudioOutput : public QObject {
     Q_SIGNALS:
         void volumeChanged(float volume);
         void mutedChanged(bool muted);
+        void deviceLost();
     private:
         QScopedPointer<AudioOutputPrivate> d;
 };
@@ -298,6 +306,7 @@ class NEKO_API MediaPlayer : public QObject {
         void hasVideoChanged(bool videoAvailable);
 
         void bufferProgressChanged(float progress);
+        void bufferedDurationChanged(qreal duration);
 
         void seekableChanged(bool seekable);
         void playingChanged(bool playing);

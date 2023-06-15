@@ -72,3 +72,4 @@ Result<DanmakuList> ParseDanmaku(const QString &xmlstr);
  * @return DanmakuList 
  */
 DanmakuList         MergeDanmaku(const DanmakuList &a, const DanmakuList &b);
+void                SortDanmaku(DanmakuList *list);

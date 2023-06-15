@@ -111,6 +111,7 @@ ZOOD_TEST(Network, BiliPlay) {
                 if (src) {
                     player->setHttpReferer("https://www.bilibili.com");
                     player->setHttpUseragent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537");
+                    player->setOption("multiple_requests", "1");
                     player->setSource(src.value().urls.first());
                     player->play();
                 }
@@ -149,7 +150,7 @@ ZOOD_TEST(Network, BiliPlay) {
         playByBVID(result.bvid);
     });
     QObject::connect(player, &NekoMediaPlayer::bufferProgressChanged, [=](float n) {
-        ZOOD_QLOG("MediaPlayer status changed to %1", n);
+        ZOOD_QLOG("MediaPlayer buffer progress changed to %1", QString::number(n));
     });
     QObject::connect(player, &NekoMediaPlayer::seekableChanged, [=](bool v) {
         play.progressSlider->setEnabled(v);

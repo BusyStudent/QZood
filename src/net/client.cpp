@@ -51,16 +51,19 @@ void RegisterVideoInterface(VideoInterface *(*fn)()) {
         auto interface = fn();
         GetVideoInterfaceList().push_back(interface);
 
-        // interface->setParent(qApp);
+        interface->setParent(qApp);
     }
 }
 void InitializeVideoInterface() {
+    if (VideoInited) {
+        return;
+    }
     VideoInited = true;
     auto &objects = GetVideoInterfaceList();
     for (auto fn : GetVideoCreateList()) {
         auto interface = fn();
         objects.push_back(interface);
 
-        // interface->setParent(qApp);
+        interface->setParent(qApp);
     }
 }

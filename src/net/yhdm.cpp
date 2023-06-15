@@ -1,9 +1,20 @@
 #include "client.hpp"
 #include "yhdm.hpp"
 
-YhdmClient::YhdmClient(QObject *parent) : QObject(parent) {
-    
-}
-YhdmClient::~YhdmClient() {
+namespace {
+
+class YhdmBangumi : public Bangumi {
+public:
+
+
+};
+
 
 }
+
+// YhdmClient::YhdmClient(QObject *parent)  {
+//     setParent(parent);
+// }
+// YhdmClient::~YhdmClient() {
+
+// }

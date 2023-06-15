@@ -67,6 +67,14 @@ class AVTraits<AVCodecContext> {
 };
 
 template <>
+class AVTraits<AVDictionary> {
+    public:
+        void operator()(AVDictionary *ptr) {
+            av_dict_free(&ptr);
+        }
+};
+
+template <>
 class AVTraits<SwrContext> {
     public:
         void operator()(SwrContext *ptr) {
@@ -79,6 +87,14 @@ class AVTraits<SwsContext> {
     public:
         void operator()(SwsContext *ptr) {
             sws_freeContext(ptr);
+        }
+};
+
+template <>
+class AVTraits<uint8_t> {
+    public:
+        void operator()(uint8_t *ptr) {
+            av_free(ptr);
         }
 };
 
@@ -119,6 +135,9 @@ class AudioThread : public QObject {
             // return waitting;
             return queue.size() == 0;
         }
+        bool isOk() const {
+            return audioInitialized;
+        }
         bool isPaused() const {
             return audioOutput->isPaused();
         }
@@ -147,8 +166,12 @@ class AudioThread : public QObject {
         // Frame decode to
         AVPtr<AVFrame>       frame {av_frame_alloc()};
         AVPtr<SwrContext>    swrCtxt{ };
-        std::vector<uint8_t> buffer; //< Tmp buffer
+        AVPtr<uint8_t>       swrBuffer{ }; //< Buffers of resampled data
+        uint8_t             *buffer = nullptr; //< Buffer pointer to address of readable
         int                  bufferIndex = 0; //< Position in buffer, (in byte)
+        int                  bufferSize = 0; //< Size of buffer
+        bool                 needResample = false;
+        bool                 audioInitialized = false;
 
         // Status
         bool   waitting = false;
@@ -178,6 +201,7 @@ class VideoThread : public QThread {
     private:
         bool videoDecodeFrame(AVPacket *packet, AVFrame **ret);
         void videoWriteFrame(AVFrame *source);
+        void tryHardwareInit();
         void run() override;
 
         DemuxerThread  *demuxerThread = nullptr;
@@ -207,6 +231,7 @@ class VideoThread : public QThread {
         int64_t videoClockStart = 0; //< Video started time
         double  videoClock = 0.0f;
         double  swsScaleDuration = 0.0; //< prev Swscale take's time
+        double  videoDecodeDuration = 0.0; //< prev video decode duration
         bool    waitting = false;
 
 };
@@ -245,7 +270,7 @@ class DemuxerThread : public QThread {
         AudioOutput     *audioOutput() const noexcept;
         VideoSink       *videoSink() const  noexcept;
     Q_SIGNALS:
-        void ffmpegBufferProgressChanged(float progress);
+        void ffmpegBuffering(qreal duration, float progress);
         void ffmpegMediaStatusChanged(MediaStatus status);
         void ffmpegPlaybackStateChanged(PlaybackState state);
         void ffmpegPositionChanged(qreal pos);
@@ -281,14 +306,18 @@ class DemuxerThread : public QThread {
         qreal               seekPosition = 0;
         qreal               curPosition = 0;
 
+        int64_t             externalClockStart = 0;
+        qreal               externalClock = 0.0; //< External clock
+
         uint8_t            *ioBuffer = nullptr;
         int                 ioBufferSize = 0;
 
         // Buffering     
         int                 bufferedPacketsLimit = 4000;
         int                 bufferedPacketsLessThreshold = 100;
-        int                 bufferedPacketsEnough = (bufferedPacketsLimit + bufferedPacketsLessThreshold) / 2;
+        int                 bufferedPacketsEnough = 500;
         float               prevBufferProgress = 0.0f;
+        int64_t             prevTooLessPacketsTime = 0; //< Previous buffer data not enough time
 
         // Stream info
         bool                isLocalSource = false; //< If source is local, no need to buffering
@@ -349,12 +378,15 @@ class MediaPlayerPrivate : public QObject {
         Error         error = Error::NoError;
         QString       errorString;
     private:
-        void demuxerBufferProgressChanged(float progress);
+        void demuxerBuffering(qreal duration, float progress);
         void demuxerErrorOccurred(int errcode);
         void demuxerPositionChanged(qreal pos);
         void demuxerMediaLoaded();
         void updateMediaInfo();
+        void audioDeviceLost();
+    friend class MediaPlayer;
 };
+
 class VideoFramePrivate : public AVFrame {
 
 };
@@ -379,6 +411,18 @@ inline bool    IsSpecialPacket(AVPacket *pak) noexcept {
 inline QString FFErrorToString(int errcode) {
     char buffer[AV_ERROR_MAX_STRING_SIZE];
     return av_make_error_string(buffer, sizeof(buffer), errcode);
+}
+inline AVPtr<uint8_t>  FFAllocateBuffer(size_t n) {
+    return AVPtr<uint8_t>(static_cast<uint8_t*>(av_malloc(n)));
+}
+inline AVPtr<uint8_t> &FFReallocateBuffer(AVPtr<uint8_t> *old, size_t newSize) {
+    old->reset(
+        static_cast<uint8_t*>(av_realloc(
+            old->release(),
+            newSize
+        ))
+    );
+    return *old;
 }
 
 }

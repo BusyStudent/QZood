@@ -16,7 +16,7 @@ VideoBLLPtr VideoBLL::createVideoBLL(const EpisodePtr episode) {
 
 QListWidgetItem* VideoBLL::addToList(QListWidget* listWidget) {
     QListWidgetItem* item = new QListWidgetItem(QIcon(":/icons/loading_bar.png"), video->title());
-    video->icon().then([item](const Result<QImage> &image){
+    video->fetchCover().then([item](const Result<QImage> &image){
         if (image.has_value()) {
             item->setIcon(QPixmap::fromImage(image.value()));
         } else {

@@ -87,9 +87,7 @@ Result<DanmakuList> ParseDanmaku(const QString &xmlstr) {
     }
 
     // Sort danmaku by position
-    std::sort(danmakus.begin(), danmakus.end(), [](const DanmakuItem &a,const DanmakuItem &b){
-        return a.position < b.position;
-    });
+    SortDanmaku(&danmakus);
 
     xmlFreeDoc(doc);
 
@@ -102,10 +100,15 @@ DanmakuList MergeDanmaku(const DanmakuList &a, const DanmakuList &b) {
     result.append(a);
     result.append(b);
 
-    std::sort(result.begin(), result.end(), [](const DanmakuItem &a,const DanmakuItem &b){
-        return a.position < b.position;
-    });
-
+    SortDanmaku(&result);
 
     return result;
+}
+void       SortDanmaku(DanmakuList *d) {
+    if (!d) {
+        return;
+    }
+    std::sort(d->begin(), d->end(), [](const DanmakuItem &a,const DanmakuItem &b){
+        return a.position < b.position;
+    });
 }

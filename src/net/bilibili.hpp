@@ -62,8 +62,8 @@ class BiliTimelineEpisode final {
 };
 class BiliTimelineDay final {
     public:
-        QDateTime date;
-        int       dayOfWeek;
+        QDate date;
+        int   dayOfWeek;
         QList<BiliTimelineEpisode> episodes;
 };
 

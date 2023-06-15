@@ -4,6 +4,8 @@
 #include <QAbstractEventDispatcher>
 #include <QIODevice>
 
+#define NEKOAV_TIME_BASE 1000000.0
+
 namespace NekoAV {
 
 // Packet Queue Part
@@ -78,15 +80,31 @@ AudioThread::AudioThread(DemuxerThread *parent, AVStream *stream, AVCodecContext
       codecCtxt(ctxt),
       audioOutput(parent->audioOutput())
 {
+    AudioSampleFormat outputFormat = AudioSampleFormat::Float32;
+
+    needResample = false;
+    switch (ctxt->sample_fmt) {
+        case AV_SAMPLE_FMT_U8 : outputFormat = AudioSampleFormat::Uint8; break;
+        case AV_SAMPLE_FMT_S16 : outputFormat = AudioSampleFormat::Sint16; break;
+        case AV_SAMPLE_FMT_S32 : outputFormat = AudioSampleFormat::Sint32; break;
+        case AV_SAMPLE_FMT_FLT : outputFormat = AudioSampleFormat::Float32; break;
+        default : needResample = true; outputFormat = AudioSampleFormat::Float32; break;
+    }
+    if (!needResample) {
+        qDebug() << "AudioThread: output supported format, passthrough";
+    }
+
+
     audioOutput->setCallback([this](void *data, int n) {
         audioCallback(data, n);
     });   
     audioOutput->open(
-        AudioSampleFormat::Float32,
+        outputFormat,
         ctxt->sample_rate,
         ctxt->channels
     );
     audioOutput->pause(true);
+    audioInitialized = audioOutput->isOpen();
 }
 AudioThread::~AudioThread() {
     audioOutput->close();
@@ -96,10 +114,11 @@ AudioThread::~AudioThread() {
 void AudioThread::pause(bool v) {
     audioOutput->pause(v);
 }
+// FIXME : Memory bug here
 void AudioThread::audioCallback(void *data, int len) {
     uint8_t *dst = static_cast<uint8_t*>(data);
     while (len > 0) {
-        if (bufferIndex >= buffer.size()) {
+        if (bufferIndex >= bufferSize) {
             // Run out of buffer
             int audioSize = audioDecodeFrame();
             if (audioSize < 0) {
@@ -109,10 +128,10 @@ void AudioThread::audioCallback(void *data, int len) {
         }
 
         // Write buffer
-        int left = buffer.size() - bufferIndex;
+        int left = bufferSize - bufferIndex;
         left = qMin(len, left);
 
-        ::memcpy(dst, buffer.data() + bufferIndex, left);
+        ::memcpy(dst, buffer + bufferIndex, left);
         
         dst += left;
         
@@ -156,6 +175,9 @@ int AudioThread::audioDecodeFrame() {
         // Normal data
         AVPtr<AVPacket> guard(packet);
 
+        // Check the timestamp here
+        int64_t curTime = av_gettime_relative();
+
         ret = avcodec_send_packet(codecCtxt, packet);
         if (ret < 0) {
             // Too much
@@ -170,6 +192,11 @@ int AudioThread::audioDecodeFrame() {
                 continue;
             }
             return -1; // Err
+        }
+
+        double decodeUsed = (av_gettime_relative() - curTime) / NEKOAV_TIME_BASE;
+        if (decodeUsed > 0.04) {
+            qWarning() << "AudioThread spent too long to decode" << decodeUsed;
         }
 
         // Update audio clock 
@@ -192,6 +219,17 @@ int AudioThread::audioDecodeFrame() {
     }
 }
 int AudioThread::audioResample(int wanted_samples) {
+    if (!needResample) {
+        // Just output this data
+        int size = frame->linesize[0];
+
+        buffer = frame->data[0];
+        bufferSize = size;
+        bufferIndex = 0;
+
+        return size;
+    }
+
     // Get frame samples buffer size
     int data_size = av_samples_get_buffer_size(nullptr, codecCtxt->channels, frame->nb_samples, AVSampleFormat(frame->format), 1);
 
@@ -246,8 +284,11 @@ int AudioThread::audioResample(int wanted_samples) {
                 return -1;
             }
         }
-        buffer.resize(out_size);
-        buffer_data = buffer.data();
+
+        FFReallocateBuffer(&swrBuffer, out_size);
+
+        buffer = swrBuffer.get();
+        buffer_data = swrBuffer.get();
 
         int len2 = swr_convert(swrCtxt.get(), out, out_count, in, frame->nb_samples);
         if (len2 < 0) {
@@ -258,8 +299,10 @@ int AudioThread::audioResample(int wanted_samples) {
             // BTK_LOG("audio buffer is probably too small\n");
         }
         int resampled_data_size = len2 * codecCtxt->channels * av_get_bytes_per_sample(codecCtxt->sample_fmt);
-        buffer.resize(resampled_data_size);
+
+        buffer = swrBuffer.get();
         bufferIndex = 0;
+        bufferSize = resampled_data_size;
         return resampled_data_size;
     }
     else {
@@ -277,6 +320,7 @@ VideoThread::VideoThread(DemuxerThread *parent, AVStream *stream, AVCodecContext
     stream(stream),
     codecCtxt(ctxt)    
 {
+    tryHardwareInit();
     setObjectName("NekoAV VideoThread");
     
     videoSink = demuxerThread->videoSink();
@@ -305,6 +349,62 @@ VideoThread::~VideoThread() {
     wait();
 
     avcodec_free_context(&codecCtxt);
+}
+void VideoThread::tryHardwareInit() {
+    static AVPixelFormat staticHardwareFormat; //< Maybe we should use thread_local ?
+    AVHWDeviceType hardwareType;
+
+    // Try create a context with hardware
+    auto codec = avcodec_find_decoder(stream->codecpar->codec_id);
+    AVPtr<AVCodecContext> hardwareCtxt(avcodec_alloc_context3(codec));
+    if (!hardwareCtxt) {
+        return;
+    }
+    if (avcodec_parameters_to_context(hardwareCtxt.get(), stream->codecpar) < 0) {
+        return;
+    }
+
+    // Get Configuaration
+    const AVCodecHWConfig *conf = nullptr;
+    for (int i = 0; ; i++) {
+        conf = avcodec_get_hw_config(codec, i);
+        if (!conf) {
+            return;
+        }
+
+        if (conf->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) {
+            // Got
+            hardwarePixfmt = conf->pix_fmt;
+            hardwareType = conf->device_type;
+            staticHardwareFormat = conf->pix_fmt;
+            break;
+        }
+    }
+
+    // Override HW get format
+    hardwareCtxt->get_format = [](struct AVCodecContext *s, const enum AVPixelFormat * fmt) {
+        return staticHardwareFormat;
+    };
+
+    // Try init hw
+    AVBufferRef *hardwareDeviceCtxt = nullptr;
+    if (av_hwdevice_ctx_create(&hardwareDeviceCtxt, hardwareType, nullptr, nullptr, 0) < 0) {
+        // Failed
+        return;
+    }
+    // hardwareCtxt->hw_device_ctx = av_buffer_ref(hardwareDeviceCtxt);
+    hardwareCtxt->hw_device_ctx = hardwareDeviceCtxt;
+
+    // Init codec
+    if (avcodec_open2(hardwareCtxt.get(), codec, nullptr) < 0) {
+        return;
+    }
+
+    // Done
+    avcodec_free_context(&codecCtxt);
+    codecCtxt = hardwareCtxt.release();
+
+    qDebug() << "VideoThread tryHardwareInit ok " << av_hwdevice_get_type_name(hardwareType);
 }
 void VideoThread::run() {
     videoClockStart = av_gettime_relative();
@@ -351,7 +451,7 @@ void VideoThread::run() {
         // Sync
         double currentFramePts = srcFrame->pts * av_q2d(stream->time_base);
         double masterClock = demuxerThread->position();
-        double diff = masterClock - videoClock - swsScaleDuration;
+        double diff = masterClock - videoClock - swsScaleDuration - videoDecodeDuration;
 
         videoClock = currentFramePts;
 
@@ -365,9 +465,10 @@ void VideoThread::run() {
         else if (diff > 0.3) {
             // We are too slow, drop
             // BTK_LOG(BTK_RED("[VideoThread] ") "A-V = %lf Too slow, drop sws_duration = %lf\n", diff, sws_scale_duration);
+            qDebug() << "VideoThread drop frame";
             continue;
         }
-        else if (diff < AVSyncThreshold){
+        else if (diff < AVSyncThreshold) {
             // Sleep we we should
             double delay = 0;
             if (srcFrame->pkt_duration != AV_NOPTS_VALUE) {
@@ -383,9 +484,11 @@ void VideoThread::run() {
 
         videoWriteFrame(frame);
     }
-    videoSink->putVideoFrame(VideoFrame());
+    videoSink->setVideoFrame(VideoFrame());
 }
 bool VideoThread::videoDecodeFrame(AVPacket *packet, AVFrame **retFrame) {
+    int64_t decBeginTime = av_gettime_relative();
+
     AVFrame *cvtSource = srcFrame.get();
     int ret;
     ret = avcodec_send_packet(codecCtxt, packet);
@@ -408,6 +511,8 @@ bool VideoThread::videoDecodeFrame(AVPacket *packet, AVFrame **retFrame) {
     }
 
     *retFrame = cvtSource;
+    videoDecodeDuration = (av_gettime_relative() - decBeginTime) / NEKOAV_TIME_BASE;
+
     return true;
 }
 void VideoThread::videoWriteFrame(AVFrame *source) {
@@ -454,14 +559,14 @@ void VideoThread::videoWriteFrame(AVFrame *source) {
     dstFrame->width = codecCtxt->width;
     dstFrame->height = codecCtxt->height;
 
-    swsScaleDuration = (av_gettime_relative() - swsBeginTime) / 1000000.0;
+    swsScaleDuration = (av_gettime_relative() - swsBeginTime) / NEKOAV_TIME_BASE;
 
     if (ret < 0) {
         // BTK_LOG(BTK_RED("[VideoThread] ") "sws_scale failed %d!!!\n", ret);
         return;
     }
 
-    videoSink->putVideoFrame(VideoFrame::fromAVFrame(dstFrame.get()));
+    videoSink->setVideoFrame(VideoFrame::fromAVFrame(dstFrame.get()));
 }
 void VideoThread::pause(bool v) {
     if (paused == v) {
@@ -494,7 +599,7 @@ void DemuxerThread::run() {
     
     // Settings some status
     Q_EMIT ffmpegPositionChanged(0.0);
-    player->setMediaStatus(MediaStatus::NoMedia);
+    player->setMediaStatus(MediaStatus::EndOfMedia);
     player->setPlaybackState(PlaybackState::StoppedState);
 
     // Cleanup
@@ -505,6 +610,7 @@ void DemuxerThread::run() {
     videoThread = nullptr;
 
     avformat_close_input(&formatCtxt);
+    av_packet_free(&packet);
 }
 bool DemuxerThread::load() {
     // Shoud we lock here ?
@@ -688,6 +794,8 @@ bool DemuxerThread::runDemuxer() {
         packet = av_packet_alloc();
     }
 
+    externalClockStart = av_gettime_relative();
+
     // Start all worker
     doPause(false);
 
@@ -735,15 +843,6 @@ bool DemuxerThread::runDemuxer() {
             // If Stopped state, stop the thread and return false.
             quit = true;
         }
-        // if (player->playbackState == PlaybackState::PlayingState) {
-        //     // If Stopped state, stop the thread and return false.
-        //     if (audioThread) {
-        //         audioThread->pause(false);
-        //     }
-        //     if (videoThread) {
-        //         videoThread->pause(false);
-        //     }
-        // }
 
         // Check too much packet
         if (tooMuchPackets()) {
@@ -794,7 +893,7 @@ bool DemuxerThread::readFrame(int *eof) {
     errcode = av_read_frame(formatCtxt, packet);
     if (errcode < 0) {
         if (errcode == AVERROR_EOF) {
-            // 
+            // End of file
             *eof = true;
         }
         else {
@@ -819,33 +918,47 @@ bool DemuxerThread::readFrame(int *eof) {
 
     // Check buffering here
     if (player->mediaStatus == MediaStatus::BufferingMedia) {
+        // Buffering progressing
+        float curProgress = bufferProgress();
+        if ((curProgress - prevBufferProgress) > 0.05f) {
+            prevBufferProgress = curProgress;
+
+            // TODO : Do notify the player
+            Q_EMIT ffmpegBuffering(bufferedDuration(), curProgress);
+        }
+
         if (hasEnoughPackets() || *eof) {
             // End of buffering
             qDebug() << "DemuxerThread leave buffering";
+            Q_EMIT ffmpegBuffering(bufferedDuration(), 1.0);
             player->setMediaStatus(MediaStatus::BufferedMedia);
             if (player->playbackState == PlaybackState::PlayingState) {
                 // Restore playing
                 doPause(false);
             }
         }
-        else {
-            // Buffering progressing
-            float curProgress = bufferProgress();
-            if ((curProgress - prevBufferProgress) > 0.1) {
-                prevBufferProgress = curProgress;
-
-                // TODO : Do notify the player
-                Q_EMIT ffmpegBufferProgressChanged(curProgress);
-            }
+    }
+    else if (tooLessPackets() && !(*eof)) {
+        // Wit for next time 
+        if (prevTooLessPacketsTime == 0) {
+            // First time not enough data
+            prevTooLessPacketsTime = av_gettime_relative();
+            return true;
         }
+        auto diff = (av_gettime_relative() - prevTooLessPacketsTime) / NEKOAV_TIME_BASE;
+        if (diff < 0.02) {
+            // If bigger than 20ms, we begin buffering
+            return true;
+        }
+
+        prevTooLessPacketsTime = 0; //< Clear the mark
+        prevBufferProgress = 0.0f; //< Clear buffering progress
+        qDebug() << "DemuxerThread enter buffering";
+        player->setMediaStatus(MediaStatus::BufferingMedia);
+        doPause(true);
     }
     else {
-        if (tooLessPackets()) {
-            prevBufferProgress = 0.0f; //< Clear buffering progress
-            qDebug() << "DemuxerThread enter buffering";
-            player->setMediaStatus(MediaStatus::BufferingMedia);
-            doPause(true);
-        }
+        prevTooLessPacketsTime = 0; //< Clear the mark
     }
     return true;
 }
@@ -916,7 +1029,7 @@ bool DemuxerThread::doSeek() {
             return sendError(errcode);
         }
     }
-    if (videoThread) {
+    if (videoThread && !isPictureStream(player->videoStream)) {
         // We didnot seek if it is a audio cover
         restoreVideo = !videoThread->isPaused();
         videoThread->pause(true);
@@ -930,6 +1043,10 @@ bool DemuxerThread::doSeek() {
             return sendError(errcode);
         }
     }
+
+    // Set external Clock 
+    externalClock = seekPosition;
+    externalClockStart = av_gettime_relative() - externalClock * NEKOAV_TIME_BASE;
 
     if (restoreAudio) {
         audioThread->pause(false);
@@ -947,8 +1064,8 @@ bool DemuxerThread::waitForEvent(std::chrono::milliseconds ms) {
 }
 void DemuxerThread::doUpdateClock() {
     qreal curPos = position();
-    if (abs(curPos - curPosition) >= 1) {
-        // Time to update
+    if ((curPos - int64_t(curPos)) < 0.1 && abs(curPos - curPosition) >= 1) {
+        // Time to update , 1s per second
         curPosition = curPos;
 
         if (audioThread && videoThread) {
@@ -969,6 +1086,16 @@ void DemuxerThread::requestSeek(qreal pos) {
     wakeUp();
 }
 void DemuxerThread::doPause(bool v) {
+    // Save external clock
+    if (v) {
+        externalClock = position();
+    }
+    else {
+        // Restore
+        externalClockStart = av_gettime_relative() - externalClock * NEKOAV_TIME_BASE;
+    }
+
+    // Do work
     if (audioThread) {
         audioThread->pause(v);
     }
@@ -977,11 +1104,17 @@ void DemuxerThread::doPause(bool v) {
     }
 }
 qreal DemuxerThread::position() const {
+    // Has audio, audio master
     if (audioThread) {
         return audioThread->clock();
     }
-    qDebug() << "DemuxerThread::position warning no audioThread";
-    return 0.0;
+    // Only video, external master
+    if (videoThread) {
+        if (videoThread->isPaused()) {
+            return externalClock;
+        }
+    }
+    return (av_gettime_relative() - externalClockStart) / NEKOAV_TIME_BASE;
 }
 qreal DemuxerThread::bufferedDuration() const {
     if (!audioThread && !videoThread) {
@@ -993,7 +1126,7 @@ qreal DemuxerThread::bufferedDuration() const {
         auto ts = audioThread->packetQueue().duration();
         duration = qMin(ts * av_q2d(formatCtxt->streams[player->audioStream]->time_base), duration);
     }
-    if (videoThread) {
+    if (videoThread && !isPictureStream(player->videoStream)) {
         auto ts = videoThread->packetQueue().duration();
         duration = qMin(ts * av_q2d(formatCtxt->streams[player->videoStream]->time_base), duration);
     }
@@ -1008,19 +1141,22 @@ float DemuxerThread::bufferProgress() const {
     if (audioThread) {
         packets = qMin(packets, audioThread->packetQueue().size());
     }
-    if (videoThread) {
+    if (videoThread && !isPictureStream(player->videoStream)) {
         packets = qMin(packets, videoThread->packetQueue().size());
     }
+    if (packets < bufferedPacketsLessThreshold) {
+        packets = bufferedPacketsLessThreshold;
+    }
 
-    return double(packets - bufferedPacketsLessThreshold) / double(bufferedPacketsEnough);
+    auto progress = double(packets - bufferedPacketsLessThreshold) / double(bufferedPacketsEnough);
+    progress = (int64_t(progress * 100)) / 100.0; //< Make it like 0.1 0.2 0.3
+    return progress;
 }
 bool DemuxerThread::isPictureStream(int idx) const {
     // TODO : Improve
     auto stream = formatCtxt->streams[idx];
     return (stream->disposition & AV_DISPOSITION_STILL_IMAGE) || 
-           (stream->nb_frames <= 1 && stream->attached_pic.data) ||
-           (stream->codecpar->codec_id = AV_CODEC_ID_JPEG2000) ||
-           (stream->codecpar->codec_id = AV_CODEC_ID_PNG)
+           (stream->nb_frames <= 1 && stream->attached_pic.size > 0)
     ;
 }
 
@@ -1055,8 +1191,8 @@ void MediaPlayerPrivate::load() {
                 this, &MediaPlayerPrivate::demuxerPositionChanged, 
                 Qt::QueuedConnection
         );
-        connect(demuxerThread, &DemuxerThread::ffmpegBufferProgressChanged, 
-                this, &MediaPlayerPrivate::demuxerBufferProgressChanged,  
+        connect(demuxerThread, &DemuxerThread::ffmpegBuffering, 
+                this, &MediaPlayerPrivate::demuxerBuffering,   
                 Qt::QueuedConnection
         );
 
@@ -1123,7 +1259,8 @@ void MediaPlayerPrivate::setPlaybackState(PlaybackState s) {
         cb();
     }
 }
-void MediaPlayerPrivate::demuxerBufferProgressChanged(float progress) {
+void MediaPlayerPrivate::demuxerBuffering(qreal duration, float progress) {
+    Q_EMIT player->bufferedDurationChanged(duration);
     Q_EMIT player->bufferProgressChanged(progress);
 }
 void MediaPlayerPrivate::demuxerErrorOccurred(int errcode) {
@@ -1135,7 +1272,8 @@ void MediaPlayerPrivate::demuxerErrorOccurred(int errcode) {
 
         // Resource
         case AVERROR_PROTOCOL_NOT_FOUND:
-        case AVERROR_INVALIDDATA: 
+        case AVERROR_INVALIDDATA:
+        case AVERROR(EIO): //< IO ERROR 
             error = Error::ResourceError;
             break;
 
@@ -1186,7 +1324,9 @@ void MediaPlayerPrivate::updateMediaInfo() {
     Q_EMIT player->activeTracksChanged();
     Q_EMIT player->metaDataChanged();
 }
-
+void MediaPlayerPrivate::audioDeviceLost() {
+    stop();
+}
 
 
 // Expose public method
@@ -1289,6 +1429,9 @@ auto MediaPlayer::bufferProgress() const -> float {
         return 0.0;
     }
     return d->demuxerThread->bufferProgress();
+}
+auto MediaPlayer::isAvailable() const -> bool {
+    return true;
 }
 auto MediaPlayer::errorString() const -> QString {
     return d->errorString;
@@ -1404,6 +1547,13 @@ void MediaPlayer::setSourceDevice(QIODevice *dev, const QUrl &url) {
     d->url = url.toLocalFile();
 }
 void MediaPlayer::setAudioOutput(AudioOutput *output) {
+    if (d->audioOutput) {
+        d->audioOutput->disconnect(d.get());
+    }
+    if (output) {
+        connect(output, &AudioOutput::deviceLost, d.get(), &MediaPlayerPrivate::audioDeviceLost);
+    }
+
     d->audioOutput = output;
     Q_EMIT audioOutputChanged();
 }
@@ -1466,7 +1616,7 @@ VideoSink::VideoSink(QObject *parent) : QObject(parent) {
 VideoSink::~VideoSink() {
 
 }
-void  VideoSink::putVideoFrame(const VideoFrame &f) {
+void  VideoSink::setVideoFrame(const VideoFrame &f) {
     frame = f;
     if (frame.isNull()) {
         *mark = false;
@@ -1489,11 +1639,38 @@ void  VideoSink::putVideoFrame(const VideoFrame &f) {
         Q_EMIT videoFrameChanged(frame);
     }, Qt::QueuedConnection);
 }
+void  VideoSink::setSubtitleText(const QString &text) {
+    subtitle = text;
+    QMetaObject::invokeMethod(this, [this, text]() {
+        Q_EMIT subtitleTextChanged(text);
+    }, Qt::QueuedConnection);
+}
 QSize VideoSink::videoSize() const {
     return size;
 }
+VideoFrame VideoSink::videoFrame() const {
+    return frame;
+}
+QString VideoSink::subtitleText() const {
+    return subtitle;
+}
+
 
 // Video Frame
+// May memory leak ?
+VideoFrame::VideoFrame() {
+    d = nullptr;
+}
+VideoFrame::VideoFrame(const VideoFrame &b) {
+    d = nullptr;
+    d = b.d;
+    // if (!b.isNull()) {
+    //     d = static_cast<VideoFramePrivate*>(av_frame_clone(b.d));
+    // }
+}
+VideoFrame::~VideoFrame() {
+    // av_frame_free(reinterpret_cast<AVFrame**>(&d));
+}
 int VideoFrame::width() const {
     if (isNull()) {
         return 0;
@@ -1519,18 +1696,18 @@ int  VideoFrame::planeCount() const {
     return av_pix_fmt_count_planes(AVPixelFormat(d->format));
 }
 void VideoFrame::lock() const {
-    if (d) {
-        if (d->opaque) {
-            static_cast<std::mutex*>(d->opaque)->lock();
-        }
-    }
+    // if (d) {
+    //     if (d->opaque) {
+    //         static_cast<std::mutex*>(d->opaque)->lock();
+    //     }
+    // }
 }
 void VideoFrame::unlock() const {
-    if (d) {
-        if (d->opaque) {
-            static_cast<std::mutex*>(d->opaque)->unlock();
-        }
-    }
+    // if (d) {
+    //     if (d->opaque) {
+    //         static_cast<std::mutex*>(d->opaque)->unlock();
+    //     }
+    // }
 }
 uchar *VideoFrame::bits(int plane) const {
     if (isNull()) {
@@ -1580,8 +1757,23 @@ VideoPixelFormat VideoFrame::pixelFormat() const {
 
 VideoFrame VideoFrame::fromAVFrame(void *avframe) {
     VideoFrame f;
+    // if (avframe) {
+    //     f.d = static_cast<VideoFramePrivate*>(av_frame_clone(static_cast<AVFrame*>(avframe)));
+    // }
     f.d = static_cast<VideoFramePrivate*>(avframe);
     return f;
+}
+VideoFrame &VideoFrame::operator =(const VideoFrame &other) {
+    if (&other == this) {
+        return *this;
+    }
+    // av_frame_free(reinterpret_cast<AVFrame**>(&d));
+    // if (other.d) {
+    //     d = static_cast<VideoFramePrivate*>(av_frame_clone(other.d));
+    // }
+    d = other.d;
+
+    return *this;
 }
 
 }
