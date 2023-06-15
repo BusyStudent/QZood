@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PlayOrderSettingView</class>
+ <widget class="QWidget" name="PlayOrderSettingView">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>112</width>
+    <height>132</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <property name="autoFillBackground">
+   <bool>false</bool>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">QWidget{
+	background-color: #303030;
+}
+QPushButton{
+	border: 1px solid #303030;
+	text-align: left;
+	color: white;
+}
+QPushButton:hover {
+	border: 1px solid #66B2FF;
+}</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing">
+    <number>0</number>
+   </property>
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QWidget" name="widget" native="true">
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <property name="leftMargin">
+       <number>9</number>
+      </property>
+      <property name="topMargin">
+       <number>9</number>
+      </property>
+      <property name="rightMargin">
+       <number>9</number>
+      </property>
+      <item>
+       <widget class="QPushButton" name="inOrderButton">
+        <property name="text">
+         <string>顺序播放</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../resources/resources.qrc">
+          <normaloff>:/icons/order_down_white.png</normaloff>:/icons/order_down_white.png</iconset>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="listLoopButton">
+        <property name="text">
+         <string>列表循环</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../resources/resources.qrc">
+          <normaloff>:/icons/repeat_list_white.png</normaloff>:/icons/repeat_list_white.png</iconset>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="listRandomButton">
+        <property name="text">
+         <string>列表随机</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../resources/resources.qrc">
+          <normaloff>:/icons/random_list_white.png</normaloff>:/icons/random_list_white.png</iconset>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="singleCycleButton">
+        <property name="text">
+         <string>单个视频循环</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../resources/resources.qrc">
+          <normaloff>:/icons/repeat_one_white.png</normaloff>:/icons/repeat_one_white.png</iconset>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="stopButton">
+        <property name="text">
+         <string>播完停止</string>
+        </property>
+        <property name="icon">
+         <iconset resource="../../../resources/resources.qrc">
+          <normaloff>:/icons/order_one_white.png</normaloff>:/icons/order_one_white.png</iconset>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources>
+  <include location="../../../resources/resources.qrc"/>
+ </resources>
+ <connections/>
+</ui>

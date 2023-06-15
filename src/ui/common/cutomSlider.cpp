@@ -142,3 +142,7 @@ void CustomSlider::resizeEvent(QResizeEvent* ev) {
 
     QSlider::resizeEvent(ev);
 }
+
+CustomSlider::~CustomSlider() {
+    delete d;
+}

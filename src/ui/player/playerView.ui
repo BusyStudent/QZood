@@ -49,6 +49,10 @@ QListWidget#playlist::item {
 QListWidget#playlist::item:selected {
 	background: #66b2ff;
 	outline: 0px;
+}
+QListWidget#playlist::item:hover {
+	background: #66b2ff;
+	outline: 0px;
 }</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
@@ -243,19 +247,6 @@ QListWidget#playlist::item:selected {
           <property name="bottomMargin">
            <number>0</number>
           </property>
-          <item>
-           <spacer name="verticalSpacer">
-            <property name="orientation">
-             <enum>Qt::Vertical</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>20</width>
-              <height>40</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
          </layout>
         </widget>
         <widget class="QWidget" name="extraAreaContainer" native="true">
@@ -347,6 +338,21 @@ QListWidget#playlist::item:selected {
               <width>0</width>
               <height>0</height>
              </size>
+            </property>
+            <property name="verticalScrollBarPolicy">
+             <enum>Qt::ScrollBarAlwaysOff</enum>
+            </property>
+            <property name="horizontalScrollBarPolicy">
+             <enum>Qt::ScrollBarAlwaysOff</enum>
+            </property>
+            <property name="editTriggers">
+             <set>QAbstractItemView::NoEditTriggers</set>
+            </property>
+            <property name="selectionMode">
+             <enum>QAbstractItemView::SingleSelection</enum>
+            </property>
+            <property name="textElideMode">
+             <enum>Qt::ElideNone</enum>
             </property>
            </widget>
           </item>

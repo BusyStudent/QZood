@@ -1,7 +1,7 @@
 #include "fullSettingWidget.hpp"
 #include "ui_fullSettingView.h"
 
-FullSettingWidget::FullSettingWidget(QWidget* parent) : PopupWidget(parent), ui(new Ui::FullSettingView) {
+FullSettingWidget::FullSettingWidget(QWidget* parent, Qt::WindowFlags f) : PopupWidget(parent, f), ui(new Ui::FullSettingView) {
     ui->setupUi(this);
     _setupUi();
 }

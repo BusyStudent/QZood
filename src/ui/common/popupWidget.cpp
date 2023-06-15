@@ -4,7 +4,7 @@
 #include <QScreen>
 #include <QMouseEvent>
 
-PopupWidget::PopupWidget(QWidget* parent, Qt::WindowFlags f) : QWidget(parent, Qt::Popup) {
+PopupWidget::PopupWidget(QWidget* parent, Qt::WindowFlags f) : QWidget(parent, f) {
     timer = new QTimer(this);
     timer->setSingleShot(true);
     connect(timer, &QTimer::timeout, this, &PopupWidget::hide);
@@ -46,11 +46,11 @@ void PopupWidget::showEvent(QShowEvent *event) {
             topLeft = attachWidgetGeometry.topLeft() - 
                 QPoint(selfRect.width(), (selfRect.height() - attachWidgetGeometry.height()) / 2);
         } else if (direction == BOTTOM) {
-            topLeft = attachWidgetGeometry.topLeft() + 
-                QPoint((selfRect.width() - attachWidgetGeometry.width()) / 2, attachWidgetGeometry.height());
+            topLeft = attachWidgetGeometry.topLeft() - 
+                QPoint((selfRect.width() - attachWidgetGeometry.width()) / 2, -attachWidgetGeometry.height());
         } else if (direction == RIGHT) {
             topLeft = attachWidgetGeometry.topLeft() - 
-                QPoint(attachWidgetGeometry.width(), (selfRect.height() - attachWidgetGeometry.height()) / 2);
+                QPoint(-attachWidgetGeometry.width(), (selfRect.height() - attachWidgetGeometry.height()) / 2);
         }
 
         // 根据自身超出容器范围进行位置调整

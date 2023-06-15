@@ -2,6 +2,8 @@
 #include "testregister.hpp"
 #include "../ui/common/customSlider.hpp"
 
+#include <QTimer>
+
 ZOOD_TEST_W(Ui, playerWindowTest) {
     PlayerWidget* playerWidget = new PlayerWidget();
 

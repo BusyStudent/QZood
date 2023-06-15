@@ -9,7 +9,7 @@ class FullSettingView;
 class FullSettingWidget : public PopupWidget {
     Q_OBJECT
     public:
-        FullSettingWidget(QWidget* parent = nullptr);
+        FullSettingWidget(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::Popup);
 
     public Q_SLOTS:
         void show();

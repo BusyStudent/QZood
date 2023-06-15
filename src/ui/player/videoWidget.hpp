@@ -2,56 +2,47 @@
 
 #include <QWidget>
 
-#include "../../player/videocanvas.hpp"
+#include "../../BLL/data/videoBLL.hpp"
+
+class VideoWidgetPrivate;
+
+enum Order {
+    IN_ORDER,
+    LIST_LOOP,
+    LIST_RANDOM,
+    SINGLE_CYCLE,
+    STOP,
+};
 
 class VideoWidget : public QWidget{
     Q_OBJECT
     public:
         VideoWidget(QWidget* parent = nullptr);
         ~VideoWidget();
-        int duration();
-        int position();
-        inline int volume() { return (audio->volume() + 0.005) * 100; }
-        inline bool isSeekable() { return player->isSeekable(); }
 
     public:
         void resizeEvent(QResizeEvent* event) override;
+        bool eventFilter(QObject *obj, QEvent *event) override;
+        void leaveEvent(QEvent* event) override;
+        void mouseMoveEvent(QMouseEvent* event) override;
+        bool event(QEvent *event) override;
 
     Q_SIGNALS:
-        void sourceChanged(const QUrl& url);
-
-        void durationChanged(int sec);
-
-        void seekableChanged(bool seekable);
-
-        void positionChanged(int sec);
-        void bufferProgressChanged(int sec);
-
-        void volumeChanged(int value);
-
-        void runError(const QString& errorMessage);
-        
         void playing();
         void paused();
         void stoped();
-
-        void skipStepChange(int sec);
+        void finished();
+        void invalidVideo(const VideoBLLPtr video);
+        void nextVideo();
+        void previousVideo();
 
     public Q_SLOTS:
-        void setVolume(int value);
-        void setPosition(int sec);
-        void setSkipStep(int sec);
-        void playVideo(const QUrl& url);
-        void playVideo(QIODevice* device);
-        void pauseVideo();
-        void resumeVide();
+        void playVideo(const VideoBLLPtr video);
+        void videoLog(const QString& msg);
+        void stop();
         // void setDanmaku(int id);
         // void setSubtitle();
 
     private:
-        VideoCanvas* vcanvas;
-        NekoMediaPlayer* player;
-        NekoAudioOutput* audio;
-
-        int skipStep = 5;
+        VideoWidgetPrivate* d;
 };

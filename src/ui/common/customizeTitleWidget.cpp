@@ -4,7 +4,6 @@
 #include <QGraphicsDropShadowEffect>
 #include <QHoverEvent>
 #include <QPainter>
-#include <QPainterPath>
 
 #if defined(_WIN32)
 #define USE_WINAPI
@@ -284,27 +283,7 @@ void CustomizeTitleWidget::showNormal() {
 }
 
 void CustomizeTitleWidget::paintEvent(QPaintEvent *event) {
-    //绘制阴影
-    QPainterPath path;
-    path.setFillRule(Qt::WindingFill);
-    auto shadowLength = 10;
-    path.addRect(shadowLength, shadowLength, this->width() - shadowLength * 2, this->height() - shadowLength * 2);
-
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.fillPath(path, QBrush(Qt::white));
-
-    QColor color(0, 0, 0, 255);
-    auto alphaCoeff = 255 / qSqrt(shadowLength);
-    for (int i = 0; i < shadowLength; ++i)
-    {
-        QPainterPath path;
-        path.setFillRule(Qt::WindingFill);
-        path.addRoundedRect(shadowLength - i, shadowLength - i, this->width() - (shadowLength- i) * 2, this->height() - (shadowLength- i) * 2, shadowLength, shadowLength);
-        color.setAlpha(255 - qSqrt(i) * alphaCoeff);
-        painter.setPen(color);
-        painter.drawPath(path);
-    }
+    //TODO(llhsdmd): 绘制阴影
 
   QWidget::paintEvent(event);
 }

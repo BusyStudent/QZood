@@ -1,6 +1,6 @@
 #include "playerWidget.hpp"
 #include "ui_playerView.h"
-#include "ui_videoSettingView.h"
+#include "ui_playOrderSettingView.h"
 
 #include <QMenuBar>
 #include <QMouseEvent>
@@ -9,187 +9,270 @@
 #include <QTime>
 #include <QWindow>
 #include <QFileInfo>
+#include <QFileDialog>
 
-struct Video {
-    Episode* episode = nullptr;
-    QString filePath = "";
-    int type = 0;
+#include "videoWidget.hpp"
+#include "../common/popupWidget.hpp"
+#include "../../BLL/data/videoItemModel.hpp"
 
-    static Video* createVideSource(const QString filepath) {
-        auto video = new Video();
-        video->filePath = filepath;
-        video->type = 1;
-        return video;
-    }
-    static Video* createVideSource(Episode* episode) {
-        auto video = new Video();
-        video->episode = episode;
-        video->type = 2;
-        return video;
+class PlayerWidgetPrivate {
+public:
+    PlayerWidgetPrivate(PlayerWidget* parent) : self(parent), ui(new Ui::PlayerView()) {
+        itemModel = new VideoItemModel();
     }
 
-    QString videoTitle() {
-        switch(type) {
-            case 1: {
-                QFileInfo fileinfo(filePath);
-                return fileinfo.fileName();
-            } case 2: {
-                return episode->title();
+    ~PlayerWidgetPrivate() {
+        delete ui;
+        delete itemModel;
+    }
+
+    void setupUi() {
+        // TODO(llhsdmd): 创建播放器界面
+        ui->setupUi(self);
+
+        // 设置默认划分比例
+        ui->splitter->setStretchFactor(0, 10);
+        ui->splitter->setStretchFactor(1, 1);
+
+        // 实例化视频播放核心控件
+        videoWidget = new VideoWidget(ui->videoPlayContainer);
+        ui->videoPlayContainer->layout()->addWidget(videoWidget);
+
+        // 播放顺序设置界面
+        playOrderSettingWidget = new PopupWidget(self);
+        ui_playOrderSettingView = new Ui::PlayOrderSettingView();
+        ui_playOrderSettingView->setupUi(playOrderSettingWidget);
+        playOrderSettingWidget->setAssociateWidget(ui->playOrder, PopupWidget::BOTTOM);
+    }
+
+    void update() {
+        // TODO(llhsdmd): 使用数据模型更新界面ui
+
+    }
+
+    void connect() {
+        // TODO(llhsdmd): 将用户请求连接到对应的请求函数
+        connectTitleBar();
+        connectPlayList();
+    }
+
+    void addVideo(const VideoBLLPtr video) {
+        itemModel->add(video);
+        video->addToList(ui->playlist);
+    }
+
+private:
+    /**
+     * @brief 标题栏
+     */
+    void connectTitleBar() {
+        // 设置窗口置顶功能
+        QWidget::connect(ui->onTopButton, &QToolButton::clicked, self, [this, flags = self->windowFlags()]() mutable {
+            QWindow* pWin = self->windowHandle();
+            if (ui->onTopButton->isChecked()) {
+                flags = self->windowFlags();
+                pWin->setFlags(flags | Qt::WindowStaysOnTopHint);
+            } else {
+                pWin->setFlags(flags);
             }
-        }
-        return "";
+        });
+        QWidget::connect(ui->minimizeButton, &QToolButton::clicked, self, [this](){
+            self->showMinimized();
+        });
+        QWidget::connect(ui->maximizeButton, &QToolButton::clicked, self, [this](){
+            if (self->isMaximized()) {
+                self->showNormal();
+            } else {
+                self->showMaximized();
+            }
+        });
+        QWidget::connect(ui->closeButton, &QToolButton::clicked, self, [this](){
+            videoWidget->stop();
+            self->close();
+        });
+
+        QWidget::connect(ui->miniPlayerButton, &QToolButton::clicked, self, [this]() mutable {
+            // TODO(llhsdmd): 实现小窗播放请求
+        });
     }
 
-    QImage videoIcon() {
-        switch(type) {
-            case 1: {
-                return QImage();
-            } case 2: {
-                auto result = episode->icon();
-                return QImage();
+    /**
+     * @brief 视频播放列表设置
+     */
+    void connectPlayList() {
+        // 切换播放列表的视图模式
+        QWidget::connect(ui->listViewMode, &QToolButton::clicked, self, [this](bool clicked){
+            switch (ui->playlist->viewMode()) {
+                case QListView::ViewMode::IconMode:
+                    ui->playlist->setViewMode(QListView::ViewMode::ListMode);
+                    ui->listViewMode->setIcon(QIcon(":/icons/list_text_white.png"));
+                    break;
+                case QListView::ViewMode::ListMode:
+                    ui->playlist->setViewMode(QListView::ViewMode::IconMode);
+                    ui->listViewMode->setIcon(QIcon(":/icons/list_icon_white.png"));
+                    break;
             }
-        }
+        });
+        // 更改播放顺序设置。
+        QWidget::connect(ui->playOrder, &QToolButton::clicked, self, [this](bool clicked){
+            playOrderSettingWidget->show();
+            playOrderSettingWidget->hideLater(5000);
+        });
+        QWidget::connect(ui_playOrderSettingView->inOrderButton, &QToolButton::clicked, self, [this]() {
+            setPlayOrder(Order::IN_ORDER);
+            ui->playOrder->setIcon(QIcon(":/icons/order_down_white.png"));
+        });
+        QWidget::connect(ui_playOrderSettingView->listLoopButton, &QToolButton::clicked, self, [this]() {
+            setPlayOrder(Order::LIST_LOOP);
+            ui->playOrder->setIcon(QIcon(":/icons/repeat_list_white.png"));
+        });
+        QWidget::connect(ui_playOrderSettingView->listRandomButton, &QToolButton::clicked, self, [this]() {
+            setPlayOrder(Order::LIST_RANDOM);
+            ui->playOrder->setIcon(QIcon(":/icons/random_list_white.png"));
+        });
+        QWidget::connect(ui_playOrderSettingView->singleCycleButton, &QToolButton::clicked, self, [this]() {
+            setPlayOrder(Order::SINGLE_CYCLE);
+            ui->playOrder->setIcon(QIcon(":/icons/repeat_one_white.png"));
+        });
+        QWidget::connect(ui_playOrderSettingView->stopButton, &QToolButton::clicked, self, [this]() {
+            setPlayOrder(Order::STOP);
+            ui->playOrder->setIcon(QIcon(":/icons/order_one_white.png"));
+        });
+        QWidget::connect(ui->addVideo, &QToolButton::clicked, self, [this]() {
+            // TODO(llhsdmd): 添加视频，暂时只能添加本地视频到播放列表算了。
+            auto filePaths = QFileDialog::getOpenFileNames(self, self->tr("文件"), "./", "*.mp4;*.mkv;;*.*");
+            for (auto filePath : filePaths) {
+                if (!filePath.isEmpty()) {
+                    addVideo(VideoBLL::createVideoBLL(filePath));
+                }
+            }
+        });
+        QWidget::connect(ui->playlist, &QListWidget::itemDoubleClicked, self, [this](QListWidgetItem* item){
+            auto index = ui->playlist->indexFromItem(item).row();
+            setCurrentIndex(index);
+        });
+        QWidget::connect(videoWidget, &VideoWidget::finished, self, [this](){
+            auto nexti = nextIndexByOrder(_index);
+            setCurrentIndex(nexti);
+        });
+        QWidget::connect(videoWidget, &VideoWidget::nextVideo, self, [this](){
+            auto nexti = nextIndexByOrder(_index);
+            if (nexti != -1) {
+                setCurrentIndex(nexti);
+            }
+        });
+        QWidget::connect(videoWidget, &VideoWidget::previousVideo, self, [this](){
+            auto nexti = previousIndexByOrder(_index);
+            if (nexti != -1) {
+                setCurrentIndex(nexti);
+            }
+        });
     }
+
+public:
+
+    void setCurrentIndex(int i) {
+        if (i >= itemModel->size()) {
+            qWarning() << "[PlayerWidget:setCurrentIndex] 请求的下标" << i << "大于当前所有视频的size(" << itemModel->size() << ")";
+            return ;
+        }
+        if (i < -1) {
+            qWarning() << "[PlayerWidget:setCurrentIndex] 非法下标" << i << "请输入[" << -1 << "," << "videos.size(" << itemModel->size() << ")]之间的值，-1代表停止播放。";
+            i = -1;
+        }
+        if (-1 != i) {
+            auto video = itemModel->item(i);
+            videoWidget->playVideo(video);
+            ui->playlist->setCurrentRow(i);
+            ui->videoTitle->setText(video->title());
+        }
+        _index = i;
+    }
+
+    void setPlayOrder(Order playOrder) {
+        _order = playOrder;
+    }
+
+    int currentIndex() {
+        return _index;
+    }
+
+    Order playOrder() {
+        return _order;
+    }
+
+    int nextIndexByOrder(int index) {
+        switch (_order) {
+        case Order::IN_ORDER:
+            return index + 1 >= itemModel->size() ? -1 : index + 1;
+        case Order::LIST_LOOP:
+            return (index + 1) % itemModel->size();
+        case Order::LIST_RANDOM:
+            srand((unsigned int)time(NULL));
+            return rand() % itemModel->size();
+        case Order::SINGLE_CYCLE:
+            return index;
+        case Order::STOP:
+            return -1;
+        }
+        return -1;
+    }
+
+    int previousIndexByOrder(int index) {
+        switch (_order) {
+        case Order::IN_ORDER:
+            return index - 1 < 0 ? -1 : index - 1;
+        case Order::LIST_LOOP:
+            return (index - 1 + itemModel->size()) % itemModel->size();
+        case Order::LIST_RANDOM:
+            srand((unsigned int)time(NULL));
+            return rand() % itemModel->size();
+        case Order::SINGLE_CYCLE:
+            return index;
+        case Order::STOP:
+            return -1;
+        }
+        return -1;
+    }
+
+    void showInfo(QString info) {
+        // TODO(llhsdmd) : 这里可能搬到videowidget里面实现比较好
+    }
+
+public:
+    PlayerWidget* self;
+    Ui::PlayerView* ui;
+
+    VideoWidget* videoWidget = nullptr;
+
+    PopupWidget* playOrderSettingWidget = nullptr;
+    Ui::PlayOrderSettingView* ui_playOrderSettingView = nullptr;
+
+        
+    VideoItemModel* itemModel;
+
+    int _index = -1;
+    Order _order = Order::IN_ORDER;
 };
 
-static QString timeFormat(int sec) {
-    if (sec < 60 * 60) {
-        return QString("%1:%2").
-            arg(sec / 60, 2, 10, QLatin1Char('0')).
-            arg(sec % 60, 2, 10, QLatin1Char('0'));
-    } else {
-        return QString("%1:%2:%3").
-            arg(sec / 3600).
-            arg((sec % 3600) / 60, 2, 10, QLatin1Char('0')).
-            arg(sec % 60, 2, 10, QLatin1Char('0'));
-    }
-}
-
-VideoSettingWidget::VideoSettingWidget(QWidget* parent) : PopupWidget(parent), ui(new Ui::VideoSettingView) {
-    ui->setupUi(this);
-
-    videoProgressBar = new CustomSlider();
-    videoProgressBar->setObjectName("videoProgressBar");
-    static_cast<QVBoxLayout*>(layout())->insertWidget(1, videoProgressBar);
-
-    timer = new QTimer(this);
-    timer->setSingleShot(true);
-
-    connect(timer, &QTimer::timeout, this, [this](){
-        if (ui->infoBoard->count()) {
-            auto item = ui->infoBoard->takeItem(0);
-            delete item;
-            ui->infoBoard->update();
-            QMetaObject::invokeMethod(this, [this](){
-                timer->start(1000);
-            }, Qt::QueuedConnection);
-        }
-    });
-
-    connect(videoProgressBar, &CustomSlider::tipBeforeShow, this, [this](QLabel *label, int value){
-        label->setText(timeFormat(value));
-        label->updateGeometry();
-    }, Qt::ConnectionType::DirectConnection);
-}
-
-void VideoSettingWidget::showLog(const QString& info) {
-    timer->start(1000);
-    ui->infoBoard->addItem(info);
-}
-
-PlayerWidget::PlayerWidget(QWidget* parent) : CustomizeTitleWidget(parent), ui(new Ui::PlayerView()) {
-    ui->setupUi(this);
-    _setupUi();
+PlayerWidget::PlayerWidget(QWidget* parent) : CustomizeTitleWidget(parent), d(new PlayerWidgetPrivate(this)) {
+    d->setupUi();
+    d->connect();
+    d->update();
     setWindowTitle("QZoodPlayer");
+    createShadow(d->ui->containerWidget);
 
-    createShadow(ui->containerWidget);
-
-    connect(ui->minimizeButton, &QToolButton::clicked, this, [this](){
-        showMinimized();
-    });
-    connect(ui->maximizeButton, &QToolButton::clicked, this, [this](){
-        if (isMaximized()) {
-            showNormal();
-        } else {
-            showMaximized();
-        }
-    });
-    connect(ui->closeButton, &QToolButton::clicked, this, [this](){
-        close();
-    });
-}
-
-void PlayerWidget::_setupUi() {
-    // 设置默认划分比例
-    ui->splitter->setStretchFactor(0, 10);
-    ui->splitter->setStretchFactor(1, 1);
-
-    // 设置窗口置顶功能
-    connect(ui->onTopButton, &QToolButton::clicked, this, [this, flags = windowFlags()]() mutable {
-        QWindow* pWin = windowHandle();
-        if (ui->onTopButton->isChecked()) {
-            flags = windowFlags();
-            pWin->setFlags(flags | Qt::WindowStaysOnTopHint);
-        } else {
-            pWin->setFlags(flags);
-        }
-    });
     setAcceptDrops(true); // 支持从文件夹拖拽
-
-    // 实例化视频播放核心控件
-    videoWidget = new VideoWidget(ui->videoPlayContainer);
-    videoWidget->resize(ui->videoPlayContainer->size());
-    ui->videoPlayContainer->installEventFilter(this);
-
-    // 实例化视频播放进度条及设置栏
-    videoSetting = new VideoSettingWidget();
-    ui->videoPlayContainer->layout()->addWidget(videoSetting);
-    videoSetting->show();
-
-    // 设置可以自动隐藏的进度条栏
-    _setupProgressBar();
-
-    // 设置音量调节控件
-    _setupVolumeSetting();
-    
-    // 链接视频信号
-    _setupVideoPlay();
-
-    // 设置播放列表
-    _setupPlayList();
-
-    // 设置控件
-    videoSetting->ui->settingButton->installEventFilter(this);
-    settings = new FullSettingWidget(ui->videoPlayContainer);
-    settings->setAssociateWidget(videoSetting->ui->settingButton, PopupWidget::TOP);
-    settings->setHideAfterLeave(false);
-    connect(videoSetting, &VideoSettingWidget::hided, settings, &FullSettingWidget::hide);
-    connect(settings, &FullSettingWidget::showed, this, [this](){
-        videoSetting->show();
-        videoSetting->setDefualtHideTime(std::numeric_limits<int>::max());
-    });
-    connect(settings, &FullSettingWidget::hided, this, [this](){
-        videoSetting->setDefualtHideTime(100);
-        videoSetting->hideLater(5000);
-    });
-    connect(videoSetting->ui->settingButton, &QToolButton::clicked, settings, [this](){
-        if (settings->isHidden()) {
-            settings->show();
-            settings->hideLater(5000);
-        } else {
-            settings->hide();
-        }
-    });
 }
 
 void PlayerWidget::resizeEvent(QResizeEvent *event) {
     static bool is_maximized = false;
 	if (isMaximized() && !is_maximized) {
         is_maximized = true;
-		ui->maximizeButton->setIcon(QIcon(":/icons/minimize_white.png"));
+		d->ui->maximizeButton->setIcon(QIcon(":/icons/minimize_white.png"));
 	} else if (is_maximized) {
         is_maximized = false;
-		ui->maximizeButton->setIcon(QIcon(":/icons/maximize_white.png"));
+		d->ui->maximizeButton->setIcon(QIcon(":/icons/maximize_white.png"));
 	}
 
     CustomizeTitleWidget::resizeEvent(event);
@@ -211,235 +294,36 @@ void PlayerWidget::dropEvent(QDropEvent *event) {
         
         // 转换为本地文件路径
         QString filePath = fileUrl.toLocalFile();
-        
-        auto video = Video::createVideSource(filePath);
-        _addVideoToList(video);
-        _playVideo(video);
+        d->addVideo(VideoBLL::createVideoBLL(filePath));
+        d->setCurrentIndex(d->itemModel->size() - 1);
     }
 
     QWidget::dropEvent(event);
 }
 
 bool PlayerWidget::eventFilter(QObject* obj,QEvent* event) {
-    if (obj == ui->videoPlayContainer){
+    if (obj == d->ui->videoPlayContainer){
         if(event->type() == QEvent::Type::Resize) {
-            videoWidget->resize(ui->videoPlayContainer->size());
-        }
-    } else if (videoSetting != nullptr && obj == videoSetting->ui->voiceSettingButton) {
-        if (event->type() == QEvent::Enter) {
-            volumeSetting->show();
-        } else if (event->type() == QEvent::Leave) {
-            volumeSetting->hideLater(100);
+            d->videoWidget->resize(d->ui->videoPlayContainer->size());
         }
     }
-
     return QWidget::eventFilter(obj, event);
 }
 
-void PlayerWidget::leaveEvent(QEvent* event) {
-    if (videoSetting != nullptr) {
-        videoSetting->hideLater();
-    }
-
-    CustomizeTitleWidget::leaveEvent(event);
-}
-
 void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
-    auto topLeft = ui->videoPlayContainer->mapToGlobal(QPoint(0, 0));
-    auto bottomRight = ui->videoPlayContainer->mapToGlobal(QPoint(ui->videoPlayContainer->size().width(), ui->videoPlayContainer->size().height()));
-    if (QRect(topLeft, bottomRight).contains(event->globalPos())) {
-        if (videoSetting != nullptr) {
-            QMetaObject::invokeMethod(this, [this](){
-                videoSetting->show();
-                videoSetting->hideLater(5000);
-            }, Qt::QueuedConnection);
-        }
-    }
-
-    if (movingStatus() && ui->titleBar->geometry().contains(event->pos())) {
+    if (movingStatus() && d->ui->titleBar->geometry().contains(event->pos())) {
         if (isMaximized()) {
             showNormal();
-            move(event->globalPos() - ui->titleBar->rect().bottomRight() / 2);
-            diff_pos = ui->titleBar->rect().bottomRight() / 2;
+            move(event->globalPos() - d->ui->titleBar->rect().bottomRight() / 2);
+            diff_pos = d->ui->titleBar->rect().bottomRight() / 2;
         }
         move(event->globalPos() - diff_pos);
         event->accept();
     }
-
     // 刷新窗体状态
     CustomizeTitleWidget::mouseMoveEvent(event);
 }
 
-void PlayerWidget::_setupProgressBar() {
-    videoSetting->videoProgressBar->setDisabled(true);
-
-
-    connect(videoWidget, &VideoWidget::durationChanged, this, [this](int sec){
-        videoSetting->videoProgressBar->setRange(0, sec);
-    });
-
-    connect(videoWidget, &VideoWidget::stoped, this, [this](){
-        videoSetting->videoProgressBar->setDisabled(true);
-    });
-
-    connect(videoWidget, &VideoWidget::seekableChanged, this, [this](bool v) {
-        videoSetting->videoProgressBar->setEnabled(v);
-    });
-
-    connect(videoWidget, &VideoWidget::positionChanged, this, [this](int value){
-        auto total = timeFormat(videoWidget->duration());
-        auto current = timeFormat(value);
-        if (total.length() > current.length()) {
-            current = QString("%1:%2").
-                arg(0,total.length() - current.length() - 1, 10, QLatin1Char('0')).
-                arg(current);
-        }
-        videoSetting->ui->videoTimeLabel->setText(current + "/" + total);
-
-        if (videoSetting->videoProgressBar->isSliderDown()) {
-            return;
-        }
-        videoSetting->videoProgressBar->setValue(value);
-    });
-
-    connect(videoSetting->videoProgressBar, &QSlider::sliderMoved, videoWidget, [this](int position){
-        videoWidget->setPosition(position);
-    });
-}
-
-void PlayerWidget::_setupVolumeSetting() {
-    // 注册音量控制按钮到本类用于处理音量调节条的弹出
-    videoSetting->ui->voiceSettingButton->installEventFilter(this);
-    volumeSetting = new VolumeSettingWidget();
-    // 连接音量调节条显示：定义弹出窗口显示时进度条不自动隐藏。
-    connect(volumeSetting, &VolumeSettingWidget::showed, this, [this](){
-        videoSetting->show();
-        videoSetting->setDefualtHideTime(std::numeric_limits<int>::max());
-    });
-    // 连接音量调节条隐藏：恢复视频进度条自动隐藏
-    connect(volumeSetting, &VolumeSettingWidget::hided, this, [this](){
-        videoSetting->setDefualtHideTime(100);
-        videoSetting->hideLater(5000);
-    });
-    // 按钮图标并更新程序播放音量
-    connect(videoWidget, &VideoWidget::volumeChanged, this, [this](int value){
-        volumeSetting->setValue(value);
-    });
-    // 连接音量调节条调节：同步音量
-    connect(volumeSetting, &VolumeSettingWidget::sliderMoved, this, [this](int value) {
-        videoWidget->setVolume(value);
-    });
-    // 连接视频播放进度条隐藏：隐藏自己
-    connect(videoSetting, &VideoSettingWidget::hided, volumeSetting, &VolumeSettingWidget::hide);
-    // 连接音量按钮点击：切换静音-有声模式
-    connect(videoSetting->ui->voiceSettingButton, &QToolButton::clicked, this,  [this, volume = 0]() mutable {
-        if (videoSetting->ui->voiceSettingButton->isChecked()) {
-            volume = videoWidget->volume();
-            videoWidget->setVolume(0);
-        } else {
-            videoWidget->setVolume(volume);
-        }
-    });
-    // 同步音量按钮图标
-    connect(volumeSetting, &VolumeSettingWidget::valueChanged, this, [this, flag = -1](int value) mutable {
-        if (value == 0 && flag != 0) {
-            flag = 0;
-            QIcon icon;
-            icon.addFile(QString::fromUtf8(":/icons/mute_white.png"), QSize(), QIcon::Normal, QIcon::Off);
-            videoSetting->ui->voiceSettingButton->setIcon(icon);
-        } else if (value > 0 && value <= 33 && flag != 1) {
-            flag = 1;
-            QIcon icon;
-            icon.addFile(QString::fromUtf8(":/icons/volume_1_white.png"), QSize(), QIcon::Normal, QIcon::Off);
-            videoSetting->ui->voiceSettingButton->setIcon(icon);
-        } else if (value > 33 && value <= 66 && flag != 2) {
-            flag = 2;
-            QIcon icon;
-            icon.addFile(QString::fromUtf8(":/icons/volume_2_white.png"), QSize(), QIcon::Normal, QIcon::Off);
-            videoSetting->ui->voiceSettingButton->setIcon(icon);
-        } else if (value > 66 && flag != 3){
-            flag = 3;
-            QIcon icon;
-            icon.addFile(QString::fromUtf8(":/icons/volume_3_white.png"), QSize(), QIcon::Normal, QIcon::Off);
-            videoSetting->ui->voiceSettingButton->setIcon(icon);
-        }
-    });
-
-    // 设置控件属性
-    volumeSetting->setParent(ui->videoPlayContainer);
-    volumeSetting->setAssociateWidget(videoSetting->ui->voiceSettingButton, PopupWidget::Direction::TOP);
-    volumeSetting->setValue(videoWidget->volume());
-}
-
-void PlayerWidget::_setupPlayList() {
-    // TODO(llhsdmd@gmail.com) : 
-    connect(ui->listViewMode, &QToolButton::clicked, this, [this](bool clicked){
-        switch (ui->playlist->viewMode()) {
-            case QListView::ViewMode::IconMode:
-                ui->playlist->setViewMode(QListView::ViewMode::ListMode);
-                ui->listViewMode->setIcon(QIcon(":/icons/list_text_white.png"));
-                break;
-            case QListView::ViewMode::ListMode:
-                ui->playlist->setViewMode(QListView::ViewMode::IconMode);
-                ui->listViewMode->setIcon(QIcon(":/icons/list_icon_white.png"));
-                break;
-        }
-    });
-    // connect();
-}
-
-void PlayerWidget::_playVideo(Video* episode) {
-    videoWidget->playVideo(episode->filePath);
-}
-
-void PlayerWidget::_addVideoToList(Video* video) {
-    QListWidgetItem *item = new QListWidgetItem(
-            QIcon(QPixmap::fromImage(video->videoIcon())), 
-            video->videoTitle());
-    
-    videos.insert(item, video);
-    ui->playlist->addItem(item);
-}
-
-QListWidgetItem* PlayerWidget::_nextVideo(){
-    return nullptr;
-}
-
-void PlayerWidget::_setupVideoPlay() {
-    videoWidget->lower();
-    videoWidget->setWindowFlag(Qt::WindowTransparentForInput, true);
-    videoWidget->setAttribute(Qt::WA_PaintOnScreen);
-    // 连接播放按钮的行为
-    videoSetting->ui->playerButton->setCheckable(false);
-    videoSetting->ui->playerButton->setChecked(false);
-    connect(videoSetting->ui->playerButton, &QToolButton::clicked, this, [this](bool checked){
-        if (!checked) {
-            videoWidget->pauseVideo();
-        } else {
-            videoWidget->resumeVide();
-        }
-    });
-    // 连接异常信息显示
-    connect(videoWidget, &VideoWidget::runError, videoSetting, &VideoSettingWidget::showLog);
-    connect(videoWidget, &VideoWidget::playing, this, [this](){
-        videoSetting->ui->playerButton->setCheckable(true);
-        videoSetting->ui->playerButton->setChecked(true);
-    });
-    connect(videoWidget, &VideoWidget::paused, this, [this](){
-        videoSetting->ui->playerButton->setCheckable(true);
-        videoSetting->ui->playerButton->setChecked(false);
-    });
-    connect(videoWidget, &VideoWidget::stoped, this, [this](){
-        videoSetting->ui->playerButton->setCheckable(false);
-        videoSetting->ui->playerButton->setChecked(false);
-    });
-
-    // TODO(llhsdmd@gmail.com) : 切换集数，
-}
-
-bool PlayerWidget::_doLater(std::function<void()> func) {
-    return QMetaObject::invokeMethod(this, func, Qt::QueuedConnection);
-}
-
 PlayerWidget::~PlayerWidget() {
+    delete d;
 }

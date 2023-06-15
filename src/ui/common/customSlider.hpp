@@ -10,6 +10,7 @@ class CustomSlider : public QSlider
     Q_OBJECT
     public:
         CustomSlider(QWidget *parent = nullptr);
+        virtual ~CustomSlider();
         int preloadValue();
         void setShowTipLabel(bool flag);
         bool showTipLabel();

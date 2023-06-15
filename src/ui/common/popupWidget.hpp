@@ -13,7 +13,7 @@ class PopupWidget : public QWidget {
             LEFT
         };
     public:
-        PopupWidget(QWidget* parent = nullptr,Qt::WindowFlags f = Qt::WindowFlags());
+        PopupWidget(QWidget* parent = nullptr,Qt::WindowFlags f = Qt::Widget);
         inline void setAssociateWidget(QWidget* widget, Direction direction) {
             attach_widget = widget;
             this->direction = direction;
