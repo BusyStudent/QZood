@@ -351,7 +351,6 @@ VideoThread::~VideoThread() {
     avcodec_free_context(&codecCtxt);
 }
 void VideoThread::tryHardwareInit() {
-    static AVPixelFormat staticHardwareFormat; //< Maybe we should use thread_local ?
     AVHWDeviceType hardwareType;
 
     // Try create a context with hardware
@@ -376,14 +375,27 @@ void VideoThread::tryHardwareInit() {
             // Got
             hardwarePixfmt = conf->pix_fmt;
             hardwareType = conf->device_type;
-            staticHardwareFormat = conf->pix_fmt;
             break;
         }
     }
 
     // Override HW get format
+    hardwareCtxt->opaque = this;
     hardwareCtxt->get_format = [](struct AVCodecContext *s, const enum AVPixelFormat * fmt) {
-        return staticHardwareFormat;
+        auto self = static_cast<VideoThread*>(s->opaque);
+        auto p = fmt;
+        while (*p != -1) {
+            if (*p == self->hardwarePixfmt) {
+                return self->hardwarePixfmt;
+            }
+            if (*(p + 1) == AV_PIX_FMT_NONE) {
+                qWarning() << "Cannot get hardware format";
+                return *p;
+            }
+            p ++;
+        }
+        qWarning() << "Cannot get hardware format";
+        return AV_PIX_FMT_NONE;
     };
 
     // Try init hw
@@ -939,7 +951,8 @@ bool DemuxerThread::readFrame(int *eof) {
         }
     }
     else if (tooLessPackets() && !(*eof)) {
-        // Wit for next time 
+#if     defined(NEKOAV_BUFFERING_1)
+        // Wait for next time 
         if (prevTooLessPacketsTime == 0) {
             // First time not enough data
             prevTooLessPacketsTime = av_gettime_relative();
@@ -950,6 +963,7 @@ bool DemuxerThread::readFrame(int *eof) {
             // If bigger than 20ms, we begin buffering
             return true;
         }
+#endif
 
         prevTooLessPacketsTime = 0; //< Clear the mark
         prevBufferProgress = 0.0f; //< Clear buffering progress
@@ -1069,7 +1083,10 @@ void DemuxerThread::doUpdateClock() {
         curPosition = curPos;
 
         if (audioThread && videoThread) {
-            qDebug() << "Demuxer Position changed to" << curPosition << " A-V " << audioThread->clock() - videoThread->clock();  
+            qDebug() << "Demuxer Position changed to" << curPosition 
+                     << " A :" << audioThread->clock()
+                     << " V :" << videoThread->clock()
+                     << " A-V " << audioThread->clock() - videoThread->clock();  
         }
         else {
             qDebug() << "Demuxer Position changed to" << curPosition;
@@ -1077,6 +1094,7 @@ void DemuxerThread::doUpdateClock() {
 
         // Update position
         Q_EMIT ffmpegPositionChanged(curPosition);
+        Q_EMIT ffmpegBuffering(bufferedDuration(), NAN);
     }
 }
 void DemuxerThread::requestSeek(qreal pos) {
@@ -1260,8 +1278,12 @@ void MediaPlayerPrivate::setPlaybackState(PlaybackState s) {
     }
 }
 void MediaPlayerPrivate::demuxerBuffering(qreal duration, float progress) {
-    Q_EMIT player->bufferedDurationChanged(duration);
-    Q_EMIT player->bufferProgressChanged(progress);
+    if (!std::isnan(duration)) {
+        Q_EMIT player->bufferedDurationChanged(duration);
+    }
+    if (!std::isnan(progress)) {
+        Q_EMIT player->bufferProgressChanged(progress);
+    }
 }
 void MediaPlayerPrivate::demuxerErrorOccurred(int errcode) {
     errorString = FFErrorToString(errcode);
@@ -1273,6 +1295,7 @@ void MediaPlayerPrivate::demuxerErrorOccurred(int errcode) {
         // Resource
         case AVERROR_PROTOCOL_NOT_FOUND:
         case AVERROR_INVALIDDATA:
+        case AVERROR(ETIMEDOUT): //< Timeout
         case AVERROR(EIO): //< IO ERROR 
             error = Error::ResourceError;
             break;
@@ -1380,7 +1403,7 @@ auto MediaPlayer::isSeekable() const -> bool {
     if (!ctxt) {
         return false;
     }
-    if (ctxt->pb) {
+    if (ctxt->pb && strcmp(ctxt->iformat->name, "hls") != 0) {
         if (ctxt->pb->seekable == 0) {
             return false;
         }

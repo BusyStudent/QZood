@@ -112,6 +112,7 @@ ZOOD_TEST(Player, VideoCanvas) {
         player->setHttpReferer("https://www.bilibili.com");
         player->setHttpUseragent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537");
         player->setOption("multiple_requests", "1");
+        player->setOption("http_seekable", "1");
         player->setSource(url);
         player->play();
     });

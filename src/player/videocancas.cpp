@@ -97,6 +97,8 @@ VideoCanvasPrivate::VideoCanvasPrivate(VideoCanvas *parent) : QObject(parent), v
     connect(&videoSink, &NekoVideoSink::videoFrameChanged, this, &VideoCanvasPrivate::_on_VideoFrameChanged, Qt::QueuedConnection);
 }
 void VideoCanvasPrivate::paint(QPainter &painter) {
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    painter.setRenderHint(QPainter::TextAntialiasing, true);
     if (!image.isNull()) {
         qreal texWidth = image.width();
         qreal texHeight = image.height();

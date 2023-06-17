@@ -2,7 +2,7 @@
 #include <QObject>
 #include "../stl.hpp"
 
-class NetPromiseHelper : public QObject, public std::enable_shared_from_this<NetPromiseHelper> {
+class NetPromiseHelper : public QObject, public DynRefable {
     Q_OBJECT
     public:
         NetPromiseHelper(QObject *parent = nullptr);

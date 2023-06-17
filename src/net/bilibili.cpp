@@ -253,7 +253,7 @@ NetResult<BiliVideoSource> BiliClient::fetchVideoSource(const QString &cid, cons
             QJsonParseError error;
             auto doc = QJsonDocument::fromJson(reply->readAll(), &error);
 
-            // qDebug() << doc;
+            qDebug() << doc;
 
             if (!doc.isEmpty() && doc["code"] == 0) {
                 BiliVideoSource bilisource;
@@ -498,7 +498,7 @@ BiliUrlParse    BiliClient::parseUrl(const QString &url) {
         int ssbegin = url.indexOf("ss");
         if (ssbegin >= 0) {
             QString seasonID;
-            int ssend = url.indexOf("?", ssend);
+            int ssend = url.indexOf("?", ssbegin);
 
             // Skip SS prefix
             if (ssend >= 0) {
@@ -625,6 +625,9 @@ public:
     QStringList danmakuSourceList() override {
         return QStringList(BSourceName);
     }
+    QString     recommendedSource() override {
+        return BSourceName;
+    }
     NetResult<QString> fetchVideo(const QString &sourceString) override {
         if (sourceString != BSourceName) {
             return NetResult<QString>::Alloc().putLater(std::nullopt);
@@ -655,12 +658,29 @@ public:
     BBangumi(BiliBangumi b, BiliClient &client) : data(b), client(client) { }
 
     NetResult<EpisodeList> fetchEpisodes() override {
+        if (!hasFullData) {
+            auto result = NetResult<EpisodeList>::Alloc();
+            client.fetchBangumiBySeasonID(data.seasonID).then([result, c = &this->client](const Result<BiliBangumi> &ban) mutable {
+                if (!ban) {
+                    result.putResult(std::nullopt);
+                    return;
+                }
+
+                EpisodeList list;
+                for (const auto &each : ban.value().episodes) {
+                    list.push_back(std::make_shared<BEpisode>(each, *c));
+                }
+                result.putResult(list);
+            });
+            return result;
+        }
+
         EpisodeList list;
         for (const auto &each : data.episodes) {
             list.push_back(std::make_shared<BEpisode>(each, client));
         }
 
-        return NetResult<EpisodeList>::Alloc().putLater(list);
+        return NetResult<EpisodeList>::AllocWithResult(list);
     }
     NetResult<QImage> fetchCover() override {
         auto r = NetResult<QImage>::Alloc();
@@ -678,9 +698,9 @@ public:
         });
         return r;
     }
-    QStringList availableSource() override {
-        return QStringList(BSourceName);
-    }
+    // QStringList availableSource() override {
+    //     return QStringList(BSourceName);
+    // }
     QString description() override {
         return data.evaluate;
     }
@@ -690,6 +710,8 @@ public:
 private:
     BiliBangumi data;
     BiliClient &client;
+    bool        hasFullData = true;
+friend class BClient;
 };
 class BTimelineItem : public TimelineItem, public QObject {
 public:
@@ -757,7 +779,10 @@ public:
             }
             BangumiList outList;
             for (const auto &each : bans.value()) {
-                outList.push_back(std::make_shared<BBangumi>(each, client));
+                auto i = std::make_shared<BBangumi>(each, client);
+                i->hasFullData = false;
+                outList.push_back(i);
+                
             }
             r.putResult(outList);
         });

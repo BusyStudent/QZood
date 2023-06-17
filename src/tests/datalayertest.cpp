@@ -4,6 +4,8 @@
 #include <QTreeWidget>
 #include <QListWidget>
 #include <QPushButton>
+#include <QMessageBox>
+#include <QInputDialog>
 
 #include "ui_datalayertest.h"
 
@@ -81,6 +83,7 @@ ZOOD_TEST(DataLayer, Timeline) {
                 for (auto &item : bangumi.value()) {
                     auto vt = new QListWidgetItem(item->title());
                     ui.searchListWidget->addItem(vt);
+                    vt->setData(Qt::UserRole, QVariant::fromValue(item));
 
                     item->fetchCover().then(ui.searchListWidget, [=](const Result<QImage> &image) {
                         if (image) {
@@ -90,6 +93,35 @@ ZOOD_TEST(DataLayer, Timeline) {
                 }
             }
         );
+    });
+    QObject::connect(ui.searchListWidget, &QListWidget::itemDoubleClicked, [=](QListWidgetItem *item) {
+        auto ptr = item->data(Qt::UserRole).value<BangumiPtr>();
+        if (!ptr) {
+            return;
+        }
+        ptr->fetchEpisodes().then([=](const Result<EpisodeList> &eps) mutable {
+            if (!eps) {
+                QMessageBox::critical(container, "Error", "Failed to fetch episodes");
+                return;
+            }
+            QStringList names;
+            for (const auto &e : eps.value()) {
+                names.push_back(e->title());
+            }
+            auto ret = QInputDialog::getItem(container, "Select a episode", "Select", names);
+            for (const auto &e : eps.value()) {
+                if (e->title() == ret) {
+                    e->fetchVideo(e->recommendedSource()).then([=](const Result<QString> &url) {
+                        if (!url) {
+                            QMessageBox::critical(container, "Error", "Failed to get video url");
+                            return;
+                        }
+                        QInputDialog::getText(container, "Get your url here", "Url", QLineEdit::Normal, url.value());
+                    });
+                    return;
+                }
+            }
+        });
     });
 
     return container;

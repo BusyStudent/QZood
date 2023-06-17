@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <QImage>
 #include <QList>
 #include "promise.hpp"
 #include "../danmaku.hpp"
@@ -29,7 +30,7 @@ class Episode : public DynRefable {
          * 
          * @return NetResult<QImage> 
          */
-        virtual NetResult<QImage> fetchCover() = 0;
+        virtual NetResult<QImage> fetchCover();
 
         /**
          * @brief Get the avliable source of the episode
@@ -79,7 +80,7 @@ class Bangumi : public DynRefable {
          * 
          * @return QStringList 
          */
-        virtual QStringList availableSource() = 0;
+        // virtual QStringList availableSource() = 0;
         /**
          * @brief Get description of the bangumi, probably be null string
          * 
@@ -154,8 +155,12 @@ inline QStringList Episode::danmakuSourceList() {
     return QStringList();
 }
 
+inline NetResult<QImage> Episode::fetchCover() {
+    return NetResult<QImage>::Alloc().putLater(std::nullopt);
+}
+
 inline NetResult<DanmakuList> Episode::fetchDanmaku(const QString &) {
-    return NetResult<DanmakuList>::Alloc().putLater(std::nullopt);;
+    return NetResult<DanmakuList>::Alloc().putLater(std::nullopt);
 }
 
 inline NetResult<Timeline> VideoInterface::fetchTimeline() {
