@@ -2,21 +2,52 @@
 
 #include <QFileInfo>
 
-VideoBLL::VideoBLL(const EpisodePtr episode) : video(episode) {
-
+QStringList VideoBLL::sourcesList() {
+    return sourceList;
 }
 
-VideoBLLPtr VideoBLL::createVideoBLL(const QString filepath) {
-    return VideoBLLPtr((VideoBLL*)new VideoBLLLocal(filepath));
+QStringList VideoBLL::danmakuSourceList() {
+    return danmakuList;
 }
 
-VideoBLLPtr VideoBLL::createVideoBLL(const EpisodePtr episode) {
-     return VideoBLLPtr(new VideoBLL(episode));
+QStringList VideoBLL::subtitleSourceList() {
+    return subtitleList;
 }
 
-QListWidgetItem* VideoBLL::addToList(QListWidget* listWidget) {
+void VideoBLL::loadDanmakuFromFile(const QString &filepath) {
+    danmakuList.push_back(filepath);
+}
+
+void VideoBLL::loadSubtitleFromFile(const QString &filepath) {
+    subtitleList.push_back(filepath);
+}
+
+void VideoBLL::setCurrentVideoSource(const QString& source) {
+    if (source.isEmpty() || sourcesList().contains(source)) {
+        currentVideoSource = source;
+    }
+}
+
+void VideoBLL::setCurrentSubtitleSource(const QString& source) {
+    if (source.isEmpty() || subtitleSourceList().contains(source)) {
+        currentSubtitleSource = source;
+    }
+}
+
+void VideoBLL::setCurrentDanmakuSource(const QString& source) {
+    if (source.isEmpty() || danmakuSourceList().contains(source)) {
+        currentDanmakuSource = source;
+        dirty &= (uint16_t)DANMAKU;
+    }
+}
+
+VideoBLLEpisode::VideoBLLEpisode(const EpisodePtr episode) : video(episode) {
+    update();
+}
+
+QListWidgetItem* VideoBLLEpisode::addToList(QListWidget* listWidget) {
     QListWidgetItem* item = new QListWidgetItem(QIcon(":/icons/loading_bar.png"), video->title());
-    video->fetchCover().then([item](const Result<QImage> &image){
+    loadThumbnail([item](const Result<QImage> &image){
         if (image.has_value()) {
             item->setIcon(QPixmap::fromImage(image.value()));
         } else {
@@ -27,16 +58,89 @@ QListWidgetItem* VideoBLL::addToList(QListWidget* listWidget) {
     return item;
 }
 
-QString VideoBLL::loadVideo() {
-    return "";
-}
-
-QString VideoBLL::title() {
+QString VideoBLLEpisode::title() {
     return video->title();
 }
 
-VideoBLLLocal::VideoBLLLocal(const QString filepath) : filePath(filepath) {
+QStringList VideoBLLEpisode::sourcesList() {
+    return video->sourcesList();
+}
 
+QStringList VideoBLLEpisode::danmakuSourceList() {
+    return danmakuList + video->danmakuSourceList();
+}
+
+QStringList VideoBLLEpisode::subtitleSourceList() {
+    return subtitleList;
+}
+
+void VideoBLLEpisode::loadVideoToPlay(std::function<void(const Result<QString>&)> callAble) {
+    video->fetchVideo(currentVideoSource).then(callAble);
+}
+
+void VideoBLLEpisode::loadVideoToPlay(QObject *ctxt, std::function<void(const Result<QString>&)> callAble) {
+    video->fetchVideo(currentVideoSource).then(ctxt, callAble);
+}
+
+void VideoBLLEpisode::loadThumbnail(std::function<void(const Result<QImage>&)> callAble) {
+    if (dirty & THUMBNAIL) {
+        video->fetchCover().then([this](const Result<QImage>& img){
+            if(img.has_value()) {
+                thumbnail = img.value();
+            }
+        });
+        dirty = dirty ^ (uint16_t)THUMBNAIL;
+    }
+    callAble(thumbnail);
+}
+
+void VideoBLLEpisode::loadThumbnail(QObject *ctxt, std::function<void(const Result<QImage>&)> callAble) {
+    if (dirty & THUMBNAIL) {
+        video->fetchCover().then(ctxt, [this](const Result<QImage>& img){
+            if(img.has_value()) {
+                thumbnail = img.value();
+            }
+        });
+        dirty = dirty ^ (uint16_t)THUMBNAIL;
+    }
+    callAble(thumbnail);
+}
+
+void VideoBLLEpisode::loadDanmaku(std::function<void(const Result<DanmakuList>&)> callAble) {
+    if (dirty & THUMBNAIL) {
+        video->fetchDanmaku(currentDanmakuSource).then([this](const Result<DanmakuList>& d){
+            if(d.has_value()) {
+                danmaku = d.value();
+            }
+        });
+        dirty = dirty ^ (uint16_t)DANMAKU;
+    }
+    callAble(danmaku);
+}
+
+void VideoBLLEpisode::loadDanmaku(QObject *ctxt, std::function<void(const Result<DanmakuList>&)> callAble) {
+    if (dirty & THUMBNAIL) {
+        video->fetchDanmaku(currentDanmakuSource).then(ctxt, [this](const Result<DanmakuList>& d){
+            if(d.has_value()) {
+                danmaku = d.value();
+            }
+        });
+        dirty = dirty ^ (uint16_t)DANMAKU;
+    }
+    callAble(danmaku);
+}
+
+void VideoBLLEpisode::loadSubtitle(std::function<void(const Result<QString>&)> callAble) {
+    callAble(currentSubtitleSource);
+}
+
+void VideoBLLEpisode::loadSubtitle(QObject *ctxt, std::function<void(const Result<QString>&)> callAble) {
+    loadSubtitle(callAble);
+}
+
+VideoBLLLocal::VideoBLLLocal(const QString filepath) : filePath(filepath) { 
+    sourceList.push_back("本地");
+    setCurrentVideoSource("本地");
 }
 
 QListWidgetItem* VideoBLLLocal::addToList(QListWidget* listWidget) {
@@ -45,10 +149,42 @@ QListWidgetItem* VideoBLLLocal::addToList(QListWidget* listWidget) {
     return item;
 }
 
-QString VideoBLLLocal::loadVideo() {
-    return filePath;
-}
-
 QString VideoBLLLocal::title() {
     return QFileInfo(filePath).fileName();
+}
+
+void VideoBLLLocal::loadVideoToPlay(std::function<void(const Result<QString>&)> callAble) {
+    callAble(filePath);
+}
+
+void VideoBLLLocal::loadVideoToPlay(QObject*, std::function<void(const Result<QString>&)> callAble) {
+    loadVideoToPlay(callAble);
+}
+
+void VideoBLLLocal::loadThumbnail(std::function<void(const Result<QImage>&)> callAble) {
+    callAble(QImage());
+}
+
+void VideoBLLLocal::loadThumbnail(QObject*, std::function<void(const Result<QImage>&)> callAble) {
+    loadThumbnail(callAble);
+}
+
+void VideoBLLLocal::loadDanmaku(std::function<void(const Result<DanmakuList>&)> callAble) {
+    if (!currentDanmakuSource.isEmpty() && danmakuList.size() > 0) {
+        callAble(danmaku);
+    }
+}
+
+void VideoBLLLocal::loadDanmaku(QObject*, std::function<void(const Result<DanmakuList>&)> callAble) {
+    loadDanmaku(callAble);
+}
+
+void VideoBLLLocal::loadSubtitle(std::function<void(const Result<QString>&)> callAble) {
+    if (!currentSubtitleSource.isEmpty()) {
+        callAble(currentSubtitleSource);
+    }
+}
+
+void VideoBLLLocal::loadSubtitle(QObject*, std::function<void(const Result<QString>&)> callAble) {
+    loadSubtitle(callAble);
 }

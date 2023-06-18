@@ -37,10 +37,9 @@ class CustomizeTitleWidget : public QWidget {
   inline void setResizingStatus(bool v) { flag_resizing = v; }
   inline void setMovingStatus(bool v) { flag_moving = v; }
 
-
  private:
-  const int MARGIN_MIN_SIZE = -10;
-  const int MARGIN_MAX_SIZE = 5;
+  const int MARGIN_IN_SIZE = 5;
+  const int MARGIN_OUT_SIZE = 5;
   enum MovingDirection {
     NONE,
     BOTTOMRIGHT,

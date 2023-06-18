@@ -16,8 +16,6 @@ Zood::Zood(QWidget *parent) : CustomizeTitleWidget(parent), ui(new Ui::Zood()) {
     // 设置设计器设计的UI布局。
     ui->setupUi(this);
     setWindowTitle("QZood");
-    // 应用自定义窗口基类定义的容器shadow
-    createShadow(ui->containerWidget);
     
     homePage = new HomeWidget();
     ui->centerWidget->addWidget(homePage);
@@ -105,6 +103,10 @@ void Zood::setPredictStringList(QStringList indicator) {
     ui->searchBox->addItems(indicator);
     auto view = searchCompleter->popup();
     view->move(view->pos() + QPoint(0, 5));
+}
+
+void Zood::showEvent(QShowEvent *event) {
+    createShadow(ui->containerWidget);
 }
 
 void Zood::resizeEvent(QResizeEvent *event) {

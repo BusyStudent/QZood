@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>440</width>
-    <height>333</height>
+    <height>291</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -797,6 +797,9 @@ QToolButton:hover, QToolButton:checked {
            <property name="maximum">
             <number>100</number>
            </property>
+           <property name="pageStep">
+            <number>10</number>
+           </property>
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
@@ -804,6 +807,12 @@ QToolButton:hover, QToolButton:checked {
          </item>
          <item row="1" column="1">
           <widget class="QSlider" name="danmakuSizeBar">
+           <property name="minimum">
+            <number>50</number>
+           </property>
+           <property name="maximum">
+            <number>170</number>
+           </property>
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
@@ -827,6 +836,12 @@ QToolButton:hover, QToolButton:checked {
          </item>
          <item row="2" column="1">
           <widget class="QSlider" name="danmakuSpeedBar">
+           <property name="maximum">
+            <number>4</number>
+           </property>
+           <property name="pageStep">
+            <number>1</number>
+           </property>
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
@@ -894,17 +909,7 @@ QToolButton:hover, QToolButton:checked {
         </layout>
        </item>
        <item>
-        <widget class="QCheckBox" name="danmakuBackgroundCheckBox">
-         <property name="text">
-          <string>字体背景</string>
-         </property>
-        </widget>
-       </item>
-       <item>
         <layout class="QHBoxLayout" name="horizontalLayout_6">
-         <item>
-          <widget class="QComboBox" name="danmakuBackgroundComboBox"/>
-         </item>
          <item>
           <widget class="QLabel" name="label_19">
            <property name="text">
@@ -914,6 +919,77 @@ QToolButton:hover, QToolButton:checked {
          </item>
          <item>
           <widget class="QSlider" name="danmakuTransparencyBar">
+           <property name="maximum">
+            <number>100</number>
+           </property>
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="danmakuTransparencyLabel">
+           <property name="minimumSize">
+            <size>
+             <width>40</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>0%</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_8">
+         <item>
+          <widget class="QCheckBox" name="danmakuBackgroundCheckBox">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="text">
+            <string>字体背景</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="danmakuBackgroundColor">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">QPushButton {
+	border: 1px dashed white;
+}</string>
+           </property>
+           <property name="text">
+            <string/>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label">
+           <property name="text">
+            <string>透明度</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSlider" name="danmakuBackgroundBar">
+           <property name="maximum">
+            <number>100</number>
+           </property>
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
@@ -938,16 +1014,25 @@ QToolButton:hover, QToolButton:checked {
         </layout>
        </item>
        <item>
-        <widget class="QCheckBox" name="danmakuStrokeCheckBox">
-         <property name="text">
-          <string>字体描边</string>
-         </property>
-        </widget>
-       </item>
-       <item>
         <layout class="QHBoxLayout" name="horizontalLayout_10">
          <item>
-          <widget class="QComboBox" name="danmakuStrokeComboBox"/>
+          <widget class="QCheckBox" name="danmakuStrokeCheckBox">
+           <property name="text">
+            <string>字体描边</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="danmakuStroke">
+           <property name="styleSheet">
+            <string notr="true">QPushButton {
+	border: 1px dashed white;
+}</string>
+           </property>
+           <property name="text">
+            <string/>
+           </property>
+          </widget>
          </item>
          <item>
           <widget class="QLabel" name="label_22">
@@ -958,6 +1043,9 @@ QToolButton:hover, QToolButton:checked {
          </item>
          <item>
           <widget class="QSlider" name="danmakuStrokeTransparencyBar">
+           <property name="maximum">
+            <number>100</number>
+           </property>
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
@@ -1029,14 +1117,14 @@ QToolButton:hover, QToolButton:checked {
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_13">
          <item>
-          <widget class="QToolButton" name="defualtsynchronizeTimeButton">
+          <widget class="QToolButton" name="subtitleDefualtsynchronizeTimeButton">
            <property name="text">
             <string>默认</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QDoubleSpinBox" name="synchronizeTimeBox"/>
+          <widget class="QDoubleSpinBox" name="subtitleSynchronizeTimeBox"/>
          </item>
         </layout>
        </item>
@@ -1125,7 +1213,11 @@ QToolButton:hover, QToolButton:checked {
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_15">
          <item>
-          <widget class="QComboBox" name="subtitleColorComboBox"/>
+          <widget class="QPushButton" name="subtitleColor">
+           <property name="text">
+            <string/>
+           </property>
+          </widget>
          </item>
          <item>
           <widget class="QLabel" name="label_28">
@@ -1160,16 +1252,25 @@ QToolButton:hover, QToolButton:checked {
         </layout>
        </item>
        <item>
-        <widget class="QCheckBox" name="subtitleStrokeCheckBox">
-         <property name="text">
-          <string>字体描边</string>
-         </property>
-        </widget>
-       </item>
-       <item>
         <layout class="QHBoxLayout" name="horizontalLayout_14">
          <item>
-          <widget class="QComboBox" name="subtitleStrokeComboBox"/>
+          <widget class="QCheckBox" name="subtitleStrokeCheckBox">
+           <property name="text">
+            <string>字体描边</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="subtitleStroke">
+           <property name="styleSheet">
+            <string notr="true">QPushButton {
+	border: 1px dashed white;
+}</string>
+           </property>
+           <property name="text">
+            <string/>
+           </property>
+          </widget>
          </item>
          <item>
           <widget class="QLabel" name="label_27">

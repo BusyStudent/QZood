@@ -1,6 +1,6 @@
 #pragma once
 
-enum ItemFlag : int {
+enum class ItemFlag : int {
     VALID = 1<<0,
     DIRTY = 1<<1,
     INVALID = 1<<2,
@@ -21,7 +21,6 @@ inline ItemFlag operator^(ItemFlag lhs, ItemFlag rhs) {
 inline ItemFlag operator~(ItemFlag e) {
     return static_cast<ItemFlag>(~static_cast<int>(e));
 }
-
 
 template<typename ItemType>
 class ItemModel {

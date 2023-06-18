@@ -3,21 +3,18 @@
 #include <QWidget>
 #include <QTimer>
 
+class PopupWidgetPrivate;
+
 class PopupWidget : public QWidget {
     Q_OBJECT
     public:
-        enum Direction{
-            TOP,
-            RIGHT,
-            BOTTOM,
-            LEFT
-        };
-    public:
         PopupWidget(QWidget* parent = nullptr,Qt::WindowFlags f = Qt::Widget);
-        inline void setAssociateWidget(QWidget* widget, Direction direction) {
+        ~PopupWidget();
+        inline void setAlignment(Qt::Alignment align) {
+            aligns = align;
+        }
+        inline void setAssociateWidget(QWidget* widget) {
             attach_widget = widget;
-            this->direction = direction;
-            setAuotLayout();
         }
         inline void setAuotLayout(bool flag = true) { auto_layout = flag; }
         inline bool autoLayout() { return auto_layout; }
@@ -42,9 +39,10 @@ class PopupWidget : public QWidget {
         void hided();
 
     private:
+        PopupWidgetPrivate *d;
         QTimer* timer = nullptr;
         QWidget* attach_widget = nullptr;
-        Direction direction = BOTTOM;
+        Qt::Alignment aligns = Qt::AlignBottom | Qt::AlignHCenter;
         bool auto_layout = false;
         bool hide_after_leave = true;
         int defualt_hide_after_time = 100;

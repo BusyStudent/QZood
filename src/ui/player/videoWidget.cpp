@@ -74,11 +74,14 @@ public:
         // 实例化音量控制界面
         volumeSetting = new VolumeSettingWidget(self);
         ui_videoSetting->voiceSettingButton->installEventFilter(self);
-        volumeSetting->setAssociateWidget(ui_videoSetting->voiceSettingButton, PopupWidget::Direction::TOP);
-
+        volumeSetting->setAssociateWidget(ui_videoSetting->voiceSettingButton);
+        volumeSetting->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+        volumeSetting->setAuotLayout();
         // 播放设置控件
         settings = new FullSettingWidget(self, Qt::Popup);
-        settings->setAssociateWidget(ui_videoSetting->settingButton, PopupWidget::TOP);
+        settings->setAssociateWidget(ui_videoSetting->settingButton);
+        settings->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+        settings->setAuotLayout();
         settings->setHideAfterLeave(false);
 
         // 显示信息的标签
@@ -116,6 +119,7 @@ public:
         connectVolumeSetting();
         connectVideoPlayBar();
         connectVideoPlaySetting();
+        connectVideoStatus();
     }
 
     void update() {
@@ -137,10 +141,14 @@ public:
     }
 
     void play(const VideoBLLPtr video) {
+        stop();
         this->video = video;
-        player->stop();
-        player->setSource(video->loadVideo());
-        player->play();
+        video->loadVideoToPlay(self, [this](const Result<QString>& url){
+            if (url.has_value()) {
+                player->setSource(url.value());
+                player->play();
+            }
+        });
     }
 
     void resume() {
@@ -195,11 +203,13 @@ public:
 
     void stop() {
         if (player->isPlaying()) {
+            qDebug()  << "stop : " << video->title() << "\n position : " << position();
+            video->setStatus("position", position());
             player->stop();
         }
     }
 
-protected:
+private:
      /**
      * @brief 视频进度条
      */
@@ -246,8 +256,8 @@ protected:
             tipLabel->setText(timeFormat(value));
         });
 
-        QWidget::connect(player, &NekoMediaPlayer::bufferProgressChanged, self, [this](double sec){
-            videoProgressBar->setPreloadValue(sec);
+        QWidget::connect(player, &NekoMediaPlayer::bufferedDurationChanged, self, [this](double sec){
+            videoProgressBar->setPreloadValue(sec + position());
         });
         // 结束信号
         QWidget::connect(player, &NekoMediaPlayer::errorOccurred, self, [this](NekoMediaPlayer::Error error, const QString &errorString){
@@ -371,6 +381,23 @@ protected:
     }
 
     /**
+     * @brief 播放状态恢复
+     * 
+     */
+    void connectVideoStatus() {
+        QWidget::connect(player, &NekoMediaPlayer::mediaStatusChanged, self, [this](NekoMediaPlayer::MediaStatus status){
+            switch (status)
+            {
+            case NekoMediaPlayer::MediaStatus::LoadedMedia:
+                if (video->containsStatus("position")) {
+                setPosition(video->getStatus<int>("position"));
+                }
+                break;
+            }
+        });
+    }
+
+    /**
      * @brief 视频播放设置
      * 
      */
@@ -393,13 +420,8 @@ protected:
                 settings->hide();
             }
         });
+        settings->setupSetting(self);
     }
-
-    /**
-     * @brief 播放设置界面
-     * 
-     */
-    // TODO(llhsdmd): 
 
 public:
     VideoCanvas* vcanvas;
@@ -416,13 +438,13 @@ public:
 
     PopupWidget* logWidget = nullptr;
     Ui::CustomLabel *ui_logView = nullptr;
+    VideoBLLPtr video;
+
+    int skipStep = 10;
 
 private:
     VideoWidget *self;
     QVBoxLayout* mainLayout;
-    VideoBLLPtr video;
-
-    int skipStep = 10;
 };
 
 VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent), d(new VideoWidgetPrivate(this)) {
@@ -488,7 +510,128 @@ void VideoWidget::videoLog(const QString& info) {
     d->videoLog(info);
 }
 
+void VideoWidget::setPlaybackRate(qreal v) {
+    // TODO(llhsdmd) : setPlaybackRate
+    qInfo() << "TODO(setPlaybackRate)";
+}
+// 画面设置
+void VideoWidget::setAspectRationMode(ScalingMode mode) {
+    // TODO(llhsdmd) : setAspectRationMode
+    qInfo() << "TODO(setAspectRationMode)";
+}
+void VideoWidget::RotationScreen(Rotation direction) {
+    // TODO(llhsdmd) : RotationScreen
+    qInfo() << "TODO(RotationScreen)";
+}
+void VideoWidget::setImageQualityEnhancement(bool v) {
+    // TODO(llhsdmd) : setImageQualityEnhancement
+    qInfo() << "TODO(setImageQualityEnhancement)";
+}
+// 色彩设置
+void VideoWidget::setBrightness(int v) {
+    // TODO(llhsdmd) : setBrightness
+    qInfo() << "TODO(setBrightness)";
+}
+void VideoWidget::setContrast(int v) {
+    // TODO(llhsdmd) : setContrast
+    qInfo() << "TODO(setContrast)";
+}
+void VideoWidget::setHue(int v) {
+    // TODO(llhsdmd) : setHue
+    qInfo() << "TODO(setHue)";
+}
+void VideoWidget::setSaturation(int v) {
+    // TODO(llhsdmd) : setSaturation
+    qInfo() << "TODO(setSaturation)";
+}
+// 弹幕设置
+void VideoWidget::setDanmakuShowArea(qreal OccupationRatio) {
+    // TODO(llhsdmd) : setDanmakuShowArea
+    qInfo() << "TODO(setDanmakuShowArea)";
+}
+void VideoWidget::setDanmakuSize(qreal ratio) {
+    // TODO(llhsdmd) : setDanmakuSize
+    qInfo() << "TODO(setDanmakuSize)";
+}
+void VideoWidget::setDanmakuSpeed(int speed) {
+    // TODO(llhsdmd) : setDanmakuSpeed
+    qInfo() << "TODO(setDanmakuSpeed)";
+}
+void VideoWidget::setDanmakuBackground(bool v) {
+    // TODO(llhsdmd) : setDanmakuBackground
+    qInfo() << "TODO(setDanmakuBackground)";
+}
+void VideoWidget::setDanmakuFont(const QFont& font) {
+    // TODO(llhsdmd) : setDanmakuFont
+    qInfo() << "TODO(setDanmakuFont)";
+}
+QFont VideoWidget::danmakuFont() {
+    // TODO(llhsdmd) : danmakuFont
+    qInfo() << "TODO(danmakuFont)";
+    return QFont();
+}
+void VideoWidget::setDanmakuBackgroundTransparency(qreal percentage) {
+    // TODO(llhsdmd) : setDanmakuBackgroundTransparency
+    qInfo() << "TODO(setDanmakuBackgroundTransparency)";
+}
+void VideoWidget::setDanmakuBackgroundColor(QColor color) {
+    // TODO(llhsdmd) : setDanmakuBackgroundColor
+    qInfo() << "TODO(setDanmakuBackgroundColor)";
+}
+void VideoWidget::setDanmakuTransparency(qreal ratio) {
+    // TODO(llhsdmd) : setDanmakuTransparency
+    qInfo() << "TODO(setDanmakuTransparency)";
+}
+void VideoWidget::setDanmakuStroke(bool v) {
+    // TODO(llhsdmd) : setDanmakuStroke
+    qInfo() << "TODO(setDanmakuStroke)";
+}
+void VideoWidget::setDanmakuStrokeColor(QColor color) {
+    // TODO(llhsdmd) : setDanmakuStrokeColor
+    qInfo() << "TODO(setDanmakuStrokeColor)";
+}
+void VideoWidget::setDanmakuStrokeTransparency(qreal percentage) {
+    // TODO(llhsdmd) : setDanmakuStrokeTransparency
+    qInfo() << "TODO(setDanmakuStrokeTransparency)";
+}
+// 当前指针
+VideoBLLPtr VideoWidget::currentVideo() {
+    // TODO(llhsdmd) : currentVideo
+    qInfo() << "TODO(currentVideo)";
+    return nullptr;
+}
+
+// 字幕设置
+void VideoWidget::setSubtitleSynchronizeTime(qreal t) {
+    // TODO(llhsdmd) : setSubtitleSynchronizeTime
+    qInfo() << "TODO(setSubtitleSynchronizeTime)";
+}
+void VideoWidget::setSubtitlePosition(qreal t) {
+    // TODO(llhsdmd) : setSubtitlePosition
+    qInfo() << "TODO(setSubtitlePosition)";
+}
+QFont VideoWidget::subtitleFont() {
+    // TODO(llhsdmd) : subtitleFont
+    qInfo() << "TODO(subtitleFont)";
+    return QFont();
+}
+void VideoWidget::setSubtitleFont(const QFont& font) {
+    // TODO(llhsdmd) : setSubtitleFont
+    qInfo() << "TODO(setSubtitleFont)";
+}
+void VideoWidget::setSubtitleColor(const QColor& color) {
+    // TODO(llhsdmd) : setSubtitleColor
+    qInfo() << "TODO(setSubtitleColor)";
+}
 
 VideoWidget::~VideoWidget() {
     delete d;
+}
+
+int VideoWidget::skipStep() {
+    return d->skipStep;
+}
+
+void VideoWidget::setSkipStep(int v) {
+    d->setSkipStep(v);
 }

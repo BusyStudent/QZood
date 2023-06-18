@@ -42,7 +42,9 @@ public:
         playOrderSettingWidget = new PopupWidget(self);
         ui_playOrderSettingView = new Ui::PlayOrderSettingView();
         ui_playOrderSettingView->setupUi(playOrderSettingWidget);
-        playOrderSettingWidget->setAssociateWidget(ui->playOrder, PopupWidget::BOTTOM);
+        playOrderSettingWidget->setAssociateWidget(ui->playOrder);
+        playOrderSettingWidget->setAlignment(Qt::AlignBottom | Qt::AlignHCenter);
+        playOrderSettingWidget->setAuotLayout();
     }
 
     void update() {
@@ -143,7 +145,7 @@ private:
             auto filePaths = QFileDialog::getOpenFileNames(self, self->tr("文件"), "./", "*.mp4;*.mkv;;*.*");
             for (auto filePath : filePaths) {
                 if (!filePath.isEmpty()) {
-                    addVideo(VideoBLL::createVideoBLL(filePath));
+                    addVideo(createVideoBLL(filePath));
                 }
             }
         });
@@ -166,6 +168,11 @@ private:
             if (nexti != -1) {
                 setCurrentIndex(nexti);
             }
+        });
+        QWidget::connect(ui->clearListButton, &QToolButton::clicked, self, [this](bool clicked){
+            setCurrentIndex(-1);
+            ui->playlist->clear();
+            itemModel->clear();
         });
     }
 
@@ -248,7 +255,6 @@ public:
     PopupWidget* playOrderSettingWidget = nullptr;
     Ui::PlayOrderSettingView* ui_playOrderSettingView = nullptr;
 
-        
     VideoItemModel* itemModel;
 
     int _index = -1;
@@ -260,7 +266,6 @@ PlayerWidget::PlayerWidget(QWidget* parent) : CustomizeTitleWidget(parent), d(ne
     d->connect();
     d->update();
     setWindowTitle("QZoodPlayer");
-    createShadow(d->ui->containerWidget);
 
     setAcceptDrops(true); // 支持从文件夹拖拽
 }
@@ -294,7 +299,7 @@ void PlayerWidget::dropEvent(QDropEvent *event) {
         
         // 转换为本地文件路径
         QString filePath = fileUrl.toLocalFile();
-        d->addVideo(VideoBLL::createVideoBLL(filePath));
+        d->addVideo(createVideoBLL(filePath));
         d->setCurrentIndex(d->itemModel->size() - 1);
     }
 
@@ -322,6 +327,10 @@ void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
     }
     // 刷新窗体状态
     CustomizeTitleWidget::mouseMoveEvent(event);
+}
+
+void PlayerWidget::showEvent(QShowEvent *event) {
+    createShadow(d->ui->containerWidget);
 }
 
 PlayerWidget::~PlayerWidget() {

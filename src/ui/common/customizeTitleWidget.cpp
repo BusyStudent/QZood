@@ -36,9 +36,7 @@ bool CustomizeTitleWidget::nativeEvent(const QByteArray &eventType,
       就不会被绘制，就相当于没有绘制非客户区域，所以就会看不到非客户区域的效果
       */
       return true;
-    }
-    case WM_NCHITTEST: {
-      const LONG border_width = 3;
+    } case WM_NCHITTEST: {
       RECT winrect;
       GetWindowRect(HWND(winId()), &winrect);
 
@@ -49,48 +47,47 @@ bool CustomizeTitleWidget::nativeEvent(const QByteArray &eventType,
       只用这种办法设置动态改变窗口大小比手动通过鼠标事件效果好，可以
       避免闪烁问题
       */
+      bool insideLeft = x > winrect.left - MARGIN_OUT_SIZE && x < winrect.left + MARGIN_IN_SIZE;
+      bool insideRight = x > winrect.right - MARGIN_IN_SIZE && x < winrect.right + MARGIN_OUT_SIZE;
+      bool insideTop = y > winrect.top - MARGIN_OUT_SIZE && y < winrect.top + MARGIN_IN_SIZE;
+      bool insideBottom = y > winrect.bottom - MARGIN_IN_SIZE && y < winrect.bottom + MARGIN_OUT_SIZE;
       // left border
-      if (x >= winrect.left && x < winrect.left + border_width) {
+      if (insideLeft) {
         *result = HTLEFT;
         return true;
       }
       // right border
-      if (x < winrect.right && x >= winrect.right - border_width) {
+      if (insideRight) {
         *result = HTRIGHT;
         return true;
       }
-
-      // bottom border
-      if (y < winrect.bottom && y >= winrect.bottom - border_width) {
-        *result = HTBOTTOM;
-        return true;
-      }
       // top border
-      if (y >= winrect.top && y < winrect.top + border_width) {
+      if (insideTop) {
         *result = HTTOP;
         return true;
       }
+      // bottom border
+      if (insideBottom) {
+        *result = HTBOTTOM;
+        return true;
+      }
       // bottom left corner
-      if (x >= winrect.left && x < winrect.left + border_width &&
-          y < winrect.bottom && y >= winrect.bottom - border_width) {
+      if (insideBottom && insideLeft) {
         *result = HTBOTTOMLEFT;
         return true;
       }
       // bottom right corner
-      if (x < winrect.right && x >= winrect.right - border_width &&
-          y < winrect.bottom && y >= winrect.bottom - border_width) {
+      if (insideBottom && insideRight) {
         *result = HTBOTTOMRIGHT;
         return true;
       }
       // top left corner
-      if (x >= winrect.left && x < winrect.left + border_width &&
-          y >= winrect.top && y < winrect.top + border_width) {
+      if (insideTop && insideLeft) {
         *result = HTTOPLEFT;
         return true;
       }
       // top right corner
-      if (x < winrect.right && x >= winrect.right - border_width &&
-          y >= winrect.top && y < winrect.top + border_width) {
+      if (insideTop && insideRight) {
         *result = HTTOPRIGHT;
         return true;
       }
@@ -176,39 +173,39 @@ void CustomizeTitleWidget::updateRegion(QMouseEvent *event) {
 
   if (!resizingStatus()) {
     m_direction = NONE;
-    if ((marginRight >= MARGIN_MIN_SIZE && marginRight <= MARGIN_MAX_SIZE) &&
-        ((marginBottom <= MARGIN_MAX_SIZE) &&
-         marginBottom >= MARGIN_MIN_SIZE)) {
+    if ((marginRight >= -MARGIN_OUT_SIZE && marginRight <= MARGIN_IN_SIZE) &&
+        ((marginBottom <= MARGIN_IN_SIZE) &&
+         marginBottom >= -MARGIN_OUT_SIZE)) {
       m_direction = BOTTOMRIGHT;
       setCursor(Qt::SizeFDiagCursor);
-    } else if ((marginTop >= MARGIN_MIN_SIZE && marginTop <= MARGIN_MAX_SIZE) &&
-               (marginRight >= MARGIN_MIN_SIZE &&
-                marginRight <= MARGIN_MAX_SIZE)) {
+    } else if ((marginTop >= -MARGIN_OUT_SIZE && marginTop <= MARGIN_IN_SIZE) &&
+               (marginRight >= -MARGIN_OUT_SIZE &&
+                marginRight <= MARGIN_IN_SIZE)) {
       m_direction = TOPRIGHT;
       setCursor(Qt::SizeBDiagCursor);
-    } else if ((marginLeft >= MARGIN_MIN_SIZE &&
-                marginLeft <= MARGIN_MAX_SIZE) &&
-               (marginTop >= MARGIN_MIN_SIZE && marginTop <= MARGIN_MAX_SIZE)) {
+    } else if ((marginLeft >= -MARGIN_OUT_SIZE &&
+                marginLeft <= MARGIN_IN_SIZE) &&
+               (marginTop >= -MARGIN_OUT_SIZE && marginTop <= MARGIN_IN_SIZE)) {
       m_direction = TOPLEFT;
       setCursor(Qt::SizeFDiagCursor);
-    } else if ((marginLeft >= MARGIN_MIN_SIZE &&
-                marginLeft <= MARGIN_MAX_SIZE) &&
-               (marginBottom >= MARGIN_MIN_SIZE &&
-                marginBottom <= MARGIN_MAX_SIZE)) {
+    } else if ((marginLeft >= -MARGIN_OUT_SIZE &&
+                marginLeft <= MARGIN_IN_SIZE) &&
+               (marginBottom >= -MARGIN_OUT_SIZE &&
+                marginBottom <= MARGIN_IN_SIZE)) {
       m_direction = BOTTOMLEFT;
       setCursor(Qt::SizeBDiagCursor);
-    } else if (marginBottom <= MARGIN_MAX_SIZE &&
-               marginBottom >= MARGIN_MIN_SIZE) {
+    } else if (marginBottom <= MARGIN_IN_SIZE &&
+               marginBottom >= -MARGIN_OUT_SIZE) {
       m_direction = DOWN;
       setCursor(Qt::SizeVerCursor);
-    } else if (marginLeft <= MARGIN_MAX_SIZE && marginLeft >= MARGIN_MIN_SIZE) {
+    } else if (marginLeft <= MARGIN_IN_SIZE && marginLeft >= -MARGIN_OUT_SIZE) {
       m_direction = LEFT;
       setCursor(Qt::SizeHorCursor);
-    } else if (marginRight <= MARGIN_MAX_SIZE &&
-               marginRight >= MARGIN_MIN_SIZE) {
+    } else if (marginRight <= MARGIN_IN_SIZE &&
+               marginRight >= -MARGIN_OUT_SIZE) {
       m_direction = RIGHT;
       setCursor(Qt::SizeHorCursor);
-    } else if (marginTop <= MARGIN_MAX_SIZE && marginTop >= MARGIN_MIN_SIZE) {
+    } else if (marginTop <= MARGIN_IN_SIZE && marginTop >= -MARGIN_OUT_SIZE) {
       m_direction = UP;
       setCursor(Qt::SizeVerCursor);
     } else {
@@ -270,15 +267,15 @@ void CustomizeTitleWidget::resizeRegion(int marginTop, int marginBottom,
 }
 void CustomizeTitleWidget::showMinimized() { QWidget::showMinimized(); }
 void CustomizeTitleWidget::showMaximized() {
-  layout()->setContentsMargins(0, 0, 0, 0);
+//   layout()->setContentsMargins(0, 0, 0, 0);
   QWidget::showMaximized();
 }
 void CustomizeTitleWidget::showFullScreen() {
-  layout()->setContentsMargins(0, 0, 0, 0);
+//   layout()->setContentsMargins(0, 0, 0, 0);
   QWidget::showFullScreen();
 }
 void CustomizeTitleWidget::showNormal() {
-  layout()->setContentsMargins(5, 5, 5, 5);
+//   layout()->setContentsMargins(0, 0, 0, 0);
   QWidget::showNormal();
 }
 
@@ -289,5 +286,21 @@ void CustomizeTitleWidget::paintEvent(QPaintEvent *event) {
 }
 
 void CustomizeTitleWidget::createShadow(QWidget *container_widget) {
-  containerWidget = container_widget;
+    containerWidget = container_widget;
+    layout()->setContentsMargins(0, 0, 0, 0);
+#ifdef USE_WINAPI
+    BOOL composition = FALSE;
+    if (FAILED(DwmIsCompositionEnabled(&composition)) || !composition) {
+        return ;
+    }
+    DWMNCRENDERINGPOLICY policy = DWMNCRP_ENABLED;
+    HRESULT hr;
+    hr = DwmSetWindowAttribute(HWND(winId()), DWMWA_NCRENDERING_POLICY, &policy, sizeof(policy));
+    if (FAILED(hr)) {
+        return ;
+    }
+    MARGINS m{0};
+    m = MARGINS {4, 4, 4, 4};
+    hr = DwmExtendFrameIntoClientArea(HWND(winId()), &m);
+#endif
 }
