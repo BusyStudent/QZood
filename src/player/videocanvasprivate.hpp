@@ -3,6 +3,9 @@
 #include "videocanvas.hpp"
 #include "../nekoav/nekoav.hpp"
 #include "../danmaku.hpp"
+
+#include <QOpenGLFunctions_3_3_Core>
+#include <QOpenGLContext>
 #include <QStaticText>
 
 class DanmakuPaintItem final {
@@ -23,7 +26,7 @@ class DanmakuPaintItem final {
 using DanmakuTracks = std::list<std::list<DanmakuPaintItem>>;
 using DanmakuTrack  = std::list<DanmakuPaintItem>;
 
-class VideoCanvasPrivate final : public QObject {
+class VideoCanvasPrivate final : public QObject, public QOpenGLFunctions_3_3_Core {
     Q_OBJECT
     public:
         VideoCanvasPrivate(VideoCanvas *parent);
@@ -33,12 +36,12 @@ class VideoCanvasPrivate final : public QObject {
         NekoVideoSink videoSink;
 
         // OpenGL datas
-        // GLuint                texture = 0;
-        // GLuint                textureWidth = 0;
-        // GLuint                textureHeight = 0;
-        // QOpenGLShaderProgram *program = nullptr;
-        // QOpenGLBuffer        *buffer = nullptr;
-        // QOpenGLVertexArrayObject *vertexArray = nullptr;
+        GLuint vertexArrayObject = 0;
+        GLuint vertexBufferObject = 0;
+        GLuint programObject = 0;
+        GLuint texture = 0;
+        GLuint textureWidth = 0;
+        GLuint textureHeight = 0;
 
         QImage              image;
 
@@ -62,6 +65,12 @@ class VideoCanvasPrivate final : public QObject {
         void paintDanmaku(QPainter &);
         void resizeTracks();
         void clearTracks();
+
+        void initializeGL();
+        void paintGL();
+        void cleanupGL();
+        void resizeGL(int w, int h);
+        void updateGLBuffer();
     protected:
         void timerEvent(QTimerEvent *) override;
     private:

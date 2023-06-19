@@ -389,13 +389,13 @@ void VideoThread::tryHardwareInit() {
                 return self->hardwarePixfmt;
             }
             if (*(p + 1) == AV_PIX_FMT_NONE) {
-                qWarning() << "Cannot get hardware format";
+                qWarning() << "Cannot get hardware format, fallback to " << av_pix_fmt_desc_get(*p)->name;
                 return *p;
             }
             p ++;
         }
-        qWarning() << "Cannot get hardware format";
-        return AV_PIX_FMT_NONE;
+        // Almost impossible, first is none pixfmt
+        abort();
     };
 
     // Try init hw
@@ -416,7 +416,8 @@ void VideoThread::tryHardwareInit() {
     avcodec_free_context(&codecCtxt);
     codecCtxt = hardwareCtxt.release();
 
-    qDebug() << "VideoThread tryHardwareInit ok " << av_hwdevice_get_type_name(hardwareType);
+    qDebug() << "VideoThread tryHardwareInit ok " << av_hwdevice_get_type_name(hardwareType) 
+             << " hardwareFormat " << av_pix_fmt_desc_get(hardwarePixfmt)->name;
 }
 void VideoThread::run() {
     videoClockStart = av_gettime_relative();
@@ -1634,7 +1635,7 @@ QStringList MediaPlayer::supportedProtocols() {
 
 // Video Sink
 VideoSink::VideoSink(QObject *parent) : QObject(parent) {
-    
+    addPixelFormat(VideoPixelFormat::RGBA32);
 }
 VideoSink::~VideoSink() {
 
@@ -1668,6 +1669,9 @@ void  VideoSink::setSubtitleText(const QString &text) {
         Q_EMIT subtitleTextChanged(text);
     }, Qt::QueuedConnection);
 }
+void  VideoSink::addPixelFormat(VideoPixelFormat fmt) {
+    formats.append(fmt);
+}
 QSize VideoSink::videoSize() const {
     return size;
 }
@@ -1676,6 +1680,9 @@ VideoFrame VideoSink::videoFrame() const {
 }
 QString VideoSink::subtitleText() const {
     return subtitle;
+}
+QList<VideoPixelFormat> VideoSink::supportedPixelFormats() const {
+    return formats;
 }
 
 

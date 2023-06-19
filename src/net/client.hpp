@@ -6,6 +6,8 @@
 #include "promise.hpp"
 #include "../danmaku.hpp"
 
+class QNetworkReply;
+
 class Episode;
 class Bangumi;
 class TimelineItem;
@@ -185,3 +187,6 @@ QByteArray RandomUserAgent();
 void       RegisterVideoInterface(VideoInterface *(*fn)());
 void       InitializeVideoInterface();
 QList<VideoInterface*> &GetVideoInterfaceList();
+
+NetResult<QByteArray>   WrapQNetworkReply(QNetworkReply *reply);
+NetResult<QImage>       WrapHttpImagePromise(NetResult<QByteArray> res);

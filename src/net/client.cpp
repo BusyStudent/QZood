@@ -1,5 +1,6 @@
 #include "client.hpp"
 #include <QApplication>
+#include <QNetworkReply>
 
 
 NetPromiseHelper::NetPromiseHelper(QObject *p) : QObject(p) {
@@ -66,4 +67,46 @@ void InitializeVideoInterface() {
 
         interface->setParent(qApp);
     }
+}
+
+NetResult<QByteArray>   WrapQNetworkReply(QNetworkReply *reply) {
+    auto result = NetResult<QByteArray>::Alloc();
+
+    QObject::connect(reply, &QNetworkReply::finished, [reply, result]() mutable {
+        qDebug() << "GET " 
+                 << reply->url().toString() 
+                 << " Status code: " 
+                 << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+        ;
+
+        Result<QByteArray> data;
+
+        reply->deleteLater();
+        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) == 200) {
+            data = reply->readAll();
+        }
+        else {
+            qDebug() << "Failed to fetch " << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+        }
+
+        result.putResult(data);
+    });
+
+    return result;
+}
+NetResult<QImage>       WrapHttpImagePromise(NetResult<QByteArray> prev) {
+    auto r = NetResult<QImage>::Alloc();
+    prev.then([r](const Result<QByteArray> &b) mutable {
+        if (!b) {
+            r.putResult(std::nullopt);
+            return;
+        }
+        auto image = QImage::fromData(b.value());
+        if (image.isNull()) {
+            r.putResult(std::nullopt);
+            return;
+        }
+        r.putResult(image);
+    });
+    return r;
 }

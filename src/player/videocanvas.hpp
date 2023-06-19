@@ -27,6 +27,7 @@ class VideoCanvas final : public QOpenGLWidget {
     protected:
         void paintGL() override;
         void resizeGL(int w, int h) override;
+        void initializeGL() override;
         // void paintEvent(QPaintEvent *) override;
         void resizeEvent(QResizeEvent *) override;
     private:

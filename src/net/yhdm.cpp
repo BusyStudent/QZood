@@ -396,46 +396,10 @@ NetResult<QByteArray> YhdmClient::fetchFile(const QString &url) {
     request.setUrl(url);
     request.setRawHeader("User-Agent", RandomUserAgent());
 
-    auto result = NetResult<QByteArray>::Alloc();
-    auto reply = manager.get(request);
-
-    connect(reply, &QNetworkReply::finished, this, [this, reply, result]() mutable {
-        qDebug() << "YhdmClient::fetchFile " 
-                 << reply->url().toString() 
-                 << " Status code: " 
-                 << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
-        ;
-
-        Result<QByteArray> data;
-
-        reply->deleteLater();
-        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) == 200) {
-            data = reply->readAll();
-        }
-        else {
-            qDebug() << "Failed to fetch " << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
-        }
-
-        result.putResult(data);
-    });
-
-    return result;
+    return WrapQNetworkReply(manager.get(request));
 }
 NetResult<QImage> YhdmClient::fetchImage(const QString &url) {
-    auto r = NetResult<QImage>::Alloc();
-    fetchFile(url).then([r](const Result<QByteArray> &b) mutable {
-        if (!b) {
-            r.putResult(std::nullopt);
-            return;
-        }
-        auto image = QImage::fromData(b.value());
-        if (image.isNull()) {
-            r.putResult(std::nullopt);
-            return;
-        }
-        r.putResult(image);
-    });
-    return r;
+    return WrapHttpImagePromise(fetchFile(url));
 }
 QString YhdmClient::domain() const {
     return urls[0];

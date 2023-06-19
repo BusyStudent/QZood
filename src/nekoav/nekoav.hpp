@@ -130,9 +130,11 @@ class NEKO_API VideoSink  : public QObject {
 
         void setVideoFrame(const VideoFrame &frame);
         void setSubtitleText(const QString &subtitle);
+        void addPixelFormat(VideoPixelFormat pixelFormat);
         VideoFrame videoFrame() const;
         QSize      videoSize() const;
         QString    subtitleText() const;
+        QList<VideoPixelFormat> supportedPixelFormats() const;
     Q_SIGNALS:
         void videoFrameChanged(const VideoFrame &frame);
         void videoSizeChanged();
@@ -141,6 +143,7 @@ class NEKO_API VideoSink  : public QObject {
         QString    subtitle;
         VideoFrame frame;
         QSize      size = {0, 0};
+        QList<VideoPixelFormat> formats; //< supported formats (default has RGBA32)
         std::shared_ptr<bool> mark = std::make_shared<bool>(true);
 };
 
