@@ -233,7 +233,8 @@ class VideoThread : public QThread {
         double  swsScaleDuration = 0.0; //< prev Swscale take's time
         double  videoDecodeDuration = 0.0; //< prev video decode duration
         bool    waitting = false;
-
+        bool    firstFrame = true; //< first frame arrives
+        bool    needConvert = true;
 };
 
 class DemuxerThread : public QThread {
@@ -387,8 +388,16 @@ class MediaPlayerPrivate : public QObject {
     friend class MediaPlayer;
 };
 
-class VideoFramePrivate : public AVFrame {
-
+class VideoFramePrivate {
+    public:
+        explicit VideoFramePrivate(AVFrame *f) : frame(f) { }
+        VideoFramePrivate(const VideoFramePrivate &) = delete;
+        ~VideoFramePrivate() {
+            if (frame) {
+                av_frame_unref(frame.get());
+            }
+        }
+        AVPtr<AVFrame> frame;
 };
 
 inline AudioOutput *DemuxerThread::audioOutput() const noexcept {
@@ -423,6 +432,31 @@ inline AVPtr<uint8_t> &FFReallocateBuffer(AVPtr<uint8_t> *old, size_t newSize) {
         ))
     );
     return *old;
+}
+inline AVPixelFormat ToAVPixelFormat(VideoPixelFormat fmt) {
+    switch (fmt) {
+        case VideoPixelFormat::RGBA32 : return AV_PIX_FMT_RGBA;
+        case VideoPixelFormat::RGB24  : return AV_PIX_FMT_RGB24;
+        case VideoPixelFormat::YUV420P : return AV_PIX_FMT_YUV420P;
+        case VideoPixelFormat::YUYV422 : return AV_PIX_FMT_YUYV422;
+        case VideoPixelFormat::UYVY422 : return AV_PIX_FMT_UYVY422;
+        case VideoPixelFormat::NV12 : return AV_PIX_FMT_NV12;
+        case VideoPixelFormat::NV21 : return AV_PIX_FMT_NV21;
+        case VideoPixelFormat::Invalid :
+        default : return AV_PIX_FMT_NONE;
+    }
+}
+inline VideoPixelFormat ToVideoPixelFormat(AVPixelFormat fmt) {
+    switch (fmt) {
+        case AV_PIX_FMT_RGB24 : return VideoPixelFormat::RGB24;
+        case AV_PIX_FMT_RGBA : return VideoPixelFormat::RGBA32;
+        case AV_PIX_FMT_YUV420P : return VideoPixelFormat::YUV420P;
+        case AV_PIX_FMT_YUYV422 : return VideoPixelFormat::YUYV422;
+        case AV_PIX_FMT_UYVY422 : return VideoPixelFormat::UYVY422;
+        case AV_PIX_FMT_NV12 : return VideoPixelFormat::NV12;
+        case AV_PIX_FMT_NV21 : return VideoPixelFormat::NV21;
+        default :              return VideoPixelFormat::Invalid;
+    }
 }
 
 }

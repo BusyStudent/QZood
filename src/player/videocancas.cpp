@@ -16,7 +16,7 @@
 // OpenGL parts
 #if !defined(NDEBUG)
 namespace {
-    #define VGL_CHECK_ERROR() _vglCheckError(this, __FILE__, __LINE__)
+    #define VGL_CHECK_ERROR() _vglCheckError(this, __FUNCTION__, __LINE__)
     void _vglCheckError(QOpenGLFunctions_3_3_Core *fn, const char *file, int line) {
         auto e = fn->glGetError();
         switch (e) {
@@ -141,6 +141,11 @@ void VideoCanvas::initializeGL() {
 
 VideoCanvasPrivate::VideoCanvasPrivate(VideoCanvas *parent) : QObject(parent), videoCanvas(parent) {
     connect(&videoSink, &NekoVideoSink::videoFrameChanged, this, &VideoCanvasPrivate::_on_VideoFrameChanged, Qt::QueuedConnection);
+
+#if !defined(QZOOD_VIDEO_NO_CUSTOMIZE_OPENGL)
+    videoSink.addPixelFormat(NekoVideoPixelFormat::YUV420P);
+    videoSink.addPixelFormat(NekoVideoPixelFormat::NV12);
+#endif
 }
 void VideoCanvasPrivate::paint(QPainter &painter) {
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
@@ -455,6 +460,23 @@ void VideoCanvasPrivate::_on_playerStateChanged(NekoMediaPlayer::PlaybackState s
 void VideoCanvasPrivate::_on_VideoFrameChanged(const NekoVideoFrame &frame) {
     // Update frame
     if (frame.isNull() || player->playbackState() == NekoMediaPlayer::StoppedState) {
+
+#if defined(QZOOD_VIDEO_NO_CUSTOMIZE_OPENGL)
+
+#else
+        videoCanvas->makeCurrent();
+        // Free previously texture memory
+        for (auto &t : textures) {
+            if (t) {
+                glDeleteTextures(1, &t);
+                t = 0;
+            }
+        }
+#endif
+        textureWidth = 0;
+        textureHeight = 0;
+
+        videoCanvas->update();
         return;
     }
     std::lock_guard locker(frame);
@@ -464,7 +486,9 @@ void VideoCanvasPrivate::_on_VideoFrameChanged(const NekoVideoFrame &frame) {
     int w = frame.width();
     int h = frame.height();
     int pitch = frame.bytesPerLine(0);
+    int planes = frame.planeCount();
     uchar *pixels = frame.bits(0);
+    auto format = frame.pixelFormat();
 
 #if defined(QZOOD_VIDEO_NO_CUSTOMIZE_OPENGL)
     if (image.isNull() || image.width() != w || image.height() != h) {
@@ -490,49 +514,111 @@ void VideoCanvasPrivate::_on_VideoFrameChanged(const NekoVideoFrame &frame) {
     }
 #else
     videoCanvas->makeCurrent();
-    if (texture == 0 || textureWidth != w || textureHeight != h) {
+    switch (format) {
+        case NekoVideoPixelFormat::RGBA32 : currentShader = Shader_RGBA; break;
+        case NekoVideoPixelFormat::NV12: currentShader = Shader_NV12; break;
+        case NekoVideoPixelFormat::YUV420P : currentShader = Shader_YUV420P; break;
+        default: abort();
+    }
+    if (textures[0] == 0 || textureWidth != w || textureHeight != h) {
         textureWidth = w;
         textureHeight = h;
-        if (texture) {
-            glDeleteTextures(1, &texture);
-            texture = 0;
+        // Free previously texture memory
+        for (auto &t : textures) {
+            if (t) {
+                glDeleteTextures(1, &t);
+                t = 0;
+            }
         }
-        glGenTextures(1, &texture);
-        VGL_CHECK_ERROR();
-        glActiveTexture(GL_TEXTURE0);
-        VGL_CHECK_ERROR();
-        glBindTexture(GL_TEXTURE_2D, texture);
+        glGenTextures(planes, textures);
         VGL_CHECK_ERROR();
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+        for (int n = 0; n < planes; n++) {
+            glBindTexture(GL_TEXTURE_2D, textures[n]);
+            VGL_CHECK_ERROR();
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        }
 
         updateGLBuffer();
     }
-    else {
-        glBindTexture(GL_TEXTURE_2D, texture);
-        VGL_CHECK_ERROR();
-    }
     
-    // Update texture
-    glActiveTexture(GL_TEXTURE0);
-    VGL_CHECK_ERROR();
+    // Prepare the texture
+    if (currentShader == Shader_RGBA) {
+        glBindTexture(GL_TEXTURE_2D, textures[0]);
+        VGL_CHECK_ERROR();
 
-    // Settings updates
-    // glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-	glPixelStorei(GL_UNPACK_ROW_LENGTH, pitch / 4);
+        // Settings updates
+        // glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, pitch / 4);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-    VGL_CHECK_ERROR();
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+        VGL_CHECK_ERROR();
 
-    // Restore
-    // glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-	glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-	glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
-	glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+        // Restore
+        // glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+        glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+    }
+    else if (currentShader == Shader_YUV420P) {
+        Q_ASSERT(planes == 3); // Has 3 planes
+
+        auto yData = frame.bits(0);
+        auto uData = frame.bits(1);
+        auto vData = frame.bits(2);
+        auto yPitch = frame.bytesPerLine(0);
+        auto uPitch = frame.bytesPerLine(1);
+        auto vPitch = frame.bytesPerLine(1);
+
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, yPitch);
+        glBindTexture(GL_TEXTURE_2D, textures[0]);
+        VGL_CHECK_ERROR();
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, yData);
+        VGL_CHECK_ERROR();
+
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, uPitch);
+        glBindTexture(GL_TEXTURE_2D, textures[1]);
+        VGL_CHECK_ERROR();
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w / 2, h / 2, 0, GL_RED, GL_UNSIGNED_BYTE, uData);
+        VGL_CHECK_ERROR();
+
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, vPitch);
+        glBindTexture(GL_TEXTURE_2D, textures[2]);
+        VGL_CHECK_ERROR();
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w / 2, h / 2, 0, GL_RED, GL_UNSIGNED_BYTE, vData);
+        VGL_CHECK_ERROR();
+
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    }
+    else if (currentShader == Shader_NV12) {
+        Q_ASSERT(planes == 2); // Has 3 planes
+
+        auto yData = frame.bits(0);
+        auto uvData = frame.bits(1);
+        auto yPitch = frame.bytesPerLine(0);
+        auto uvPitch = frame.bytesPerLine(1);
+
+        // Update Y
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, yPitch);
+        glBindTexture(GL_TEXTURE_2D, textures[0]);
+        VGL_CHECK_ERROR();
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, yData);
+        VGL_CHECK_ERROR();
+
+        // Update UV
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, uvPitch / 2);
+        glBindTexture(GL_TEXTURE_2D, textures[1]);
+        VGL_CHECK_ERROR();
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RG, w / 2, h / 2, 0, GL_RG, GL_UNSIGNED_BYTE, uvData);
+        VGL_CHECK_ERROR();
+
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    }
 #endif    
 
 
@@ -572,6 +658,56 @@ void main(){
 
 )";
 
+static auto yuv420PShaderCode = R"(
+#version 330 core
+out vec4 fragColor;
+in  vec2 texturePos;
+
+uniform sampler2D yTexture;
+uniform sampler2D uTexture;
+uniform sampler2D vTexture;
+
+void main(){
+    vec3 yuv;
+    vec3 rgb;
+
+    yuv.x = texture(yTexture, texturePos).r - 0.0625;
+    yuv.y = texture(uTexture, texturePos).r - 0.5;
+    yuv.z = texture(vTexture, texturePos).r - 0.5;
+
+    rgb = mat3( 1,       1,         1,
+        0,       -0.39465,  2.03211,
+        1.13983, -0.58060,  0) * yuv;
+    fragColor = vec4(rgb, 1);
+}
+
+)";
+
+static auto nv12ShaderCode = R"(
+#version 330 core
+out vec4 fragColor;
+in  vec2 texturePos;
+
+uniform sampler2D yTexture;
+uniform sampler2D uvTexture;
+
+void main(){
+    vec3 yuv;
+    vec3 rgb;
+
+    yuv.x = texture(yTexture, texturePos).r - 0.0625;
+    yuv.y = texture(uvTexture, texturePos).r - 0.5;
+    yuv.z = texture(uvTexture, texturePos).g - 0.5;
+
+
+    rgb = mat3( 1,       1,         1,
+        0,       -0.39465,  2.03211,
+        1.13983, -0.58060,  0) * yuv;
+    fragColor = vec4(rgb, 1);
+}
+
+)";
+
 
 void VideoCanvasPrivate::cleanupGL() {
     qDebug() << "VideoCanvasPrivate::cleanGL";
@@ -584,13 +720,18 @@ void VideoCanvasPrivate::cleanupGL() {
         glDeleteBuffers(1, &vertexBufferObject);
         vertexBufferObject = 0;
     }
-    if (programObject) {
-        glDeleteProgram(programObject);
-        programObject = 0;
+    for (auto &t : textures) {
+        if (t) {
+            glDeleteTextures(1, &t);
+            t = 0;
+        }
     }
-    if (texture) {
-        glDeleteTextures(1, &texture);
-        texture = 0;
+
+    for (auto &program : programObjects) {
+        if (program) {
+            glDeleteProgram(program);
+            program = 0;
+        }
     }
 }
 void VideoCanvasPrivate::initializeGL() {
@@ -631,7 +772,12 @@ void VideoCanvasPrivate::initializeGL() {
     VGL_CHECK_ERROR();
 
     // prepare shader objects
-    programObject = glCreateProgram();
+    prepareProgram(Shader_RGBA, vertexShaderCode, fragmentShaderCode);
+    prepareProgram(Shader_NV12, vertexShaderCode, nv12ShaderCode);
+    prepareProgram(Shader_YUV420P, vertexShaderCode, yuv420PShaderCode);
+}
+void VideoCanvasPrivate::prepareProgram(int type, const char *vtCode, const char *frCode) {
+    GLuint programObject = glCreateProgram();
     VGL_CHECK_ERROR();
 
     auto vertexShader = glCreateShader(GL_VERTEX_SHADER);
@@ -639,7 +785,7 @@ void VideoCanvasPrivate::initializeGL() {
     int  success;
     char infoLog[512];
 
-    glShaderSource(vertexShader, 1, &vertexShaderCode, nullptr);
+    glShaderSource(vertexShader, 1, &vtCode, nullptr);
     glCompileShader(vertexShader);
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
     if (!success) {
@@ -647,7 +793,7 @@ void VideoCanvasPrivate::initializeGL() {
         qDebug() << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog;
     }
 
-    glShaderSource(fragmentShader, 1, &fragmentShaderCode, nullptr);
+    glShaderSource(fragmentShader, 1, &frCode, nullptr);
     glCompileShader(fragmentShader);
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
     if (!success) {
@@ -672,8 +818,26 @@ void VideoCanvasPrivate::initializeGL() {
 
     // Bind uniform locations
     glUseProgram(programObject);
-    glUniform1i(glGetUniformLocation(programObject, "videoTexture"), 0);
-    VGL_CHECK_ERROR();
+    if (type == Shader_RGBA) {
+        glUniform1i(glGetUniformLocation(programObject, "videoTexture"), 0);
+        VGL_CHECK_ERROR();
+    }
+    if (type == Shader_YUV420P) {
+        glUniform1i(glGetUniformLocation(programObject, "yTexture"), 0);
+        VGL_CHECK_ERROR();
+        glUniform1i(glGetUniformLocation(programObject, "uTexture"), 1);
+        VGL_CHECK_ERROR();
+        glUniform1i(glGetUniformLocation(programObject, "vTexture"), 2);
+        VGL_CHECK_ERROR();
+    }
+    if (type == Shader_NV12) {
+        glUniform1i(glGetUniformLocation(programObject, "yTexture"), 0);
+        VGL_CHECK_ERROR();
+        glUniform1i(glGetUniformLocation(programObject, "uvTexture"), 1);
+        VGL_CHECK_ERROR();
+    }
+
+    programObjects[type] = programObject;
 }
 void VideoCanvasPrivate::paintGL() {
     glClearColor(0.0, 0.0f, 0.0f, 1.0f);
@@ -683,16 +847,24 @@ void VideoCanvasPrivate::paintGL() {
 
 
     // Begin drawing
-    if (texture == 0) {
+    if (textures[0] == 0) {
         return;
     }
-    glActiveTexture(GL_TEXTURE0);
-    VGL_CHECK_ERROR();
-    glBindTexture(GL_TEXTURE_2D, texture);
-    VGL_CHECK_ERROR();
+
+    // Active each texture unit and bind texture
+    int n = 0;
+    for (auto t : textures) {
+        if (t == 0) {
+            break;
+        }
+        glActiveTexture(GL_TEXTURE0 + n);
+        glBindTexture(GL_TEXTURE_2D, t);
+
+        n += 1;
+    }
     glBindVertexArray(vertexArrayObject);
     VGL_CHECK_ERROR();
-    glUseProgram(programObject);
+    glUseProgram(programObjects[currentShader]);
     VGL_CHECK_ERROR();
     
     
@@ -702,7 +874,7 @@ void VideoCanvasPrivate::paintGL() {
 }
 void VideoCanvasPrivate::resizeGL(int w, int h) {
     qDebug() << "GL resized to w:" << w << " h:" << h;
-    if (texture) {
+    if (textures[0]) {
         updateGLBuffer();
     }
 }

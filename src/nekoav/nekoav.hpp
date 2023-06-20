@@ -43,7 +43,23 @@ enum class AudioSampleFormat {
 };
 enum class VideoPixelFormat {
     Invalid,
+
+    // RGB formats
     RGBA32,
+    RGB24,
+
+    //< YUV format
+    IYUV,
+    YUY2,
+    UYVY,
+
+    NV12,
+    NV21,
+
+    //< YUV format alias
+    YUV420P = IYUV,
+    YUYV422 = YUY2,
+    UYVY422 = UYVY,
 };
 
 
@@ -51,6 +67,7 @@ class NEKO_API VideoFrame {
     public:
         VideoFrame();
         VideoFrame(const VideoFrame &);
+        VideoFrame(VideoFrame &&);
         ~VideoFrame();
 
         int width() const;
@@ -69,13 +86,14 @@ class NEKO_API VideoFrame {
         QImage toImage() const;
 
         VideoFrame &operator =(const VideoFrame &);
+        VideoFrame &operator =(VideoFrame &&);
         
         static VideoFrame fromAVFrame(void *avf);
     private:
-        VideoFramePrivate *d = nullptr;
+        QSharedPointer<VideoFramePrivate> d;
 };
 
-class NEKO_API MediaMetaData : public QMap<QString, QString>{
+class NEKO_API MediaMetaData : public QMap<QString, QString> {
     public:
         using QMap<QString, QString>::QMap;
 

@@ -31,6 +31,13 @@ class VideoCanvasPrivate final : public QObject, public QOpenGLFunctions_3_3_Cor
     public:
         VideoCanvasPrivate(VideoCanvas *parent);
 
+        enum ShaderType {
+            Shader_RGBA = 0,
+            Shader_YUV420P = 1,
+            Shader_NV12 = 2,
+            Shader_NbFormats,
+        };
+
         VideoCanvas *videoCanvas = nullptr;
         NekoMediaPlayer *player = nullptr;
         NekoVideoSink videoSink;
@@ -38,10 +45,12 @@ class VideoCanvasPrivate final : public QObject, public QOpenGLFunctions_3_3_Cor
         // OpenGL datas
         GLuint vertexArrayObject = 0;
         GLuint vertexBufferObject = 0;
-        GLuint programObject = 0;
-        GLuint texture = 0;
+        GLuint textures[4] {}; //< All planes texture
         GLuint textureWidth = 0;
         GLuint textureHeight = 0;
+        GLuint programObjects[Shader_NbFormats] {};
+
+        int    currentShader = 0; //< Index of current shader
 
         QImage              image;
 
@@ -71,6 +80,7 @@ class VideoCanvasPrivate final : public QObject, public QOpenGLFunctions_3_3_Cor
         void cleanupGL();
         void resizeGL(int w, int h);
         void updateGLBuffer();
+        void prepareProgram(int type, const char *vtCode, const char *frCode);
     protected:
         void timerEvent(QTimerEvent *) override;
     private:

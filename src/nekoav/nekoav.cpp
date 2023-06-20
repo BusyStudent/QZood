@@ -325,19 +325,6 @@ VideoThread::VideoThread(DemuxerThread *parent, AVStream *stream, AVCodecContext
     
     videoSink = demuxerThread->videoSink();
 
-    // Prepare convertion buffer
-    size_t n     = av_image_get_buffer_size(AV_PIX_FMT_RGBA, ctxt->width, ctxt->height, 32);
-    uint8_t *buf = static_cast<uint8_t*>(av_malloc(n));
-
-    av_image_fill_arrays(
-        dstFrame->data,
-        dstFrame->linesize,
-        buf,
-        AV_PIX_FMT_RGBA,
-        ctxt->width, ctxt->height,
-        32
-    );
-
     start();
     pause(true);
 }
@@ -531,55 +518,90 @@ bool VideoThread::videoDecodeFrame(AVPacket *packet, AVFrame **retFrame) {
 void VideoThread::videoWriteFrame(AVFrame *source) {
     
     // Lazy eval beacuse of the hardware access
-    if (!swsCtxt) {
-        swsCtxt.reset(
-            sws_getContext(
-                codecCtxt->width,
-                codecCtxt->height,
-                AVPixelFormat(source->format),
-                codecCtxt->width,
-                codecCtxt->height,
-                AV_PIX_FMT_RGBA,
-                0,
-                nullptr,
-                nullptr,
-                nullptr
-            )
+    if (firstFrame) {
+        firstFrame = false;
+
+        // Detect formats
+        auto srcFormat = AVPixelFormat(source->format);
+        needConvert = !videoSink->supportedPixelFormats().contains(ToVideoPixelFormat(srcFormat));
+
+        qDebug() << "VideoThread source frame format" << av_pix_fmt_desc_get(srcFormat)->name;
+
+        if (needConvert) {
+            // Prepare convertion buffer
+            auto dstFormat = ToAVPixelFormat(videoSink->supportedPixelFormats().first());
+
+            size_t n     = av_image_get_buffer_size(dstFormat, codecCtxt->width, codecCtxt->height, 32);
+            uint8_t *buf = static_cast<uint8_t*>(av_malloc(n));
+
+            av_image_fill_arrays(
+                dstFrame->data,
+                dstFrame->linesize,
+                buf,
+                dstFormat,
+                codecCtxt->width, codecCtxt->height,
+                32
+            );
+
+            swsCtxt.reset(
+                sws_getContext(
+                    codecCtxt->width,
+                    codecCtxt->height,
+                    AVPixelFormat(source->format),
+                    codecCtxt->width,
+                    codecCtxt->height,
+                    dstFormat,
+                    0,
+                    nullptr,
+                    nullptr,
+                    nullptr
+                )
+            );
+            if (!swsCtxt) {
+                // BTK_LOG(BTK_RED("[VideoThread] ") "sws_getContext failed!!!\n");
+                return;
+            }
+            dstFrame->format = dstFormat;
+        }
+        else {
+            qDebug() << "VideoSink directly support" << av_pix_fmt_desc_get(srcFormat)->name << " ,just passthrough";
+        }
+    }
+
+    if (!needConvert) {
+        swsScaleDuration = 0.0;
+
+        videoSink->setVideoFrame(VideoFrame::fromAVFrame(source));
+    }
+    else if (swsCtxt) {
+        // Need convert and has ctxt
+        // Convert it
+        std::lock_guard locker(dstFrameMutex);
+        
+        int64_t swsBeginTime = av_gettime_relative();
+        int ret = sws_scale(
+            swsCtxt.get(),
+            source->data,
+            source->linesize,
+            0,
+            codecCtxt->height,
+            dstFrame->data,
+            dstFrame->linesize
         );
-        if (!swsCtxt) {
-            // BTK_LOG(BTK_RED("[VideoThread] ") "sws_getContext failed!!!\n");
+
+        // Copy dara
+        dstFrame->width = codecCtxt->width;
+        dstFrame->height = codecCtxt->height;
+
+        swsScaleDuration = (av_gettime_relative() - swsBeginTime) / NEKOAV_TIME_BASE;
+
+        if (ret < 0) {
+            // BTK_LOG(BTK_RED("[VideoThread] ") "sws_scale failed %d!!!\n", ret);
             return;
         }
-        dstFrame->format = AV_PIX_FMT_RGBA;
-        dstFrame->opaque = &dstFrameMutex;
+
+        videoSink->setVideoFrame(VideoFrame::fromAVFrame(dstFrame.get()));
     }
-
-    // Convert it
-    std::lock_guard locker(dstFrameMutex);
-    
-    int64_t swsBeginTime = av_gettime_relative();
-    int ret = sws_scale(
-        swsCtxt.get(),
-        source->data,
-        source->linesize,
-        0,
-        codecCtxt->height,
-        dstFrame->data,
-        dstFrame->linesize
-    );
-
-    // Copy dara
-    dstFrame->width = codecCtxt->width;
-    dstFrame->height = codecCtxt->height;
-
-    swsScaleDuration = (av_gettime_relative() - swsBeginTime) / NEKOAV_TIME_BASE;
-
-    if (ret < 0) {
-        // BTK_LOG(BTK_RED("[VideoThread] ") "sws_scale failed %d!!!\n", ret);
-        return;
-    }
-
-    videoSink->setVideoFrame(VideoFrame::fromAVFrame(dstFrame.get()));
 }
 void VideoThread::pause(bool v) {
     if (paused == v) {
@@ -1670,7 +1692,7 @@ void  VideoSink::setSubtitleText(const QString &text) {
     }, Qt::QueuedConnection);
 }
 void  VideoSink::addPixelFormat(VideoPixelFormat fmt) {
-    formats.append(fmt);
+    formats.push_back(fmt);
 }
 QSize VideoSink::videoSize() const {
     return size;
@@ -1689,15 +1711,10 @@ QList<VideoPixelFormat> VideoSink::supportedPixelFormats() const {
 // Video Frame
 // May memory leak ?
 VideoFrame::VideoFrame() {
-    d = nullptr;
+
 }
-VideoFrame::VideoFrame(const VideoFrame &b) {
-    d = nullptr;
-    d = b.d;
-    // if (!b.isNull()) {
-    //     d = static_cast<VideoFramePrivate*>(av_frame_clone(b.d));
-    // }
-}
+VideoFrame::VideoFrame(const VideoFrame &b) = default;
+VideoFrame::VideoFrame(VideoFrame &&) = default;
 VideoFrame::~VideoFrame() {
     // av_frame_free(reinterpret_cast<AVFrame**>(&d));
 }
@@ -1705,13 +1722,13 @@ int VideoFrame::width() const {
     if (isNull()) {
         return 0;
     }
-    return d->width;
+    return d->frame->width;
 }
 int VideoFrame::height() const {
     if (isNull()) {
         return 0;
     }
-    return d->height;
+    return d->frame->height;
 }
 QSize VideoFrame::size() const {
     return QSize(width(), height());
@@ -1723,7 +1740,7 @@ int  VideoFrame::planeCount() const {
     if (isNull()) {
         return 0;
     }
-    return av_pix_fmt_count_planes(AVPixelFormat(d->format));
+    return av_pix_fmt_count_planes(AVPixelFormat(d->frame->format));
 }
 void VideoFrame::lock() const {
     // if (d) {
@@ -1731,6 +1748,9 @@ void VideoFrame::lock() const {
     //         static_cast<std::mutex*>(d->opaque)->lock();
     //     }
     // }
+    if (!isNull()) {
+        // d->mutex.lock();
+    }
 }
 void VideoFrame::unlock() const {
     // if (d) {
@@ -1738,20 +1758,23 @@ void VideoFrame::unlock() const {
     //         static_cast<std::mutex*>(d->opaque)->unlock();
     //     }
     // }
+    if (!isNull()) {
+        // d->mutex.unlock();
+    }
 }
 uchar *VideoFrame::bits(int plane) const {
     if (isNull()) {
         return nullptr;
     }
-    // Q_ASSERT(plane < planeCount());
-    return d->data[plane];
+    Q_ASSERT(plane < planeCount());
+    return d->frame->data[plane];
 }
 int    VideoFrame::bytesPerLine(int plane) const {
     if (isNull()) {
         return 0;
     }
-    // Q_ASSERT(plane < planeCount());
-    return d->linesize[plane];
+    Q_ASSERT(plane < planeCount());
+    return d->frame->linesize[plane];
 }
 QImage VideoFrame::toImage() const {
     QImage image(width(), height(), QImage::Format_RGBA8888);
@@ -1779,10 +1802,7 @@ VideoPixelFormat VideoFrame::pixelFormat() const {
     if (isNull()) {
         return VideoPixelFormat::Invalid;
     }
-    switch (d->format) {
-        case AV_PIX_FMT_RGBA : return VideoPixelFormat::RGBA32;
-        default :              return VideoPixelFormat::Invalid;
-    }
+    return ToVideoPixelFormat(AVPixelFormat(d->frame->format));
 }
 
 VideoFrame VideoFrame::fromAVFrame(void *avframe) {
@@ -1790,20 +1810,25 @@ VideoFrame VideoFrame::fromAVFrame(void *avframe) {
     // if (avframe) {
     //     f.d = static_cast<VideoFramePrivate*>(av_frame_clone(static_cast<AVFrame*>(avframe)));
     // }
-    f.d = static_cast<VideoFramePrivate*>(avframe);
+    if (avframe) {
+        auto copy = av_frame_clone(static_cast<AVFrame*>(avframe));
+        f.d = QSharedPointer<VideoFramePrivate>::create(copy);
+    }
     return f;
 }
-VideoFrame &VideoFrame::operator =(const VideoFrame &other) {
-    if (&other == this) {
-        return *this;
-    }
-    // av_frame_free(reinterpret_cast<AVFrame**>(&d));
-    // if (other.d) {
-    //     d = static_cast<VideoFramePrivate*>(av_frame_clone(other.d));
-    // }
-    d = other.d;
+// VideoFrame &VideoFrame::operator =(const VideoFrame &other) {
+//     if (&other == this) {
+//         return *this;
+//     }
+//     // av_frame_free(reinterpret_cast<AVFrame**>(&d));
+//     // if (other.d) {
+//     //     d = static_cast<VideoFramePrivate*>(av_frame_clone(other.d));
+//     // }
+//     d = other.d;
 
-    return *this;
-}
+//     return *this;
+// }
+VideoFrame &VideoFrame::operator =(const VideoFrame &other) = default;
+VideoFrame &VideoFrame::operator =(VideoFrame &&other) = default;
 
 }
