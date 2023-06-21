@@ -74,7 +74,7 @@ class PopupWidgetPrivate {
             int b1 = attachWidgetGeometry.y() + attachWidgetGeometry.height();
             int t2 = selfRect.y();
             int b2 = selfRect.y() + selfRect.height();
-            int t = layoutH(t1, b1, t2, b2, aligns);
+            int t = layoutV(t1, b1, t2, b2, aligns);
 
             return QPoint(l, t);
         }
@@ -95,7 +95,9 @@ PopupWidget::~PopupWidget() {
 }
 
 void PopupWidget::enterEvent(QEnterEvent* event) {
-    stopHideTimer();
+    if (stop_timer_enter) {
+        stopHideTimer();
+    }
     QWidget::enterEvent(event);
 }
 
@@ -111,6 +113,7 @@ void PopupWidget::showEvent(QShowEvent *event) {
         // 计算容器（父窗口或屏幕），贴靠对象，自身在容器坐标系下的矩阵
         QRect containerRect, selfRect;
         QWidget* p = isWindow() ? nullptr : parentWidget();
+        qDebug() << "parent : " << p;
         QPoint topLeft(0, 0);
         if (p != nullptr) {
             containerRect = p->rect();

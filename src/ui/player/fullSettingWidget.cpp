@@ -48,9 +48,6 @@ public:
         // ====================播放设置====================
         // 播放速度去value / 10倍。
         ui->playbackRateBar->setRange(5, 30);
-        
-
-        // ====================色彩选择界面设置====================
     }
 
     void connect(VideoWidget* videoWidget) {
@@ -58,6 +55,13 @@ public:
         connectScreenSetting(videoWidget);
         connectColorSetting(videoWidget);
         connectDanmakuSetting(videoWidget);
+        connectSubtitleSetting(videoWidget);
+
+        resetPlaySetting();
+        resetScreenSetting();
+        resetColorSetting();
+        resetDanmakuSetting();
+        resetSubtitleSetting();
     }
 
     void update(VideoWidget* videoWidget) {
@@ -133,24 +137,28 @@ private:
             videoWidget->RotationScreen(Rotation::VERTICALLY_FILP);
         });
         // 画质增强
-        QWidget::connect(ui->imageQualityEnhancementButton, &QCheckBox::clicked, videoWidget, [videoWidget](bool clicked) {
-            videoWidget->setImageQualityEnhancement(clicked);
+        QWidget::connect(ui->imageQualityEnhancementButton, &QCheckBox::stateChanged, videoWidget, [videoWidget](int status) {
+            videoWidget->setImageQualityEnhancement(status == Qt::Checked);
         });
     }
 
     void connectColorSetting(VideoWidget* videoWidget) {
         // 色彩设置
-        QWidget::connect(ui->brightnessBar, &QSlider::valueChanged, videoWidget, [videoWidget](int value) {
+        QWidget::connect(ui->brightnessBar, &QSlider::valueChanged, videoWidget, [videoWidget, this](int value) {
             videoWidget->setBrightness(value);
+            ui->brightnessLabel->setNum(value);
         });
-        QWidget::connect(ui->contrastBar, &QSlider::valueChanged, videoWidget, [videoWidget](int value) {
+        QWidget::connect(ui->contrastBar, &QSlider::valueChanged, videoWidget, [videoWidget, this](int value) {
             videoWidget->setContrast(value);
+            ui->contrastLabel->setNum(value);
         });
-        QWidget::connect(ui->hueBar, &QSlider::valueChanged, videoWidget, [videoWidget](int value) {
+        QWidget::connect(ui->hueBar, &QSlider::valueChanged, videoWidget, [videoWidget, this](int value) {
             videoWidget->setHue(value);
+            ui->hueLabel->setNum(value);
         });
-        QWidget::connect(ui->saturationBar, &QSlider::valueChanged, videoWidget, [videoWidget](int value) {
+        QWidget::connect(ui->saturationBar, &QSlider::valueChanged, videoWidget, [videoWidget, this](int value) {
             videoWidget->setSaturation(value);
+            ui->saturationLabel->setNum(value);
         });
     }
 
@@ -160,9 +168,11 @@ private:
             videoWidget->currentVideo()->setCurrentDanmakuSource(danmakuSource);
         });
         QWidget::connect(ui->loadDanmakuButton, &QToolButton::clicked, videoWidget, [videoWidget](bool clicked){
-            // TODO(llhsdmd): 添加视频，暂时只能添加本地视频到播放列表算了。
             auto filePath = QFileDialog::getOpenFileName(videoWidget, videoWidget->tr("请选择弹幕文件"), "./", ".*");
-            videoWidget->currentVideo()->loadDanmakuFromFile(filePath);
+            if (!filePath.isEmpty()) {
+                videoWidget->currentVideo()->loadDanmakuFromFile(filePath);
+                videoWidget->currentVideo()->setCurrentDanmakuSource(filePath);
+            }
         });
         QWidget::connect(ui->danmakuShowAreaBar, &QSlider::valueChanged, videoWidget, [videoWidget, this](int value) {
             videoWidget->setDanmakuShowArea((qreal) value / 100.0);
@@ -182,68 +192,42 @@ private:
             font.setFamilies(f.families());
             videoWidget->setDanmakuFont(font);
         });
-        QWidget::connect(ui->danmakuBoldCheckBox, &QCheckBox::clicked, videoWidget, [videoWidget, this](bool checked) {
+        QWidget::connect(ui->danmakuBoldCheckBox, &QCheckBox::stateChanged, videoWidget, [videoWidget, this](int checked) {
             auto font = videoWidget->danmakuFont();
-            font.setBold(checked);
+            font.setBold(checked == Qt::Checked);
         });
         QWidget::connect(ui->danmakuTransparencyBar, &QSlider::valueChanged, videoWidget, [videoWidget, this](int value) {
             videoWidget->setDanmakuTransparency(value / 100.0);
             ui->danmakuTransparencyLabel->setText(QString("%1%").arg(value));
         });
-        QWidget::connect(ui->danmakuBackgroundCheckBox, &QCheckBox::clicked, videoWidget, [videoWidget, this](bool checked) {
-            if (checked) {
-                QColor color(ui->danmakuBackgroundColor->text());
-                videoWidget->setDanmakuBackground(true);
-                videoWidget->setDanmakuBackgroundColor(color);
-                ui->danmakuBackgroundColor->setDisabled(true);
-                ui->danmakuBackgroundBar->setDisabled(true);
+        QWidget::connect(ui->danmakuStroke, &QCheckBox::stateChanged, videoWidget, [videoWidget, this](int state) {
+            if (state == Qt::Checked) {
+                videoWidget->setDanmakuStroke(StrokeType::STROKE);
             } else {
-                ui->danmakuBackgroundBar->setDisabled(false);
-                videoWidget->setDanmakuBackground(false);
-                ui->danmakuBackgroundColor->setDisabled(false);
+                videoWidget->setDanmakuStroke(StrokeType::NONE);
             }
         });
-        QWidget::connect(ui->danmakuBackgroundColor, &QPushButton::clicked, videoWidget, [videoWidget, this](bool checked) {
-            getColor(ui->danmakuBackgroundColor, [videoWidget](const QColor& color) {
-                videoWidget->setDanmakuBackgroundColor(color);
-            });
-        });
-        QWidget::connect(ui->danmakuStrokeCheckBox, &QCheckBox::clicked, videoWidget, [videoWidget, this](bool checked) {
-            if (checked) {
-                QColor color(ui->danmakuStroke->text());
-                videoWidget->setDanmakuStroke(true);
-                videoWidget->setDanmakuStrokeColor(color);
-                ui->danmakuStroke->setDisabled(true);
-                ui->danmakuStrokeTransparencyBar->setDisabled(true);
+        QWidget::connect(ui->danmakuProject45degree, &QCheckBox::stateChanged, videoWidget, [videoWidget, this](int state) {
+            if (state == Qt::Checked) {
+                videoWidget->setDanmakuStroke(StrokeType::PROJECT);
             } else {
-                videoWidget->setDanmakuStroke(false);
-                ui->danmakuBackgroundColor->setDisabled(false);
-                ui->danmakuStrokeTransparencyBar->setDisabled(false);
+                videoWidget->setDanmakuStroke(StrokeType::NONE);
             }
-        });
-        QWidget::connect(ui->danmakuStroke, &QPushButton::clicked, videoWidget, [videoWidget, this](bool checked) {
-            getColor(ui->danmakuStroke, [videoWidget](const QColor& color) {
-                videoWidget->setDanmakuStrokeColor(color);
-            });
-        });
-        QWidget::connect(ui->danmakuBackgroundBar, &QSlider::valueChanged, videoWidget, [videoWidget, this](int value) {
-            videoWidget->setDanmakuBackgroundTransparency(value / 100.0);
-            ui->danmakuBackgroundLabel->setText(QString("%1%").arg(value));
-        });
-        QWidget::connect(ui->danmakuStrokeTransparencyBar, &QSlider::valueChanged, videoWidget, [videoWidget, this](int value) {
-            videoWidget->setDanmakuStrokeTransparency(value / 100.0);
-            ui->danmakuStrokeTransparencyLabel->setText(QString("%1%").arg(value));
         });
     }
 
     void connectSubtitleSetting(VideoWidget *videoWidget) {
         // 选择字幕
         QWidget::connect(ui->subtitleComboBox, &QComboBox::currentTextChanged, videoWidget, [videoWidget](const QString& text) {
-            videoWidget->currentVideo()->setCurrentSubtitleSource(text);
+            int index = videoWidget->currentVideo()->subtitleSourceList().indexOf(text);
+            videoWidget->setSubtitle(index);
         });
         QWidget::connect(ui->loadSubtitleButton, &QToolButton::clicked, videoWidget, [videoWidget](bool checked) {
             QString filePath = QFileDialog::getOpenFileName(videoWidget, videoWidget->tr("请选择字幕文件"), "./", ".ass;;.*");
-            videoWidget->currentVideo()->loadSubtitleFromFile(filePath);
+            if (!filePath.isEmpty()) {
+                videoWidget->currentVideo()->loadSubtitleFromFile(filePath);
+                videoWidget->currentVideo()->setCurrentSubtitleSource(filePath);
+            }
         });
         QWidget::connect(ui->subtitleSynchronizeTimeBox, &QDoubleSpinBox::valueChanged, videoWidget, [videoWidget](double value) {
             videoWidget->setSubtitleSynchronizeTime(value);
@@ -266,23 +250,49 @@ private:
         });
         QWidget::connect(ui->subtitleBoldButton, &QToolButton::clicked, videoWidget, [videoWidget](bool checked) {
             auto font = videoWidget->subtitleFont();
-            font.setBold(checked);
+            font.setBold(!checked);
             videoWidget->setSubtitleFont(font);
         });
         QWidget::connect(ui->subtitleItalicsButton, &QToolButton::clicked, videoWidget, [videoWidget](bool checked) {
             auto font = videoWidget->subtitleFont();
-            font.setItalic(checked);
+            font.setItalic(!checked);
             videoWidget->setSubtitleFont(font);
         });
         QWidget::connect(ui->subtitleUnderlineButton, &QToolButton::clicked, videoWidget, [videoWidget](bool checked) {
             auto font = videoWidget->subtitleFont();
-            font.setUnderline(checked);
+            font.setUnderline(!checked);
             videoWidget->setFont(font);
         });
         QWidget::connect(ui->subtitleColor, &QPushButton::clicked, videoWidget, [videoWidget, this](bool checked) {
             getColor(ui->subtitleColor, [videoWidget](const QColor& color) {
                 videoWidget->setSubtitleColor(color);
             });
+        });
+        QWidget::connect(ui->subtitleTransparencyBar, &QSlider::valueChanged, videoWidget, [videoWidget, this](int value) {
+            ui->subtitleTransparencyLabel->setText(QString("%1%").arg(value / 100.0));
+            videoWidget->setSubtitleTransparency(value / 100.0);
+        });
+        QWidget::connect(ui->subtitleStrokeCheckBox, &QCheckBox::stateChanged, videoWidget, [videoWidget, this](int checked) {
+            if (checked == Qt::Checked) {
+                QColor color(ui->subtitleStrokeColor->text());
+                videoWidget->setSubtitleStroke(true);
+                videoWidget->setSubtitleStrokeColor(color);
+                ui->subtitleStrokeColor->setEnabled(true);
+                ui->subtitleStrokeTransparencyBar->setEnabled(true);
+            } else {
+                videoWidget->setSubtitleStroke(false);
+                ui->subtitleStrokeTransparencyBar->setEnabled(false);
+                ui->subtitleStrokeColor->setEnabled(false);
+            }
+        });
+        QWidget::connect(ui->subtitleStrokeColor, &QPushButton::clicked, videoWidget, [videoWidget, this](bool checked) {
+            getColor(ui->subtitleStrokeColor, [videoWidget](const QColor& color) {
+                videoWidget->setSubtitleStrokeColor(color);
+            });
+        });
+        QWidget::connect(ui->subtitleStrokeTransparencyBar, &QSlider::valueChanged, videoWidget, [videoWidget, this](int value) {
+            videoWidget->setSubtitleStrokeTransparency(value / 100.0);
+            ui->subtitleStrokeTransparencyLabel->setText(QString("%1%").arg(value));
         });
     }
 
@@ -294,10 +304,7 @@ private:
         QColorDialog* colorDiralog = new QColorDialog();
 
         QWidget::connect(colorDiralog, &QColorDialog::colorSelected, self, [colorButton, colorSelectWidget, func, this](const QColor& color){
-            colorButton->setText(color.name());
-            colorButton->setStyleSheet("QPushButton{background-color: " + color.name() + ";" 
-            + "color: " + color.darker().name() + ";"
-            + R"(border: 1px dashed white;})");
+            setColorForButton(colorButton, color);
             colorSelectWidget->hide();
             func(color);
             self->setHideAfterLeave(true);
@@ -315,7 +322,57 @@ private:
         colorSelectWidget->setAuotLayout();
         colorSelectWidget->show();
     }
+    
+    void setColorForButton(QPushButton* colorButton,const QColor &color) {
+        colorButton->setText(color.name());
+        colorButton->setStyleSheet("QPushButton{background-color: " + color.name() + ";" 
+        + "color: " + color.darker().name() + ";"
+        + R"(border: 1px dashed white;})");
+    }
 
+    void resetPlaySetting() {
+        ui->step10Button->click();
+        ui->playbackRate1->click();
+    }
+
+    void resetScreenSetting() {
+        ui->defaultAspectRatioButton->click();
+        ui->imageQualityEnhancementButton->setCheckState(Qt::CheckState::Unchecked);
+        ui->imageQualityEnhancementButton->stateChanged(Qt::CheckState::Unchecked);
+    }
+
+    void resetColorSetting() {
+        ui->brightnessBar->setValue(0);
+        ui->contrastBar->setValue(0);
+        ui->hueBar->setValue(0);
+        ui->saturationBar->setValue(0);
+    }
+
+    void resetDanmakuSetting() {
+        ui->danmakuShowAreaBar->setValue(100);
+        ui->danmakuSizeBar->setValue(80);
+        ui->danmakuSpeedBar->setValue(2);
+        ui->danmakuBoldCheckBox->setCheckState(Qt::CheckState::Unchecked);
+        ui->danmakuBoldCheckBox->stateChanged(Qt::CheckState::Unchecked);
+        ui->danmakuTransparencyBar->setValue(0);
+        ui->danmakuProject45degree->setCheckState(Qt::CheckState::Unchecked);
+        ui->danmakuStroke->setCheckState(Qt::CheckState::Unchecked);
+    }
+
+    void resetSubtitleSetting() {
+        ui->subtitleDefualtsynchronizeTimeButton->click();
+        ui->subtitlePositionBar->setValue(20);
+        ui->subtitleSizeBox->setValue(12);
+        ui->subtitleBoldButton->setChecked(false);
+        ui->subtitleItalicsButton->setChecked(false);
+        ui->subtitleUnderlineButton->setChecked(false);
+        ui->subtitleTransparencyBar->setValue(0);
+        ui->subtitleStrokeCheckBox->setCheckState(Qt::CheckState::Unchecked);
+        ui->subtitleStrokeCheckBox->stateChanged(Qt::CheckState::Unchecked);
+        setColorForButton(ui->subtitleStrokeColor, Qt::white);
+        setColorForButton(ui->subtitleColor, Qt::black);
+        ui->subtitleStrokeTransparencyBar->setValue(0);
+    }
 
 public:
     Ui::FullSettingView* ui;
@@ -326,6 +383,14 @@ private:
 
 FullSettingWidget::FullSettingWidget(QWidget* parent, Qt::WindowFlags f) : PopupWidget(parent, f), d(new FullSettingWidgetPrivate(this)) {
     d->setupUi();
+}
+
+void FullSettingWidget::initDanmakuSetting(VideoBLLPtr video) {
+    d->ui->danmakuCombobox->addItems(video->danmakuSourceList());
+}
+
+void FullSettingWidget::initSubtitleSetting(VideoBLLPtr video) {
+    d->ui->subtitleComboBox->addItems(video->subtitleSourceList());
 }
 
 void FullSettingWidget::setupSetting(VideoWidget *videoWidget) {

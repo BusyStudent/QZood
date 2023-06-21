@@ -40,6 +40,10 @@ class VideoBLL : public DynRefable {
         virtual QStringList danmakuSourceList();
         virtual QStringList subtitleSourceList();
 
+        virtual void addSource(const QString& source);
+        virtual void addDanmakuSource(const QString& source);
+        virtual void addSubtitleSource(const QString& source);
+
         virtual void loadDanmakuFromFile(const QString &filepath);
         virtual void loadSubtitleFromFile(const QString &filepath);
 

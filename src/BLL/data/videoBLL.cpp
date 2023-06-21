@@ -28,6 +28,18 @@ void VideoBLL::setCurrentVideoSource(const QString& source) {
     }
 }
 
+void VideoBLL::addSource(const QString& source) {
+    sourceList.push_back(source);
+}
+
+void VideoBLL::addDanmakuSource(const QString& source) {
+    danmakuList.push_back(source);
+}
+
+void VideoBLL::addSubtitleSource(const QString& source) {
+    subtitleList.push_back(source);
+}
+
 void VideoBLL::setCurrentSubtitleSource(const QString& source) {
     if (source.isEmpty() || subtitleSourceList().contains(source)) {
         currentSubtitleSource = source;

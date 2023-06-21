@@ -70,6 +70,12 @@ QToolButton#playerButton:checked {
 }
 QLabel#videoTimeLabel {
 	color:white;
+}
+QToolButton#showFullScreenButton {
+	image: url(:/icons/showFullScreen_white.png);
+}
+QToolButton#showFullScreenButton:checked {
+	image: url(:/icons/showNormal_white.png);
 }</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
@@ -219,11 +225,10 @@ QLabel#videoTimeLabel {
       <item>
        <widget class="QToolButton" name="showFullScreenButton">
         <property name="text">
-         <string>...</string>
+         <string/>
         </property>
-        <property name="icon">
-         <iconset resource="../../../resources/resources.qrc">
-          <normaloff>:/icons/showFullScreen_white.png</normaloff>:/icons/showFullScreen_white.png</iconset>
+        <property name="checkable">
+         <bool>true</bool>
         </property>
        </widget>
       </item>

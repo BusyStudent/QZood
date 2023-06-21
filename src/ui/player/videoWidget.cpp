@@ -38,6 +38,7 @@ public:
 
     ~VideoWidgetPrivate() {
         delete ui_videoSetting;
+        delete ui_logView;
         if (player->isPlaying()) {
             player->stop();
         }
@@ -78,39 +79,58 @@ public:
         volumeSetting->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
         volumeSetting->setAuotLayout();
         // 播放设置控件
-        settings = new FullSettingWidget(self, Qt::Popup);
+        settings = new FullSettingWidget(self, Qt::Popup | Qt::WindowStaysOnTopHint);
         settings->setAssociateWidget(ui_videoSetting->settingButton);
         settings->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
         settings->setAuotLayout();
         settings->setHideAfterLeave(false);
 
         // 显示信息的标签
-        // TODO(llhsdmd): 添加信息显示标签
+        logWidget = new PopupWidget();
+        ui_logView = new Ui::CustomLabel();
+        ui_logView->setupUi(logWidget);
+        logWidget->setAlignment(Qt::AlignLeft | Qt::AlignBottom);
+        logWidget->setAuotLayout(true);
+        logWidget->setHideAfterLeave(false);
+        logWidget->setStopTimerEnter(false);
+        logWidget->setParent(self);
+        logWidget->hide();
     }
     
     void setupShortcut() {
         // 设置快捷键
         QShortcut* keySpace = new QShortcut(Qt::Key_Space, self);
         QWidget::connect(keySpace, &QShortcut::activated, self, [this](){
-            if (player->hasVideo()) {
+            if (player->isLoaded()) {
                 player->isPlaying() ? pause() : resume();
             }
         });
         QShortcut* keyLeft = new QShortcut(Qt::Key_Left, self);
         QWidget::connect(keyLeft, &QShortcut::activated, self, [this](){
+            videoLog(QString("快退 %1s").arg(skipStep));
             setPosition(position() - skipStep);
         });
         QShortcut* keyRight = new QShortcut(Qt::Key_Right, self);
         QWidget::connect(keyRight, &QShortcut::activated, self, [this](){
+            videoLog(QString("快进 %1s").arg(skipStep));
             setPosition(position() + skipStep);
         });
         QShortcut* keyUp = new QShortcut(Qt::Key_Up, self);
         QWidget::connect(keyUp, &QShortcut::activated, self, [this](){
             setVolume(volume() + 10);
+            videoLog(QString("音量 %1").arg(volume()));
         });
         QShortcut* keyDown = new QShortcut(Qt::Key_Down, self);
         QWidget::connect(keyDown, &QShortcut::activated, self, [this](){
             setVolume(volume() - 10);
+            videoLog(QString("音量 %1").arg(volume()));
+        });
+        QShortcut* keyEsc = new QShortcut(Qt::Key_Escape, self);
+        QWidget::connect(keyEsc, &QShortcut::activated, self, [this](){
+            qDebug() << "keyEsc";
+            if (self->isFullScreen()) {
+                ui_videoSetting->showFullScreenButton->click();
+            }
         });
     }
 
@@ -129,7 +149,10 @@ public:
     }
 
     void videoLog(const QString& msg) {
-
+        logWidget->hide();
+        ui_logView->label->setText(msg);
+        logWidget->show();
+        logWidget->hideLater(1000);
     }
 
     void pause() {
@@ -182,11 +205,7 @@ public:
             return;
         }
         player->setPosition(sec);
-
-        // TODO(llhsdmd@gmail.com,BusyStudent): 增加弹幕是否装载的判定
-        // vcanvas->setDanmakuPosition(sec);
-
-        // TODO(BusyStudent): 字幕同弹幕一样
+        vcanvas->setDanmakuPosition(sec);
     }
 
     void setSkipStep(int sec) {
@@ -203,12 +222,18 @@ public:
 
     void stop() {
         if (player->isPlaying()) {
-            qDebug()  << "stop : " << video->title() << "\n position : " << position();
-            video->setStatus("position", position());
+            savePlayStatus();
             player->stop();
         }
     }
 
+    void hideCursor() {
+        self->setCursor(Qt::BlankCursor);
+    }
+
+    void showCursor() {
+        self->setCursor(Qt::ArrowCursor);
+    }
 private:
      /**
      * @brief 视频进度条
@@ -378,6 +403,18 @@ private:
         QWidget::connect(ui_videoSetting->BackwardButton, &QToolButton::clicked, self, [this](bool clicked){
             emit self->previousVideo();
         });
+        QWidget::connect(ui_videoSetting->showFullScreenButton, &QToolButton::clicked, self, [this, parent = self->parentWidget()](bool clicked) mutable {
+            if (!self->isFullScreen()) {
+                self->setWindowFlags(Qt::Window);
+                settings->setParent(self, Qt::Widget);
+                settings->raise();
+                self->showFullScreen();
+            } else {
+                self->setWindowFlags(Qt::SubWindow);
+                settings->setParent(self, Qt::Popup);
+                self->showNormal();
+            }
+        });
     }
 
     /**
@@ -389,9 +426,7 @@ private:
             switch (status)
             {
             case NekoMediaPlayer::MediaStatus::LoadedMedia:
-                if (video->containsStatus("position")) {
-                setPosition(video->getStatus<int>("position"));
-                }
+                resumePlayStatus();
                 break;
             }
         });
@@ -403,7 +438,13 @@ private:
      */
     void connectVideoPlaySetting() {
         // 设置窗口显示和隐藏
-        QWidget::connect(videoSetting, &PopupWidget::hided, settings, &FullSettingWidget::hide);
+        QWidget::connect(videoSetting, &PopupWidget::hided,self, [this](){
+            settings->hide();
+            hideCursor();
+        });
+        QWidget::connect(videoSetting, &PopupWidget::showed, self, [this](){
+            showCursor();
+        });
         QWidget::connect(settings, &FullSettingWidget::showed, self, [this](){
             videoSetting->show();
             videoSetting->setDefualtHideTime(std::numeric_limits<int>::max());
@@ -413,14 +454,34 @@ private:
             videoSetting->hideLater(5000);
         });
         QWidget::connect(ui_videoSetting->settingButton, &QToolButton::clicked, settings, [this](){
-            if (settings->isHidden()) {
-                settings->show();
-                settings->hideLater(5000);
-            } else {
-                settings->hide();
+            // TODO(llhsdmd):popup属性的窗口在全屏模式下无法正常的弹出。
+            if (player->isLoaded()) {
+                if (settings->isHidden()) {
+                    settings->show();
+                    settings->hideLater(5000);
+                } else {
+                    settings->hide();
+                }
             }
         });
         settings->setupSetting(self);
+    }
+
+    void savePlayStatus() {
+        video->setStatus("position", position());
+    }
+
+    void resumePlayStatus() {
+        if (video->containsStatus("position")) {
+            setPosition(video->getStatus<int>("position"));
+        }
+        qWarning() << "resumePlayStatus";
+        for (const auto source : player->subtitleTracks()) {
+            qWarning() << "subtitle title : " << source.Title;
+            video->addSubtitleSource(source.Title);
+        }
+        settings->initSubtitleSetting(video);
+        settings->initDanmakuSetting(video);
     }
 
 public:
@@ -454,6 +515,7 @@ VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent), d(new VideoWidgetPr
 
     setMinimumSize(100,75);
     setAttribute(Qt::WA_Hover);                  // 启动鼠标悬浮追踪
+    setFocusPolicy(Qt::StrongFocus);
     
     d->update();
 }
@@ -496,23 +558,23 @@ void VideoWidget::mouseMoveEvent(QMouseEvent* event) {
             d->videoSetting->hideLater(5000);
         }, Qt::QueuedConnection);
 }
-
 void VideoWidget::playVideo(const VideoBLLPtr video) {
     d->play(video);
 }
-
-
 void VideoWidget::stop() {
     d->stop();
 }
-
 void VideoWidget::videoLog(const QString& info) {
     d->videoLog(info);
 }
-
+int VideoWidget::skipStep() {
+    return d->skipStep;
+}
+void VideoWidget::setSkipStep(int v) {
+    d->setSkipStep(v);
+}
 void VideoWidget::setPlaybackRate(qreal v) {
-    // TODO(llhsdmd) : setPlaybackRate
-    qInfo() << "TODO(setPlaybackRate)";
+    d->player->setPlaybackRate(v);
 }
 // 画面设置
 void VideoWidget::setAspectRationMode(ScalingMode mode) {
@@ -545,62 +607,35 @@ void VideoWidget::setSaturation(int v) {
     qInfo() << "TODO(setSaturation)";
 }
 // 弹幕设置
-void VideoWidget::setDanmakuShowArea(qreal OccupationRatio) {
-    // TODO(llhsdmd) : setDanmakuShowArea
-    qInfo() << "TODO(setDanmakuShowArea)";
+void VideoWidget::setDanmakuShowArea(qreal occupationRatio) {
+    d->vcanvas->setDanmakuTracksLimit(occupationRatio);
 }
 void VideoWidget::setDanmakuSize(qreal ratio) {
-    // TODO(llhsdmd) : setDanmakuSize
-    qInfo() << "TODO(setDanmakuSize)";
+    QFont font = d->vcanvas->danmakuFont();
+    font.setPixelSize(font.pixelSize() * ratio);
+    d->vcanvas->setDanmakuFont(font);
 }
 void VideoWidget::setDanmakuSpeed(int speed) {
     // TODO(llhsdmd) : setDanmakuSpeed
     qInfo() << "TODO(setDanmakuSpeed)";
 }
-void VideoWidget::setDanmakuBackground(bool v) {
-    // TODO(llhsdmd) : setDanmakuBackground
-    qInfo() << "TODO(setDanmakuBackground)";
-}
 void VideoWidget::setDanmakuFont(const QFont& font) {
-    // TODO(llhsdmd) : setDanmakuFont
-    qInfo() << "TODO(setDanmakuFont)";
+    d->vcanvas->setDanmakuFont(font);
 }
 QFont VideoWidget::danmakuFont() {
-    // TODO(llhsdmd) : danmakuFont
-    qInfo() << "TODO(danmakuFont)";
-    return QFont();
-}
-void VideoWidget::setDanmakuBackgroundTransparency(qreal percentage) {
-    // TODO(llhsdmd) : setDanmakuBackgroundTransparency
-    qInfo() << "TODO(setDanmakuBackgroundTransparency)";
-}
-void VideoWidget::setDanmakuBackgroundColor(QColor color) {
-    // TODO(llhsdmd) : setDanmakuBackgroundColor
-    qInfo() << "TODO(setDanmakuBackgroundColor)";
+    return d->vcanvas->danmakuFont();
 }
 void VideoWidget::setDanmakuTransparency(qreal ratio) {
-    // TODO(llhsdmd) : setDanmakuTransparency
-    qInfo() << "TODO(setDanmakuTransparency)";
+    d->vcanvas->setDanmakuOpacity(1 - ratio);
 }
-void VideoWidget::setDanmakuStroke(bool v) {
+void VideoWidget::setDanmakuStroke(StrokeType stroke) {
     // TODO(llhsdmd) : setDanmakuStroke
     qInfo() << "TODO(setDanmakuStroke)";
 }
-void VideoWidget::setDanmakuStrokeColor(QColor color) {
-    // TODO(llhsdmd) : setDanmakuStrokeColor
-    qInfo() << "TODO(setDanmakuStrokeColor)";
-}
-void VideoWidget::setDanmakuStrokeTransparency(qreal percentage) {
-    // TODO(llhsdmd) : setDanmakuStrokeTransparency
-    qInfo() << "TODO(setDanmakuStrokeTransparency)";
-}
 // 当前指针
 VideoBLLPtr VideoWidget::currentVideo() {
-    // TODO(llhsdmd) : currentVideo
-    qInfo() << "TODO(currentVideo)";
-    return nullptr;
+    return d->video;
 }
-
 // 字幕设置
 void VideoWidget::setSubtitleSynchronizeTime(qreal t) {
     // TODO(llhsdmd) : setSubtitleSynchronizeTime
@@ -623,15 +658,27 @@ void VideoWidget::setSubtitleColor(const QColor& color) {
     // TODO(llhsdmd) : setSubtitleColor
     qInfo() << "TODO(setSubtitleColor)";
 }
+void VideoWidget::setSubtitleStroke(bool v) {
+    // TODO(llhsdmd) : setSubtitleStroke
+    qInfo() << "TODO(setSubtitleStroke)";
+}
+void VideoWidget::setSubtitleStrokeColor(const QColor& color) {
+    // TODO(llhsdmd) : setSubtitleStrokeColor
+    qInfo() << "TODO(setSubtitleStrokeColor)";
+}
+void VideoWidget::setSubtitleStrokeTransparency(qreal percentage) {
+    // TODO(llhsdmd) : setSubtitleStrokeTransparency
+    qInfo() << "TODO(setSubtitleStrokeTransparency)";
+}
+void VideoWidget::setSubtitleTransparency(qreal percentag) {
+    // TODO(llhsdmd) : setSubtitleTransparency
+    qInfo() << "TODO(setSubtitleTransparency)";
+}
+void VideoWidget::setSubtitle(int index) {
+    d->video->setCurrentSubtitleSource(d->video->subtitleSourceList()[index]);
+    d->player->setActiveSubtitleTrack(index);
+}
 
 VideoWidget::~VideoWidget() {
     delete d;
-}
-
-int VideoWidget::skipStep() {
-    return d->skipStep;
-}
-
-void VideoWidget::setSkipStep(int v) {
-    d->setSkipStep(v);
 }

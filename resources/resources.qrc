@@ -22,6 +22,8 @@
     <file alias="download_white.png">icons/download_white.png</file>
     <file alias="showFullScreen.png">icons/showFullScreen.png</file>
     <file alias="showFullScreen_white.png">icons/showFullScreen_white.png</file>
+    <file alias="showNormal.png">icons/showNormal.png</file>
+    <file alias="showNormal_white.png">icons/showNormal_white.png</file>
     <file alias="volume_0.png">icons/volume_0.png</file>
     <file alias="volume_0_white.png">icons/volume_0_white.png</file>
     <file alias="volume_1.png">icons/volume_1.png</file>

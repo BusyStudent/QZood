@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../common/popupWidget.hpp"
+#include "../../BLL/data/videoBLL.hpp"
 
 class FullSettingWidgetPrivate;
 class VideoWidget;
@@ -10,6 +11,8 @@ class FullSettingWidget : public PopupWidget {
     public:
         FullSettingWidget(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::Popup);
         void setupSetting(VideoWidget *VideoWidget);
+        void initDanmakuSetting(VideoBLLPtr video);
+        void initSubtitleSetting(VideoBLLPtr video);
 
     public Q_SLOTS:
         void show();

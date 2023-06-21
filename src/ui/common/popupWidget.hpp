@@ -20,6 +20,8 @@ class PopupWidget : public QWidget {
         inline bool autoLayout() { return auto_layout; }
         inline void setHideAfterLeave(bool flag = true) { hide_after_leave = flag; }
         inline bool hideAfterLeave() { return hide_after_leave; }
+        inline void setStopTimerEnter(bool flag = true) { stop_timer_enter = flag; }
+        inline bool stopTimerEnter() { return stop_timer_enter; }
         inline void setDefualtHideTime(int ms) { defualt_hide_after_time = ms; }
         inline bool defualtHideTime() { return defualt_hide_after_time; }
 
@@ -45,5 +47,6 @@ class PopupWidget : public QWidget {
         Qt::Alignment aligns = Qt::AlignBottom | Qt::AlignHCenter;
         bool auto_layout = false;
         bool hide_after_leave = true;
+        bool stop_timer_enter = true;
         int defualt_hide_after_time = 100;
 };

@@ -28,6 +28,12 @@ enum class Rotation {
     VERTICALLY_FILP,
 };
 
+enum class StrokeType {
+    NONE,
+    PROJECT,
+    STROKE,
+};
+
 class VideoWidget : public QWidget{
     Q_OBJECT
     public:
@@ -52,19 +58,19 @@ class VideoWidget : public QWidget{
         void setDanmakuSpeed(int speed);
         void setDanmakuFont(const QFont& font);
         QFont danmakuFont();
-        void setDanmakuBackground(bool v);
-        void setDanmakuBackgroundColor(QColor color);
-        void setDanmakuBackgroundTransparency(qreal percentage);
         void setDanmakuTransparency(qreal percentage);
-        void setDanmakuStroke(bool v);
-        void setDanmakuStrokeColor(QColor color);
-        void setDanmakuStrokeTransparency(qreal percentage);
+        void setDanmakuStroke(StrokeType stroke);
         // 字幕设置
+        void setSubtitle(int);
         void setSubtitleSynchronizeTime(qreal t);
         void setSubtitlePosition(qreal t);
         QFont subtitleFont();
         void setSubtitleFont(const QFont& font);
         void setSubtitleColor(const QColor& color);
+        void setSubtitleTransparency(qreal percentag);
+        void setSubtitleStroke(bool v);
+        void setSubtitleStrokeColor(const QColor& color);
+        void setSubtitleStrokeTransparency(qreal percentage);
         // 当前指针
         VideoBLLPtr currentVideo();
 

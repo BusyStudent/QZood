@@ -27,8 +27,8 @@ public:
     }
 
     void setupUi() {
-        // TODO(llhsdmd): 创建播放器界面
         ui->setupUi(self);
+        ui->playlist->setFocusPolicy(Qt::FocusPolicy::ClickFocus);
 
         // 设置默认划分比例
         ui->splitter->setStretchFactor(0, 10);
@@ -49,11 +49,10 @@ public:
 
     void update() {
         // TODO(llhsdmd): 使用数据模型更新界面ui
-
+        
     }
 
     void connect() {
-        // TODO(llhsdmd): 将用户请求连接到对应的请求函数
         connectTitleBar();
         connectPlayList();
     }
@@ -92,7 +91,6 @@ private:
             videoWidget->stop();
             self->close();
         });
-
         QWidget::connect(ui->miniPlayerButton, &QToolButton::clicked, self, [this]() mutable {
             // TODO(llhsdmd): 实现小窗播放请求
         });
@@ -240,10 +238,6 @@ public:
             return -1;
         }
         return -1;
-    }
-
-    void showInfo(QString info) {
-        // TODO(llhsdmd) : 这里可能搬到videowidget里面实现比较好
     }
 
 public:
