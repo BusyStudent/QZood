@@ -2,6 +2,7 @@
 #include "nekoav.hpp"
 #include "nekoprivate.hpp"
 #include <QAbstractEventDispatcher>
+#include <QRegularExpression>
 #include <QIODevice>
 
 #define NEKOAV_TIME_BASE 1000000.0
@@ -86,7 +87,9 @@ AudioThread::AudioThread(DemuxerThread *parent, AVStream *stream, AVCodecContext
     switch (ctxt->sample_fmt) {
         case AV_SAMPLE_FMT_U8 : outputFormat = AudioSampleFormat::Uint8; break;
         case AV_SAMPLE_FMT_S16 : outputFormat = AudioSampleFormat::Sint16; break;
-        case AV_SAMPLE_FMT_S32 : outputFormat = AudioSampleFormat::Sint32; break;
+        // case AV_SAMPLE_FMT_S32 : outputFormat = AudioSampleFormat::Sint32; break;
+        // May has S24 but input like AV_SAMPLE_FMT_S32
+        // I didnot how to handle it, so just convert
         case AV_SAMPLE_FMT_FLT : outputFormat = AudioSampleFormat::Float32; break;
         default : needResample = true; outputFormat = AudioSampleFormat::Float32; break;
     }
@@ -611,6 +614,168 @@ void VideoThread::pause(bool v) {
     cond.notify_one();
 }
 
+SubtitleThread::SubtitleThread(DemuxerThread *parent, AVStream *stream, AVCodecContext *ctxt) :
+    QThread(),
+    demuxerThread(parent),
+    stream(stream),
+    codecCtxt(ctxt)    
+{
+    setObjectName("NekoAV SubtitleThread");
+    
+    videoSink = demuxerThread->videoSink();
+
+    start();
+    pause(true);
+}
+
+SubtitleThread::~SubtitleThread() {
+    queue.flush();
+    queue.put(StopPacket);
+    quit = true;
+    pause(false);
+    cond.notify_one();
+    // Wait
+    wait();
+
+    avcodec_free_context(&codecCtxt);
+}
+void SubtitleThread::run() {
+    // Try get packet
+    int ret;
+    int got;
+
+    AVSubtitle subtitle;
+    QRegularExpression reg("{.*?}");
+    QString text;
+    while (!quit) {
+        mainloop : 
+        if (reqSwitch) {
+            reqSwitch = false;
+        }
+        if (paused) {
+            waitting = true;
+            std::unique_lock lock(condMutex);
+            cond.wait(lock);
+            continue;
+        }
+        AVPacket *packet = queue.get();
+        if (packet == EofPacket) {
+            // No more data
+            waitting = true;
+            continue;
+        }
+        if (packet == FlushPacket) {
+            avcodec_flush_buffers(codecCtxt);
+            
+            // BTK_LOG(BTK_RED("[VideoThread] ") "Got flush\n");
+            continue;
+        }
+        if (packet == StopPacket) {
+            waitting = true;
+            break; //< It tell us, it time to stop
+        }
+        if (packet == nullptr) {
+            // No Data
+            waitting = true;
+            continue;
+        }
+        waitting = false;
+
+        AVPtr<AVPacket> pguard(packet);
+
+        ret = avcodec_decode_subtitle2(codecCtxt, &subtitle, &got, packet);
+        if (!got || ret < 0) {
+            continue;
+        }
+        
+        // Free the subtitle if
+        AVPtr<AVSubtitle> sguard(&subtitle);
+
+        if (subtitle.num_rects <= 0) {
+            continue;
+        }
+        auto data = subtitle.rects[0];
+        if (data->type == SUBTITLE_TEXT) {
+            text = QString::fromUtf8(data->text);
+        }
+        if (data->type == SUBTITLE_ASS) {
+            text = QString::fromUtf8(data->ass).replace(reg, "").split(",").back();
+        }
+
+        // Sleep until we got it
+        double duration = packet->duration * av_q2d(stream->time_base);
+        double currentPts = packet->pts * av_q2d(stream->time_base);
+        double startPts = currentPts + subtitle.start_display_time / NEKOAV_TIME_BASE;
+        double endPts = currentPts + subtitle.end_display_time / NEKOAV_TIME_BASE + duration;
+
+        double diff = startPts - demuxerThread->position();
+
+        while (diff > 0) {
+            // Wait until
+            std::unique_lock lock(condMutex);
+            cond.wait_for(lock, 10ms);
+
+            diff = startPts - demuxerThread->position();
+            if (quit) {
+                goto quitLabel;
+            }
+            if (reqSwitch) {
+                goto mainloop;
+            }
+        }
+        if (demuxerThread->position() > endPts) {
+            // Skip it
+            continue;
+        }
+
+        // Put subtitle
+        qDebug() << "Puting subtitle " << text << "Started " << startPts << " end " << endPts;
+        videoSink->setSubtitleText(text);
+
+        diff = endPts - demuxerThread->position();
+        while (diff > 0) {
+            // Wait until
+            std::unique_lock lock(condMutex);
+            cond.wait_for(lock, 10ms);
+
+            diff = endPts - demuxerThread->position();
+
+            if (quit) {
+                goto quitLabel;
+            }
+            if (reqSwitch) {
+                goto mainloop;
+            }
+        }
+
+        // End 
+        videoSink->setSubtitleText(QString());
+    }
+
+    quitLabel : videoSink->setSubtitleText(QString());
+}
+void SubtitleThread::pause(bool v) {
+    if (paused == v) {
+        return;
+    }
+    paused = v;
+    cond.notify_one();
+}
+void SubtitleThread::switchStream(AVStream* stream) {
+    reqSwitch = true;
+    queue.flush();
+    queue.put(FlushPacket);
+    cond.notify_one();
+
+    while (!waitting) { 
+        std::this_thread::sleep_for(1ms);
+    }
+
+    avcodec_free_context(&codecCtxt);
+    auto [ctxt, errcode] = FFCreateDecoderContext(stream);
+    codecCtxt = ctxt;
+}
+
 // Demuxer here
 DemuxerThread::DemuxerThread(MediaPlayerPrivate *parent) : QThread(), player(parent) {
     setObjectName("NekoAV DemuxerThread");
@@ -625,6 +790,10 @@ DemuxerThread::~DemuxerThread() {
     av_free(ioBuffer);
 }
 void DemuxerThread::run() {
+    QScopedPointer<QObject> invokeHelperGuard(new QObject());
+    invokeHelper = invokeHelperGuard.get();
+    invokeHelper->moveToThread(this);
+
     if (!load()) {
         return;
     }
@@ -640,9 +809,12 @@ void DemuxerThread::run() {
     // Cleanup
     delete audioThread;
     delete videoThread;
+    delete subtitleThread;
 
     audioThread = nullptr;
     videoThread = nullptr;
+    subtitleThread = nullptr;
+    invokeHelper = nullptr;
 
     avformat_close_input(&formatCtxt);
     av_packet_free(&packet);
@@ -662,7 +834,7 @@ bool DemuxerThread::load() {
         auto self = static_cast<DemuxerThread *>(_self);
         
         // Distach event if
-        self->eventDispatcher()->processEvents(QEventLoop::AllEvents);
+        // self->eventDispatcher()->processEvents(QEventLoop::AllEvents);
         return self->quit;
     };
     formatCtxt->interrupt_callback.opaque = this;
@@ -745,6 +917,7 @@ bool DemuxerThread::load() {
     // Get Stream of it
     player->videoStream = av_find_best_stream(formatCtxt, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
     player->audioStream = av_find_best_stream(formatCtxt, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+    player->subtitleStream = av_find_best_stream(formatCtxt, AVMEDIA_TYPE_SUBTITLE, -1, -1, nullptr, 0);
 
     if (player->audioStream < 0 && player->videoStream < 0) {
         // No stream !!!
@@ -782,29 +955,18 @@ bool DemuxerThread::prepareWorker() {
             return false;
         }
     }
+    if (player->subtitleStream >= 0 && videoSink()) {
+        if (!prepareCodec(player->subtitleStream)) {
+            return false;
+        }
+    }
     return true;
 }
 bool DemuxerThread::prepareCodec(int streamid) {
     auto stream = formatCtxt->streams[streamid];
-    auto codec = avcodec_find_decoder(stream->codecpar->codec_id);
-    if (!codec) {
-        // No codec
-        errcode = AVERROR_DECODER_NOT_FOUND;
-        return sendError(errcode);
-    }
-    auto codecCtxt = avcodec_alloc_context3(codec);
-    if (!codec) {
-        errcode = AVERROR(ENOMEM);
-        return sendError(errcode);
-    }
-    errcode = avcodec_parameters_to_context(codecCtxt, stream->codecpar);
-    if (errcode < 0) {
-        avcodec_free_context(&codecCtxt);
-        return sendError(errcode);
-    }
-    errcode = avcodec_open2(codecCtxt, codecCtxt->codec, nullptr);
-    if (errcode < 0) {
-        avcodec_free_context(&codecCtxt);
+    auto [codecCtxt, retCode] = FFCreateDecoderContext(stream);
+    if (codecCtxt == nullptr) {
+        errcode = retCode;
         return sendError(errcode);
     }
 
@@ -815,6 +977,10 @@ bool DemuxerThread::prepareCodec(int streamid) {
     }
     else if (codecCtxt->codec_type == AVMEDIA_TYPE_VIDEO) {
         videoThread = new VideoThread(this, stream, codecCtxt);
+        return true;
+    }
+    else if (codecCtxt->codec_type == AVMEDIA_TYPE_SUBTITLE) {
+        subtitleThread = new SubtitleThread(this, stream, codecCtxt);
         return true;
     }
 
@@ -944,6 +1110,9 @@ bool DemuxerThread::readFrame(int *eof) {
         else if (packet->stream_index == player->videoStream && videoThread) {
             videoThread->packetQueue().put(av_packet_clone(packet));
         }
+        else if (packet->stream_index == player->subtitleStream && subtitleThread) {
+            subtitleThread->packetQueue().put(av_packet_clone(packet));
+        }
         av_packet_unref(packet);
     }
 
@@ -1052,6 +1221,7 @@ bool DemuxerThread::doSeek() {
     
     bool restoreAudio = false;
     bool restoreVideo = false;
+    bool restoreSubtitle = false;
     if (audioThread) {
         restoreAudio = !audioThread->isPaused();
         audioThread->pause(true);
@@ -1080,6 +1250,19 @@ bool DemuxerThread::doSeek() {
             return sendError(errcode);
         }
     }
+    if (subtitleThread) {
+        restoreSubtitle = !subtitleThread->isPaused();
+        subtitleThread->pause(true);
+        subtitleThread->packetQueue().flush();
+        subtitleThread->packetQueue().put(FlushPacket);
+
+        int64_t pos = seekPosition / av_q2d(formatCtxt->streams[player->subtitleStream]->time_base);
+        errcode = av_seek_frame(formatCtxt, player->subtitleStream, pos, AVSEEK_FLAG_BACKWARD);
+        if (errcode < 0) {
+            qDebug() << "DemuxerThread failed to seek subtitleStream ";
+            return sendError(errcode);
+        }
+    }
 
     // Set external Clock 
     externalClock = seekPosition;
@@ -1090,6 +1273,9 @@ bool DemuxerThread::doSeek() {
     }
     if (restoreVideo) {
         videoThread->pause(false);
+    }
+    if (restoreSubtitle) {
+        subtitleThread->pause(false);
     }
 
     return true;
@@ -1119,12 +1305,39 @@ void DemuxerThread::doUpdateClock() {
         Q_EMIT ffmpegPositionChanged(curPosition);
         Q_EMIT ffmpegBuffering(bufferedDuration(), NAN);
     }
+    eventDispatcher()->processEvents(QEventLoop::AllEvents);
 }
 void DemuxerThread::requestSeek(qreal pos) {
     hasSeek = true;
     seekPosition = pos;
 
     wakeUp();
+}
+void DemuxerThread::requestSwitchStream(int streamIndex) {
+    QMetaObject::invokeMethod(invokeHelper, [this, streamIndex](){
+        auto stream = formatCtxt->streams[streamIndex];
+        auto type = stream->codecpar->codec_type;
+
+        Q_ASSERT(type == AVMEDIA_TYPE_SUBTITLE);
+
+        // Now try pause it
+        bool needRestore = player->playbackState == PlaybackState::PlayingState;
+        doPause(true);
+
+        qDebug() << "DemuxerThread::requestSwitchStream switch to " << streamIndex;
+        if (type == AVMEDIA_TYPE_SUBTITLE && subtitleThread) {
+            // Need change
+            player->subtitleStream = streamIndex;
+            subtitleThread->switchStream(stream);
+        }
+        // Seek the stream to the target position
+        requestSeek(position());
+        doSeek();
+
+        if (needRestore) {
+            doPause(false);
+        }
+    }, Qt::QueuedConnection);
 }
 void DemuxerThread::doPause(bool v) {
     // Save external clock
@@ -1142,6 +1355,9 @@ void DemuxerThread::doPause(bool v) {
     }
     if (videoThread) {
         videoThread->pause(v);
+    }
+    if (subtitleThread) {
+        subtitleThread->pause(v);
     }
 }
 qreal DemuxerThread::position() const {
@@ -1367,8 +1583,9 @@ void MediaPlayerPrivate::updateMediaInfo() {
     Q_EMIT player->seekableChanged(player->isSeekable());
     Q_EMIT player->hasVideoChanged(player->hasVideo());
     Q_EMIT player->hasAudioChanged(player->hasAudio());
-    Q_EMIT player->activeTracksChanged();
     Q_EMIT player->metaDataChanged();
+    Q_EMIT player->tracksChanged();
+    Q_EMIT player->activeTracksChanged();
 }
 void MediaPlayerPrivate::audioDeviceLost() {
     stop();
@@ -1497,17 +1714,49 @@ static auto getTracks(AVFormatContext *ctxt, AVMediaType type) -> QList<MediaMet
         }
         MediaMetaData data;
         AVDictionary *metadata = ctxt->streams[idx]->metadata;
-        AVDictionaryEntry *cur = av_dict_get(metadata, nullptr, nullptr, 0);
+        AVDictionaryEntry *cur = av_dict_get(metadata, "", nullptr, AV_DICT_IGNORE_SUFFIX);
         while (cur) {
             data.insert(cur->key, cur->value);
 
-            cur = av_dict_get(metadata, nullptr, cur, 0);
+            cur = av_dict_get(metadata, "", cur, AV_DICT_IGNORE_SUFFIX);
         }
 
         tracks.push_back(data);
     }
 
     return tracks;
+}
+static auto toFFTrack(AVFormatContext *ctxt, int index, AVMediaType type) -> int {
+    if (index < 0 || ctxt == nullptr || index >= ctxt->nb_streams) {
+        return -1;
+    }
+    int target = 0;
+    for (int idx = 0; idx < ctxt->nb_streams; idx++) {
+        if (ctxt->streams[idx]->codecpar->codec_type != type) {
+            continue;
+        }
+        if (target == index) {
+            return idx;
+        }
+        target += 1;
+    }
+    return target;
+}
+static auto toNekoTrack(AVFormatContext *ctxt, int index, AVMediaType type) -> int {
+    if (index < 0 || ctxt == nullptr || index >= ctxt->nb_streams) {
+        return -1;
+    }
+    int target = 0;
+    for (int idx = 0; idx < ctxt->nb_streams; idx++) {
+        if (ctxt->streams[idx]->codecpar->codec_type != type) {
+            continue;
+        }
+        if (idx == index) {
+            return target;
+        }
+        target += 1;
+    }
+    return target;
 }
 
 auto MediaPlayer::videoTracks() const -> QList<MediaMetaData> {
@@ -1541,39 +1790,55 @@ auto MediaPlayer::activeAudioTrack() const -> int {
     if (!isLoaded()) {
         return -1;
     }
-    return d->audioStream;
+    return toNekoTrack(d->formatContext(), d->audioStream, AVMEDIA_TYPE_AUDIO);
 }
 auto MediaPlayer::activeVideoTrack() const -> int {
     if (!isLoaded()) {
         return -1;
     }
-    return d->videoStream;
+    return toNekoTrack(d->formatContext(), d->videoStream, AVMEDIA_TYPE_VIDEO);
 }
 auto MediaPlayer::activeSubtitleTrack() const -> int {
-    return -1;
+    if (!isLoaded()) {
+        return -1;
+    }
+    return toNekoTrack(d->formatContext(), d->subtitleStream, AVMEDIA_TYPE_SUBTITLE);
 }
 
 
 // TODO : Runtime changed this track & subtitle support
 void MediaPlayer::setActiveAudioTrack(int t)  {
     // Check if loaded
-    if (!isLoaded() || isPlaying()) {
+    if (!isLoaded()) {
         return;
     }
-    d->audioStream = t;
+    if (t == activeAudioTrack()) {
+        return;
+    }
+    t = toFFTrack(d->formatContext(), t, AVMEDIA_TYPE_AUDIO);
+    d->demuxerThread->requestSwitchStream(t);
 }
 void MediaPlayer::setActiveVideoTrack(int t)  {
     // Check if loaded
-    if (!isLoaded() || isPlaying()) {
+    if (!isLoaded()) {
         return;
     }
-    d->videoStream = t;
+    if (t == activeVideoTrack()) {
+        return;
+    }
+    t = toFFTrack(d->formatContext(), t, AVMEDIA_TYPE_VIDEO);
+    d->demuxerThread->requestSwitchStream(t);
 }
 void MediaPlayer::setActiveSubtitleTrack(int t)  {
     // Check if loaded
-    if (!isLoaded() || isPlaying()) {
+    if (!isLoaded()) {
         return;
     }
+    if (t == activeSubtitleTrack()) {
+        return;
+    }
+    t = toFFTrack(d->formatContext(), t, AVMEDIA_TYPE_SUBTITLE);
+    d->demuxerThread->requestSwitchStream(t);
 }
 
 // Settings

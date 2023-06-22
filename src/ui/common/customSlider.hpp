@@ -29,6 +29,7 @@ class CustomSlider : public QSlider
         void mousePressEvent(QMouseEvent *ev) override;
         void mouseMoveEvent(QMouseEvent *ev) override;
         void resizeEvent(QResizeEvent* ev) override;
+        void hideEvent(QHideEvent* ev) override;
     
     private:
         CustomSliderPrivate* d;

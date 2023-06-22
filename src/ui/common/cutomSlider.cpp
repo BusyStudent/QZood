@@ -142,6 +142,9 @@ void CustomSlider::resizeEvent(QResizeEvent* ev) {
 
     QSlider::resizeEvent(ev);
 }
+void CustomSlider::hideEvent(QHideEvent* ev) {
+    d->tipLabel->hide();
+}
 
 CustomSlider::~CustomSlider() {
     delete d;

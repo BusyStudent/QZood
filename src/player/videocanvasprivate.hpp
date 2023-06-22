@@ -54,8 +54,14 @@ class VideoCanvasPrivate final : public QObject, public QOpenGLFunctions_3_3_Cor
 
         QImage              image;
 
+        QString             subtitleString;
+        QFont               subtitleFont = QFont("黑体", 40);
+        qreal               subtitleOpacity = 1.0f;
+        QColor              subtitleColor = Qt::white;
+        QColor              subtitleOutlineColor = Qt::gray;
+
         // Danmakus
-        QFont               danmakuFont =  QFont("黑体");
+        QFont               danmakuFont = QFont("黑体");
         int                 danmakuTimer = 0;
         qreal               danmakuFps   = 60;
         qreal               danmakuScale = 0.8; //< Scale factor for danmaku.  1.0 = 100% scale.  0.0 = normal scale.
@@ -69,6 +75,9 @@ class VideoCanvasPrivate final : public QObject, public QOpenGLFunctions_3_3_Cor
         DanmakuTracks       danmakuTracks; //< The list of QGraphicsTextItem to display.  Each QTextItem is a danmaku.
         DanmakuTrack        danmakuTopBottomTrack; //< Botttom danmaku
         DanmakuList::const_iterator danmakuIter; //< The iterator of current position
+        VideoCanvas::ShadowMode     danmakuShadowMode = VideoCanvas::Projection;
+
+        VideoCanvas::AspectMode     aspectMode = VideoCanvas::KeepAspect;
 
         void paint(QPainter &);
         void paintDanmaku(QPainter &);
@@ -81,11 +90,19 @@ class VideoCanvasPrivate final : public QObject, public QOpenGLFunctions_3_3_Cor
         void resizeGL(int w, int h);
         void updateGLBuffer();
         void prepareProgram(int type, const char *vtCode, const char *frCode);
+
+        /**
+         * @brief Get the texture puted rectangles
+         * 
+         * @return QRectF 
+         */
+        QRectF viewportRect() const;
     protected:
         void timerEvent(QTimerEvent *) override;
     private:
         void addDanmaku();
         void _on_VideoFrameChanged(const NekoVideoFrame &frame);
+        void _on_SubtitleTextChanged(const QString &text);
         void _on_playerStateChanged(NekoMediaPlayer::PlaybackState status);
     friend class VideoCanvas;
 };

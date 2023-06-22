@@ -164,6 +164,8 @@ private:
 
     void connectDanmakuSetting(VideoWidget* videoWidget) {
         // 弹幕选择
+        ui->danmakuFontComboBox->setCurrentFont(videoWidget->danmakuFont());
+
         QWidget::connect(ui->danmakuCombobox, &QComboBox::currentTextChanged, videoWidget, [videoWidget](const QString &danmakuSource) {
             videoWidget->currentVideo()->setCurrentDanmakuSource(danmakuSource);
         });
@@ -218,6 +220,9 @@ private:
 
     void connectSubtitleSetting(VideoWidget *videoWidget) {
         // 选择字幕
+        ui->subtitleFontComboBox->setCurrentFont(videoWidget->subtitleFont());
+        ui->subtitleSizeBox->setValue(videoWidget->subtitleFont().pixelSize());
+
         QWidget::connect(ui->subtitleComboBox, &QComboBox::currentTextChanged, videoWidget, [videoWidget](const QString& text) {
             int index = videoWidget->currentVideo()->subtitleSourceList().indexOf(text);
             videoWidget->setSubtitle(index);
@@ -362,7 +367,7 @@ private:
     void resetSubtitleSetting() {
         ui->subtitleDefualtsynchronizeTimeButton->click();
         ui->subtitlePositionBar->setValue(20);
-        ui->subtitleSizeBox->setValue(12);
+        ui->subtitleSizeBox->setValue(40);
         ui->subtitleBoldButton->setChecked(false);
         ui->subtitleItalicsButton->setChecked(false);
         ui->subtitleUnderlineButton->setChecked(false);
@@ -390,6 +395,7 @@ void FullSettingWidget::initDanmakuSetting(VideoBLLPtr video) {
 }
 
 void FullSettingWidget::initSubtitleSetting(VideoBLLPtr video) {
+    d->ui->subtitleComboBox->clear();
     d->ui->subtitleComboBox->addItems(video->subtitleSourceList());
 }
 

@@ -8,6 +8,12 @@ if is_host("windows") then
     add_cxxflags("cl::/permissive-")
 end 
 
+if is_mode("release") then 
+    set_symbols("hidden")
+    set_strip("all")
+    set_optimize("smallest")
+end
+
 add_requires("libxml2", "protobuf-cpp")
 add_packages("libxml2", "protobuf-cpp")
 

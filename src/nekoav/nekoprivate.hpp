@@ -26,7 +26,7 @@ inline static auto EofPacket = nullptr;
 inline static auto FlushPacket = reinterpret_cast<AVPacket*>(0x01);
 inline static auto StopPacket = reinterpret_cast<AVPacket*>(0x02);
 inline static auto AVSyncThreshold = 0.01;
-inline static auto AVNoSyncThreshold = 1.0;
+inline static auto AVNoSyncThreshold = 10.0;
 inline static auto AudioDiffAvgNB = 20;
 
 using namespace std::chrono_literals;
@@ -75,6 +75,14 @@ class AVTraits<AVDictionary> {
 };
 
 template <>
+class AVTraits<AVSubtitle> {
+    public:
+        void operator()(AVSubtitle *ptr) {
+            avsubtitle_free(ptr);
+        }
+};
+
+template <>
 class AVTraits<SwrContext> {
     public:
         void operator()(SwrContext *ptr) {
@@ -104,7 +112,7 @@ class AVPtr : public std::unique_ptr<T, AVTraits<T>> {
         using std::unique_ptr<T, AVTraits<T>>::unique_ptr;
 };
 
-class PacketQueue {
+class PacketQueue final {
     public:
         PacketQueue();
         PacketQueue(const PacketQueue &) = delete;
@@ -125,7 +133,7 @@ class PacketQueue {
 
 class DemuxerThread;
 
-class AudioThread : public QObject {
+class AudioThread final : public QObject {
     Q_OBJECT
     public:
         AudioThread(DemuxerThread *parent, AVStream *stream, AVCodecContext *ctxt);
@@ -178,7 +186,7 @@ class AudioThread : public QObject {
         qreal  audioClock = 0.0f;
 };
 
-class VideoThread : public QThread {
+class VideoThread final : public QThread {
     Q_OBJECT
     public:
         VideoThread(DemuxerThread *parent, AVStream *stream, AVCodecContext *ctxt);
@@ -222,7 +230,6 @@ class VideoThread : public QThread {
         AVPixelFormat hardwarePixfmt = AV_PIX_FMT_NONE;
 
         // Sync 
-        std::thread thrd;
         std::condition_variable cond;
         std::mutex condMutex;
         bool paused = false;
@@ -237,7 +244,46 @@ class VideoThread : public QThread {
         bool    needConvert = true;
 };
 
-class DemuxerThread : public QThread {
+class SubtitleThread final : public QThread {
+    Q_OBJECT
+    public:
+        SubtitleThread(DemuxerThread *parent, AVStream *stream, AVCodecContext *ctxt);
+        ~SubtitleThread();
+
+        bool idle() const {
+            // return waitting;
+            return queue.size() == 0;
+        }
+        bool isPaused() const {
+            return paused;
+        }
+        PacketQueue &packetQueue() noexcept {
+            return queue;
+        }
+        void pause(bool v);
+        void switchStream(AVStream *stream);
+    private:
+        void run() override;
+
+        DemuxerThread  *demuxerThread = nullptr;
+        AVCodecContext *codecCtxt = nullptr;
+        AVStream       *stream = nullptr;
+
+        VideoSink      *videoSink = nullptr;
+        PacketQueue     queue;        
+
+        // Sync 
+        std::condition_variable cond;
+        std::mutex condMutex;
+        bool paused = false;
+        bool waitting = false;
+        bool quit = false;
+        bool reqSwitch = false;
+
+        double subtitleClock = 0.0;
+};
+
+class DemuxerThread final : public QThread {
     Q_OBJECT
     public:
         using MediaStatus = MediaPlayer::MediaStatus;
@@ -254,6 +300,7 @@ class DemuxerThread : public QThread {
          */
         void wakeUp();
         void requestSeek(qreal position);
+        void requestSwitchStream(int stream);
         void doPause(bool v);
 
         /**
@@ -300,6 +347,9 @@ class DemuxerThread : public QThread {
 
         AudioThread        *audioThread = nullptr;
         VideoThread        *videoThread = nullptr;
+        SubtitleThread     *subtitleThread = nullptr;
+
+        QObject            *invokeHelper = nullptr;
 
         int                 errcode = 0;
         bool                quit = false;
@@ -327,7 +377,7 @@ class DemuxerThread : public QThread {
         std::mutex              condMutex;
 };
 
-class MediaPlayerPrivate : public QObject {
+class MediaPlayerPrivate final : public QObject {
     Q_OBJECT
     public:
         using MediaStatus = MediaPlayer::MediaStatus;
@@ -364,6 +414,7 @@ class MediaPlayerPrivate : public QObject {
         bool          loaded = false;
         int           audioStream = -1;
         int           videoStream = -1;
+        int           subtitleStream = -1;
         int           loops = Loops::Once;
 
         // End 
@@ -388,7 +439,7 @@ class MediaPlayerPrivate : public QObject {
     friend class MediaPlayer;
 };
 
-class VideoFramePrivate {
+class VideoFramePrivate final {
     public:
         explicit VideoFramePrivate(AVFrame *f) : frame(f) { }
         VideoFramePrivate(const VideoFramePrivate &) = delete;
@@ -457,6 +508,31 @@ inline VideoPixelFormat ToVideoPixelFormat(AVPixelFormat fmt) {
         case AV_PIX_FMT_NV21 : return VideoPixelFormat::NV21;
         default :              return VideoPixelFormat::Invalid;
     }
+}
+inline std::pair<AVCodecContext*, int> FFCreateDecoderContext(AVStream *stream) {
+    auto codec = avcodec_find_decoder(stream->codecpar->codec_id);
+    int errcode = 0;
+    if (!codec) {
+        // No codec
+        errcode = AVERROR_DECODER_NOT_FOUND;
+        return {nullptr, errcode};
+    }
+    auto codecCtxt = avcodec_alloc_context3(codec);
+    if (!codec) {
+        errcode = AVERROR(ENOMEM);
+        return {nullptr, errcode};
+    }
+    errcode = avcodec_parameters_to_context(codecCtxt, stream->codecpar);
+    if (errcode < 0) {
+        avcodec_free_context(&codecCtxt);
+        return {nullptr, errcode};
+    }
+    errcode = avcodec_open2(codecCtxt, codecCtxt->codec, nullptr);
+    if (errcode < 0) {
+        avcodec_free_context(&codecCtxt);
+        return {nullptr, errcode};
+    }
+    return {codecCtxt, errcode};
 }
 
 }

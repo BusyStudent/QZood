@@ -477,8 +477,8 @@ private:
         }
         qWarning() << "resumePlayStatus";
         for (const auto source : player->subtitleTracks()) {
-            qWarning() << "subtitle title : " << source.Title;
-            video->addSubtitleSource(source.Title);
+            qWarning() << "subtitle title : " << source[NekoMediaMetaData::Title];
+            video->addSubtitleSource(source[NekoMediaMetaData::Title]);
         }
         settings->initSubtitleSetting(video);
         settings->initDanmakuSetting(video);
@@ -578,8 +578,12 @@ void VideoWidget::setPlaybackRate(qreal v) {
 }
 // 画面设置
 void VideoWidget::setAspectRationMode(ScalingMode mode) {
-    // TODO(llhsdmd) : setAspectRationMode
-    qInfo() << "TODO(setAspectRationMode)";
+    switch (mode) {
+        case ScalingMode::NONE: d->vcanvas->setAspectMode(VideoCanvas::KeepAspect); break;
+        case ScalingMode::FILLING: d->vcanvas->setAspectMode(VideoCanvas::Filling); break;
+        case ScalingMode::_16X9: d->vcanvas->setAspectMode(VideoCanvas::_16x9); break;
+        case ScalingMode::_4X3: d->vcanvas->setAspectMode(VideoCanvas::_4x3); break;
+    }
 }
 void VideoWidget::RotationScreen(Rotation direction) {
     // TODO(llhsdmd) : RotationScreen
@@ -629,8 +633,12 @@ void VideoWidget::setDanmakuTransparency(qreal ratio) {
     d->vcanvas->setDanmakuOpacity(1 - ratio);
 }
 void VideoWidget::setDanmakuStroke(StrokeType stroke) {
-    // TODO(llhsdmd) : setDanmakuStroke
-    qInfo() << "TODO(setDanmakuStroke)";
+    // qInfo() << "TODO(setDanmakuStroke)";
+    switch (stroke) {
+        case StrokeType::NONE :
+        case StrokeType::STROKE :d->vcanvas->setDanmakuShadowMode(VideoCanvas::Outline); break;
+        case StrokeType::PROJECT :d->vcanvas->setDanmakuShadowMode(VideoCanvas::Projection); break;
+    }
 }
 // 当前指针
 VideoBLLPtr VideoWidget::currentVideo() {
@@ -646,33 +654,32 @@ void VideoWidget::setSubtitlePosition(qreal t) {
     qInfo() << "TODO(setSubtitlePosition)";
 }
 QFont VideoWidget::subtitleFont() {
-    // TODO(llhsdmd) : subtitleFont
-    qInfo() << "TODO(subtitleFont)";
-    return QFont();
+    // qInfo() << "TODO(subtitleFont)";
+    return d->vcanvas->subtitleFont();
 }
 void VideoWidget::setSubtitleFont(const QFont& font) {
-    // TODO(llhsdmd) : setSubtitleFont
-    qInfo() << "TODO(setSubtitleFont)";
+    // qInfo() << "TODO(setSubtitleFont)";
+    d->vcanvas->setSubtitleFont(font);
 }
 void VideoWidget::setSubtitleColor(const QColor& color) {
-    // TODO(llhsdmd) : setSubtitleColor
-    qInfo() << "TODO(setSubtitleColor)";
+    // qInfo() << "TODO(setSubtitleColor)";
+    d->vcanvas->setSubtitleColor(color);
 }
 void VideoWidget::setSubtitleStroke(bool v) {
     // TODO(llhsdmd) : setSubtitleStroke
     qInfo() << "TODO(setSubtitleStroke)";
 }
 void VideoWidget::setSubtitleStrokeColor(const QColor& color) {
-    // TODO(llhsdmd) : setSubtitleStrokeColor
-    qInfo() << "TODO(setSubtitleStrokeColor)";
+    // qInfo() << "TODO(setSubtitleStrokeColor)";
+    d->vcanvas->setSubtitleOutlineColor(color);
 }
 void VideoWidget::setSubtitleStrokeTransparency(qreal percentage) {
     // TODO(llhsdmd) : setSubtitleStrokeTransparency
     qInfo() << "TODO(setSubtitleStrokeTransparency)";
 }
 void VideoWidget::setSubtitleTransparency(qreal percentag) {
-    // TODO(llhsdmd) : setSubtitleTransparency
-    qInfo() << "TODO(setSubtitleTransparency)";
+    // qInfo() << "TODO(setSubtitleTransparency)";
+    d->vcanvas->setSubtitleOpacity(1.0 - percentag);
 }
 void VideoWidget::setSubtitle(int index) {
     d->video->setCurrentSubtitleSource(d->video->subtitleSourceList()[index]);

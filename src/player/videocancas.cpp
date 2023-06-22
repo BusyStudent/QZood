@@ -82,6 +82,13 @@ void VideoCanvas::setDanmakuTracksLimit(qreal limit) {
     d->danmakuTracksLimit = std::clamp(limit, 0.0, 1.0);
     d->resizeTracks();
 }
+void VideoCanvas::setDanmakuAliveTime(qreal t) {
+    d->danmakuAliveTime = t;
+    update();
+}
+void VideoCanvas::setDanmakuShadowMode(ShadowMode m) {
+
+}
 void VideoCanvas::setDanmakuVisible(bool visible) {
     d->danmakuVisible = visible;
 }
@@ -93,6 +100,37 @@ void VideoCanvas::setDanmakuFont(const QFont &font) {
     d->danmakuFont = font;
     update();
 }
+
+void VideoCanvas::setAspectMode(AspectMode mode) {
+    d->aspectMode = mode;
+
+#if !defined(QZOOD_VIDEO_NO_CUSTOMIZE_OPENGL)
+    // We need update GL
+    if (d->textures[0]) {
+        makeCurrent();
+        d->updateGLBuffer();
+    }
+#endif
+
+    update();
+}
+void VideoCanvas::setSubtitleFont(const QFont &f) {
+    d->subtitleFont = f;
+    update();
+}
+void VideoCanvas::setSubtitleOpacity(qreal op) {
+    d->subtitleOpacity = op;
+    update();
+}
+void VideoCanvas::setSubtitleColor(const QColor &c) {
+    d->subtitleColor = c;
+    update();
+}
+void VideoCanvas::setSubtitleOutlineColor(const QColor &c) {
+    d->subtitleOutlineColor = c;
+    update();
+}
+
 qreal VideoCanvas::danmakuTracksLimit() const {
     return d->danmakuTracksLimit;
 }
@@ -102,6 +140,25 @@ qreal VideoCanvas::danmakuOpacity() const {
 QFont VideoCanvas::danmakuFont() const {
     return d->danmakuFont;
 }
+QFont VideoCanvas::subtitleFont() const {
+    return d->subtitleFont;
+}
+qreal VideoCanvas::subtitleOpacity() const {
+    return d->subtitleOpacity;
+}
+QColor VideoCanvas::subtitleColor() const {
+    return d->subtitleColor;
+}
+QColor VideoCanvas::subtitleOutlineColor() const {
+    return d->subtitleOutlineColor;
+}
+auto   VideoCanvas::aspectMode() const -> AspectMode {
+    return d->aspectMode;
+}
+auto   VideoCanvas::danmakuShadowMode() const -> ShadowMode {
+    return d->danmakuShadowMode;
+}
+
 void VideoCanvas::paintGL() {
     QPainter painter(this);
 
@@ -141,6 +198,7 @@ void VideoCanvas::initializeGL() {
 
 VideoCanvasPrivate::VideoCanvasPrivate(VideoCanvas *parent) : QObject(parent), videoCanvas(parent) {
     connect(&videoSink, &NekoVideoSink::videoFrameChanged, this, &VideoCanvasPrivate::_on_VideoFrameChanged, Qt::QueuedConnection);
+    connect(&videoSink, &NekoVideoSink::subtitleTextChanged, this, &VideoCanvasPrivate::_on_SubtitleTextChanged, Qt::QueuedConnection);
 
 #if !defined(QZOOD_VIDEO_NO_CUSTOMIZE_OPENGL)
     videoSink.addPixelFormat(NekoVideoPixelFormat::YUV420P);
@@ -150,30 +208,11 @@ VideoCanvasPrivate::VideoCanvasPrivate(VideoCanvas *parent) : QObject(parent), v
 void VideoCanvasPrivate::paint(QPainter &painter) {
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
     painter.setRenderHint(QPainter::TextAntialiasing, true);
+    painter.setRenderHint(QPainter::Antialiasing, true);
 
 #if defined(QZOOD_VIDEO_NO_CUSTOMIZE_OPENGL)
     if (!image.isNull()) {
-        qreal texWidth = image.width();
-        qreal texHeight = image.height();
-        qreal winWidth = videoCanvas->width();
-        qreal winHeight = videoCanvas->height();
-
-        qreal x, y, w, h;
-
-        if(texWidth * winHeight > texHeight * winWidth){
-            w = winWidth;
-            h = texHeight * winWidth / texWidth;
-        }
-        else{
-            w = texWidth * winHeight / texHeight;
-            h = winHeight;
-        }
-        x = (winWidth - w) / 2;
-        y = (winHeight - h) / 2;
-
-        // Size the item Size
-
-        painter.drawImage(QRectF(x, y, w, h), image);
+        painter.drawImage(viewportRect(), image);
     }
 #endif
     if (player) {
@@ -199,6 +238,28 @@ void VideoCanvasPrivate::paint(QPainter &painter) {
 
     // Then paint danmaku
     paintDanmaku(painter);
+
+    // Paint the subtitles
+    if (!subtitleString.isNull()) {
+        // Calc position
+        auto textSize = QFontMetricsF(subtitleFont).size(Qt::TextSingleLine, subtitleString);
+
+        qreal x = videoCanvas->width() / 2.0 - textSize.width() / 2.0;
+        qreal y = videoCanvas->height() - textSize.height();
+
+        painter.save();
+        painter.setOpacity(subtitleOpacity);
+        painter.setFont(subtitleFont);
+
+        painter.setPen(subtitleOutlineColor);
+        painter.drawText(x + 1, y + 1, subtitleString);
+
+        painter.setPen(subtitleColor);
+        painter.drawText(x, y, subtitleString);
+        // painter.setPen(subtitleOutlineColor);
+        // painter.drawPath(subtitlePath);
+        painter.restore();
+    }
 }
 void VideoCanvasPrivate::paintDanmaku(QPainter &painter) {
     if (!danmakuVisible) {
@@ -433,6 +494,39 @@ void VideoCanvasPrivate::clearTracks() {
     }
     danmakuTopBottomTrack.clear();
 }
+QRectF VideoCanvasPrivate::viewportRect() const {
+#if defined(QZOOD_VIDEO_NO_CUSTOMIZE_OPENGL)
+    qreal texWidth = image.width();
+    qreal texHeight = image.height();
+#else
+    qreal texWidth = textureWidth;
+    qreal texHeight = textureHeight;
+#endif
+    qreal winWidth = videoCanvas->width();
+    qreal winHeight = videoCanvas->height();
+
+    switch (aspectMode) {
+        case VideoCanvas::Filling : return QRectF(0, 0, winWidth, winHeight);
+        case VideoCanvas::KeepAspect : break;
+        case VideoCanvas::_4x3 : texWidth = 4; texHeight = 4; break;
+        case VideoCanvas::_16x9 : texWidth = 16; texHeight = 9; break;
+    }
+
+    qreal x, y, w, h;
+
+    if(texWidth * winHeight > texHeight * winWidth){
+        w = winWidth;
+        h = texHeight * winWidth / texWidth;
+    }
+    else{
+        w = texWidth * winHeight / texHeight;
+        h = winHeight;
+    }
+    x = (winWidth - w) / 2;
+    y = (winHeight - h) / 2;
+
+    return QRectF(x, y, w, h);
+}
 void VideoCanvasPrivate::_on_playerStateChanged(NekoMediaPlayer::PlaybackState state) {
     switch (state) {
         case NekoMediaPlayer::PlayingState : {
@@ -456,6 +550,10 @@ void VideoCanvasPrivate::_on_playerStateChanged(NekoMediaPlayer::PlaybackState s
             break;
         }
     }
+}
+void VideoCanvasPrivate::_on_SubtitleTextChanged(const QString &subtitle) {
+    subtitleString = subtitle;
+    videoCanvas->update();
 }
 void VideoCanvasPrivate::_on_VideoFrameChanged(const NekoVideoFrame &frame) {
     // Update frame
@@ -891,23 +989,8 @@ void VideoCanvasPrivate::updateGLBuffer() {
         return QPointF(x, y);
     };
 
-    qreal winWidth = videoCanvas->width();
-    qreal winHeight = videoCanvas->height();
 
-    qreal x, y, w, h;
-
-    if(textureWidth * height > textureHeight * width){
-        w = width;
-        h = textureHeight * width / textureWidth;
-    }
-    else{
-        w = textureWidth * height / textureHeight;
-        h = height;
-    }
-    x = (width - w) / 2;
-    y = (height - h) / 2;
-
-    QRectF outRect(x, y, w, h);
+    QRectF outRect = viewportRect();
     auto topLeft = mapPoint(outRect.topLeft());
     auto topRight = mapPoint(outRect.topRight());
     auto bottomLeft = mapPoint(outRect.bottomLeft());
