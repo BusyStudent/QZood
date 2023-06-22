@@ -6,6 +6,8 @@
 #include <QJsonObject>
 #include <QImage>
 
+#define QZOOD_NO_PROTOBUF  
+
 #if !defined(QZOOD_NO_PROTOBUF)
 #include "dm.pb.h"
 #endif
@@ -594,7 +596,7 @@ uint64_t BiliClient::bvidToAvid(const QString &bvid) {
 // BilibiliWrapper
 namespace {
 
-constexpr auto BSourceName = "Bilibili";
+static VideoInterface *staticBInterface = nullptr;
 
 class BEpisode : public Episode {
 public:
@@ -620,16 +622,16 @@ public:
         return r;
     }
     QStringList sourcesList() override {
-        return QStringList(BSourceName);
+        return QStringList(BILIBILI_CLIENT_NAME);
     }
     QStringList danmakuSourceList() override {
-        return QStringList(BSourceName);
+        return QStringList(BILIBILI_CLIENT_NAME);
     }
     QString     recommendedSource() override {
-        return BSourceName;
+        return BILIBILI_CLIENT_NAME;
     }
     NetResult<QString> fetchVideo(const QString &sourceString) override {
-        if (sourceString != BSourceName) {
+        if (sourceString != BILIBILI_CLIENT_NAME) {
             return NetResult<QString>::Alloc().putLater(std::nullopt);
         }
         auto r = NetResult<QString>::Alloc();
@@ -642,11 +644,14 @@ public:
         });
         return r;
     }
-    NetResult<DanmakuList> fetchDanmaku(const QString &sourceString) {
-        if (sourceString != BSourceName) {
+    NetResult<DanmakuList> fetchDanmaku(const QString &sourceString) override {
+        if (sourceString != BILIBILI_CLIENT_NAME) {
             return NetResult<DanmakuList>::Alloc().putLater(std::nullopt);
         }
         return client.fetchDanmaku(data.cid);
+    }
+    VideoInterface *rootInterface() override {
+        return staticBInterface;
     }
 private:
     BiliEpisode data;
@@ -707,6 +712,9 @@ public:
     QString title() override {
         return data.title;
     }
+    VideoInterface *rootInterface() override {
+        return staticBInterface;
+    }
 private:
     BiliBangumi data;
     BiliClient &client;
@@ -756,6 +764,9 @@ public:
         }
         return r;
     }
+    VideoInterface *rootInterface() override {
+        return staticBInterface;
+    }
 private:
     BiliTimelineDay data;
     BiliClient &client;
@@ -767,8 +778,11 @@ private:
 
 class BClient : public VideoInterface {
 public:
+    BClient() {
+        staticBInterface = this;
+    }
     QString name() override {
-        return BSourceName;
+        return BILIBILI_CLIENT_NAME;
     }
     NetResult<BangumiList> searchBangumi(const QString &text) override {
         auto r = NetResult<BangumiList>::Alloc();

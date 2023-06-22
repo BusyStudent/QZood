@@ -11,6 +11,7 @@ class QNetworkReply;
 class Episode;
 class Bangumi;
 class TimelineItem;
+class VideoInterface;
 
 using EpisodePtr = RefPtr<Episode>;
 using BangumiPtr = RefPtr<Bangumi>;
@@ -67,6 +68,13 @@ class Episode : public DynRefable {
          * @return NetResult<DanmakuList> 
          */
         virtual NetResult<DanmakuList> fetchDanmaku(const QString &what);
+
+        /**
+         * @brief Get the name belong to the interface
+         * 
+         * @return QString 
+         */
+        virtual VideoInterface *rootInterface() = 0;
 };
 
 class Bangumi : public DynRefable {
@@ -101,6 +109,13 @@ class Bangumi : public DynRefable {
          * @return NetResult<QImage> 
          */
         virtual NetResult<QImage> fetchCover() = 0;
+
+        /**
+         * @brief Get the name belong to the interface
+         * 
+         * @return QString 
+         */
+        virtual VideoInterface *rootInterface() = 0;
 };
 
 class TimelineItem : public DynRefable {
@@ -123,6 +138,13 @@ class TimelineItem : public DynRefable {
          * @return QList<RefPtr<Bangumi>> 
          */
         virtual NetResult<BangumiList> fetchBangumiList() = 0;
+
+        /**
+         * @brief Get the name belong to the interface
+         * 
+         * @return QString 
+         */
+        virtual VideoInterface *rootInterface() = 0;
 };
 
 /**

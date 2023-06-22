@@ -64,6 +64,9 @@ public:
         auto tools = new YhdmVideoSpider(result, _url);
         return result;
     }
+    VideoInterface *rootInterface() override {
+        return &client;
+    }
 
 
     YhdmClient &client;
@@ -122,6 +125,9 @@ public:
             list.push_back(std::make_shared<YhdmEpisode>(client, title, url));
         }
         return NetResult<EpisodeList>::AllocWithResult(list);
+    }
+    VideoInterface *rootInterface() override {
+        return &client;
     }
 
     YhdmClient &client;
@@ -220,7 +226,9 @@ public:
         }
         return r;
     }
-
+    VideoInterface *rootInterface() override {
+        return &client;
+    }
 
     YhdmClient &client;
     QStringList titles;

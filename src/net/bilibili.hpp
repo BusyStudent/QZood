@@ -7,6 +7,8 @@
 #include "client.hpp"
 #include "../danmaku.hpp"
 
+#define BILIBILI_CLIENT_NAME "Bilibili"
+
 class BiliVideoInfo final {
     public:
         QString bvid;
