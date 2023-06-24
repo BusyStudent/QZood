@@ -7,123 +7,203 @@
 #include <QComboBox>
 #include <QAbstractItemView>
 #include <QScrollBar>
+#include <QResizeEvent>
+#include <QStackedWidget>
+#include <QComboBox>
+#include <QCompleter>
+#include <QLineEdit>
 
+#include "homeWidget.hpp"
+#include "localWidget.hpp"
 #include "ui_zood.h"
 #include "homeWidget.hpp"
+#include "../../net/client.hpp"
+#include "../../BLL/data/videoSourceBLL.hpp"
 
-Zood::Zood(QWidget *parent) : CustomizeTitleWidget(parent), ui(new Ui::Zood()) {
-    // 得到设计器生成的类指针。
-    // 设置设计器设计的UI布局。
-    ui->setupUi(this);
+class ZoodPrivate {
+public:
+    ZoodPrivate(Zood* parent) : self(parent), ui(new Ui::Zood()) { }
+
+    void setupUi() {
+        ui->setupUi(self);
+        homePage = new HomeWidget();
+        ui->centerWidget->addWidget(homePage);
+
+        // 定义搜索框的行为。
+        // --定义活动按钮
+        searchEdit = new QLineEdit();
+        searchCompleter = new QCompleter();
+        searchEdit->setClearButtonEnabled(true);//添加清除按钮
+        searchEdit->addAction(ui->actionSearch, QLineEdit::ActionPosition::LeadingPosition);
+
+        ui->searchBox->installEventFilter(self);
+        ui->searchBox->setLineEdit(searchEdit);
+        ui->searchBox->setCompleter(searchCompleter);
+        
+        auto string_list_model = new QStringListModel();
+        searchCompleter->setModel(string_list_model);
+        searchCompleter->setCaseSensitivity(Qt::CaseSensitive);
+        searchCompleter->setFilterMode(Qt::MatchRecursive);
+        searchCompleter->setCompletionMode(QCompleter::CompletionMode::UnfilteredPopupCompletion);
+        auto searchCompleterPopupWidget = searchCompleter->popup();
+        searchCompleterPopupWidget->setStyleSheet(
+            R"(QAbstractItemView{
+                border:1px solid #F5F5F5;
+                border-radius: 15px;
+                padding: 1px;
+                outline: 0px;}
+            QAbstractItemView::item{
+                border: 1px solid white;
+                border-radius: 11px;
+                padding-top: 2px;
+                padding-bottom: 2px;}
+            QAbstractItemView::item:hover{
+                background-color:lightGrey;}
+            QAbstractItemView::item:selected{
+                background-color:lightGrey;
+                border:1px solid lightGrey;
+                show-decoration-selected: 0;
+                border-radius: 11px;
+                color: black;})"
+            );
+        searchCompleterPopupWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        searchCompleterPopupWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    }
+
+    void connect() {
+        connectTitleBar();
+        connectSearch();
+    }
+
+    void refresh(HomeWidget::DisplayArea area) {
+        VideoSourceBLL &videoSource = VideoSourceBLL::instance();
+        // TODO(llhsdmd) : 有问题，没有更新出数据
+        videoSource.searchVideoTimeline((TimeWeek)area, self, [this, &videoSource, area](const Result<Timeline>& timeline){
+            if (timeline.has_value()) {
+                videoSource.searchBangumiFromTimeline(timeline.value(), self, [this, area] (const Result<BangumiList>& bangumiList) {
+                    if (!bangumiList.has_value()) {
+                        return;
+                    }
+                    auto bangumis = bangumiList.value();
+                    auto video_views = homePage->addItems(area, bangumis.size());
+                    for (int i = 0; i < video_views.size(); ++i) {
+                        video_views[i]->setVideoId(bangumis[i]->title());
+                        video_views[i]->setTitle(bangumis[i]->title());
+                        video_views[i]->setExtraInformation(bangumis[i]->description());
+                        video_views[i]->setSourceInformation(bangumis[i]->availableSource().join("; "));
+                        video_views[i]->setImage(QImage(":/icons/loading_bar.png"));
+                        bangumis[i]->fetchCover().then(video_views[i], [video_view = video_views[i]](const Result<QImage>& img) {
+                            if (img.has_value()) {
+                                video_view->setImage(img.value());
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+private:
+    void connectTitleBar() {
+        // 连接默认窗口按钮的功能
+        QWidget::connect(ui->minimizeButton, &QToolButton::clicked, self, [this](){
+            self->showMinimized();
+        });
+        QWidget::connect(ui->maximizeButton, &QToolButton::clicked, self, [this](){
+            if (self->isMaximized()) {
+                self->showNormal();
+            } else {
+                self->showMaximized();
+            }
+        });
+        QWidget::connect(ui->closeButton, &QToolButton::clicked, self, [this](){
+            self->close();
+        });
+        QWidget::connect(ui->homeButton, &QToolButton::clicked, self, [this](){
+            ui->centerWidget->setCurrentWidget(homePage);
+        });
+    }
+    void connectSearch() {
+        QWidget::connect(ui->actionSearch, &QAction::triggered, searchEdit, [this](bool checked) {
+            // TODO(llhsdmd@qq.com): 单击搜索按钮，进入搜索结果界面并加载搜索结果。
+        });
+        QWidget::connect(searchEdit, &QLineEdit::textEdited, self, [this](const QString &text) {
+            if (text.isEmpty()) {
+            } else {
+                ui->searchBox->clear();
+                ui->searchBox->addItem(text);
+                self->editTextChanged(text);
+            }
+        });
+    }
+
+public:
+    Ui::Zood *ui = nullptr;
+
+    HomeWidget *homePage;
+    QLineEdit* searchEdit = nullptr;
+    QCompleter* searchCompleter = nullptr;
+
+    QList<VideoInterface*> videoInterface;
+
+private:
+    Zood *self = nullptr;
+};
+
+Zood::Zood(QWidget *parent) : CustomizeTitleWidget(parent), d(new ZoodPrivate(this)) {
     setWindowTitle("QZood");
-    
-    homePage = new HomeWidget();
-    ui->centerWidget->addWidget(homePage);
 
-    connect(ui->homeButton, &QToolButton::clicked, this, [this](){
-        ui->centerWidget->setCurrentWidget(homePage);
-    });
+    d->setupUi();
+    d->connect();
+}
+HomeWidget* Zood::homeWidget() {
+    return d->homePage;
+}
+QLineEdit* Zood::searchBox() {
+    return d->searchEdit;
+}
 
-    // 连接默认窗口按钮的功能
-    connect(ui->minimizeButton, &QToolButton::clicked, this, [this](){
-        showMinimized();
-    });
-    connect(ui->maximizeButton, &QToolButton::clicked, this, [this](){
-        if (isMaximized()) {
-            showNormal();
-        } else {
-            showMaximized();
-        }
-    });
-    connect(ui->closeButton, &QToolButton::clicked, this, [this](){
-        close();
-    });
-
-    // 定义搜索框的行为。
-    // --定义活动按钮
-    searchEdit = new QLineEdit();
-    searchCompleter = new QCompleter();
-
-    searchEdit->setClearButtonEnabled(true);//添加清除按钮
-
-    searchEdit->addAction(ui->actionSearch, QLineEdit::ActionPosition::LeadingPosition);
-
-    connect(ui->actionSearch, &QAction::triggered, searchEdit, [this](bool checked) {
-        // TODO(llhsdmd@qq.com): 单击搜索按钮，进入搜索结果界面并加载搜索结果。
-    });
-    connect(searchEdit, &QLineEdit::textEdited, this, [this](const QString &text) {
-        if (text.isEmpty()) {
-        } else {
-            ui->searchBox->clear();
-            ui->searchBox->addItem(text);
-            editTextChanged(text);
-        }
-    });
-
-    ui->searchBox->installEventFilter(this);
-    ui->searchBox->setLineEdit(searchEdit);
-    ui->searchBox->setCompleter(searchCompleter);
-    
-    auto string_list_model = new QStringListModel();
-    searchCompleter->setModel(string_list_model);
-    searchCompleter->setCaseSensitivity(Qt::CaseSensitive);
-    searchCompleter->setFilterMode(Qt::MatchRecursive);
-    searchCompleter->setCompletionMode(QCompleter::CompletionMode::UnfilteredPopupCompletion);
-    auto searchCompleterPopupWidget = searchCompleter->popup();
-    searchCompleterPopupWidget->setStyleSheet(
-        R"(QAbstractItemView{
-            border:1px solid #F5F5F5;
-            border-radius: 15px;
-            padding: 1px;
-            outline: 0px;}
-        QAbstractItemView::item{
-            border: 1px solid white;
-            border-radius: 11px;
-            padding-top: 2px;
-            padding-bottom: 2px;}
-        QAbstractItemView::item:hover{
-            background-color:lightGrey;}
-        QAbstractItemView::item:selected{
-            background-color:lightGrey;
-            border:1px solid lightGrey;
-            show-decoration-selected: 0;
-            border-radius: 11px;
-            color: black;})"
-        );
-    searchCompleterPopupWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    searchCompleterPopupWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+void Zood::refreshAll() {
+    d->refresh(HomeWidget::Monday);
+    d->refresh(HomeWidget::Tuesday);
+    d->refresh(HomeWidget::Wednesday);
+    d->refresh(HomeWidget::Thursday);
+    d->refresh(HomeWidget::Friday);
+    d->refresh(HomeWidget::Saturday);
+    d->refresh(HomeWidget::Sunday);
 }
 
 void Zood::setPredictStringList(QStringList indicator) {
-    auto model = static_cast<QStringListModel *>(searchCompleter->model());
+    auto model = static_cast<QStringListModel *>(d->searchCompleter->model());
 
     model->removeRows(0, model->rowCount());
     model->setStringList(indicator);
 
-    ui->searchBox->addItems(indicator);
-    auto view = searchCompleter->popup();
+    d->ui->searchBox->addItems(indicator);
+    auto view = d->searchCompleter->popup();
     view->move(view->pos() + QPoint(0, 5));
 }
 
 void Zood::showEvent(QShowEvent *event) {
-    createShadow(ui->containerWidget);
+    createShadow(d->ui->containerWidget);
+   refreshAll();
 }
 
 void Zood::resizeEvent(QResizeEvent *event) {
     static bool is_maximized = false;
 	if (isMaximized() && !is_maximized) {
         is_maximized = true;
-		ui->maximizeButton->setIcon(QIcon(":/icons/minimize.png"));
+		d->ui->maximizeButton->setIcon(QIcon(":/icons/minimize.png"));
 	} else if (is_maximized) {
         is_maximized = false;
-		ui->maximizeButton->setIcon(QIcon(":/icons/maximize.png"));
+		d->ui->maximizeButton->setIcon(QIcon(":/icons/maximize.png"));
 	}
 
     CustomizeTitleWidget::resizeEvent(event);
 }
 
 void Zood::mouseMoveEvent(QMouseEvent* event) {
-    if (movingStatus() && ui->topBarWidget->geometry().contains(event->pos())) {
+    if (movingStatus() && d->ui->topBarWidget->geometry().contains(event->pos())) {
         window()->move(event->globalPos() - diff_pos);
         event->accept();
     }
@@ -132,12 +212,12 @@ void Zood::mouseMoveEvent(QMouseEvent* event) {
 }
 
 bool Zood::eventFilter(QObject *obj, QEvent *e) {
-    if (obj == ui->searchBox) {
+    if (obj == d->ui->searchBox) {
         if (e->type() == QEvent::FocusIn) {
-            QPropertyAnimation *animation = new QPropertyAnimation(ui->searchBox, "geometry");
+            QPropertyAnimation *animation = new QPropertyAnimation(d->ui->searchBox, "geometry");
             animation->setDuration(500); // 设置动画持续时间为0.5秒
-            auto rect = ui->searchBox->geometry();
-            auto container_rect = ui->searchBoxLayout->geometry();
+            auto rect = d->ui->searchBox->geometry();
+            auto container_rect = d->ui->searchBoxLayout->geometry();
             animation->setStartValue(rect); // 设置起始值为左对齐
             animation->setEndValue(QRect{(container_rect.width() - rect.width()) / 2, rect.y(), rect.width(), rect.height()}); // 设置结束值为居中对齐
             animation->setEasingCurve(QEasingCurve::InOutQuad); // 设置缓动曲线为InOutQuad
@@ -145,10 +225,10 @@ bool Zood::eventFilter(QObject *obj, QEvent *e) {
             // 启动动画
             animation->start();
         } else if (e->type() == QEvent::FocusOut) {
-            QPropertyAnimation *animation = new QPropertyAnimation(ui->searchBox, "geometry");
+            QPropertyAnimation *animation = new QPropertyAnimation(d->ui->searchBox, "geometry");
             animation->setDuration(500); // 设置动画持续时间为1秒
-            auto rect = ui->searchBox->geometry();
-            auto container_rect = ui->searchBoxContainer->geometry();
+            auto rect = d->ui->searchBox->geometry();
+            auto container_rect = d->ui->searchBoxContainer->geometry();
             animation->setStartValue(rect); // 设置起始值为左对齐
             animation->setEndValue(QRect{(container_rect.width() - rect.width()), rect.y(), rect.width(), rect.height()}); // 设置结束值为居中对齐
             animation->setEasingCurve(QEasingCurve::InOutQuad); // 设置缓动曲线为InOutQuad

@@ -4,10 +4,53 @@
 #include <QString>
 #include <QElapsedTimer>
 
-enum TestType {
+#include <QDebug>
+
+enum class TestType {
     WIDGET,
     WIDGET_W,
     CMD
+};
+
+enum class LogType {
+    ABANDON,
+    INFO,
+    WARNING,
+    FATAL,
+};
+
+void ZoodRegisterTest(const QString &mudule_name, const QString &name,const TestType type, const std::function<void*(const int id)> &task);
+void ZoodLogString(const QString &text);
+QMap<int, bool>& TestFlags();
+
+class MyDebug {
+    public:
+        MyDebug(const LogType& type) : type(type) {
+            new (&buf) QDebug(&msg);
+        }
+        ~MyDebug() {
+            ((QDebug*)&buf)->~QDebug();
+            if (!msg.isEmpty()) {
+                switch (type)
+                {
+                case LogType::ABANDON:
+                    break;
+                case LogType::INFO:
+                case LogType::WARNING:
+                case LogType::FATAL:
+                    ZoodLogString(msg);
+                }
+            }
+        }
+        template <typename T>
+        MyDebug &operator <<(T &&arg) {
+            ((QDebug*)&buf)->operator <<(std::forward<T>(arg));
+            return *this;
+        }
+    private:
+        LogType type;
+        QString msg;
+        uint8_t buf[sizeof(QDebug)];
 };
 
 #define TestFlag(id) TestFlags()[id]
@@ -68,47 +111,47 @@ enum TestType {
     LOG_VAL(val1); LOG_VAL(val2);                                                                            \
     ZoodLogString(QString("%1 != %2 and the diff is : %3").arg(                                              \
             #val1, #val2, QString::number((val2) - (val1))));                                                \
-} void(0)
+} (((val1) == (val2)) ? MyDebug(LogType::ABANDON) : MyDebug(LogType::INFO))
 
 #define EXPECT_NE(val1, val2) if (!((val1) != (val2))) {                                                     \
     TestFlag(id) = false;                                                                                    \
     LOG_VAL(val1); LOG_VAL(val2);                                                                            \
     ZoodLogString(QString("%1 == %2").arg(#val1, #val2));                                                    \
-} void(0)
+} (((val1) != (val2)) ? MyDebug(LogType::ABANDON) : MyDebug(LogType::INFO))
 
 #define EXPECT_LT(val1, val2) if (!((val1) < (val2))) {                                                      \
     TestFlag(id) = false;                                                                                    \
     LOG_VAL(val1); LOG_VAL(val2);                                                                            \
     ZoodLogString(QString("%1 >= %2").arg(#val1, #val2));                                                    \
-} void(0)
+} (((val1) < (val2)) ? MyDebug(LogType::ABANDON) : MyDebug(LogType::INFO))
 
 #define EXPECT_LE(val1, val2) if (!((val1) <= (val2))) {                                                     \
     TestFlag(id) = false;                                                                                    \
     LOG_VAL(val1); LOG_VAL(val2);                                                                            \
     ZoodLogString(QString("%1 > %2").arg(#val1, #val2));                                                     \
-} void(0)
+} (((val1) <= (val2)) ? MyDebug(LogType::ABANDON) : MyDebug(LogType::INFO))
 
 #define EXPECT_GT(val1, val2) if (!((val1) > (val2))) {                                                      \
     TestFlag(id) = false;                                                                                    \
     LOG_VAL(val1); LOG_VAL(val2);                                                                            \
     ZoodLogString(QString("%1 <= %2").arg(#val1, #val2));                                                    \
-} void(0)
+} (((val1) > (val2)) ? MyDebug(LogType::ABANDON) : MyDebug(LogType::INFO))
 
 #define EXPECT_GE(val1, val2) if (!((val1) >= (val2))) {                                                     \
     TestFlag(id) = false;                                                                                    \
     LOG_VAL(val1); LOG_VAL(val2);                                                                            \
     ZoodLogString(QString("%1 < %2").arg(#val1, #val2));                                                     \
-} void(0)
+} (((val1) >= (val2)) ? MyDebug(LogType::ABANDON) : MyDebug(LogType::INFO))
 
 #define EXPECT_TRUE(val1) if (!(val1)) {                                                                     \
     TestFlag(id) = false;                                                                                    \
     ZoodLogString(QString("%1 : %2").arg(#val1, "False"));                                                   \
-} void(0)
+} ((val1) ? MyDebug(LogType::ABANDON) : MyDebug(LogType::INFO))
 
 #define EXPECT_FALSE(val1) if ((val1)) {                                                                     \
     TestFlag(id) = false;                                                                                    \
     ZoodLogString(QString("%1 : %2").arg(#val1, "True"));                                                    \
-} void(0)
+} ((!(val1)) ? MyDebug(LogType::ABANDON) : MyDebug(LogType::INFO))
 
 
 #define ASSERT_EQ(val1, val2) if (!((val1) == (val2))) {                                                     \
@@ -165,7 +208,3 @@ enum TestType {
     ZoodLogString(QString("%1 : %2").arg(#val1, "True"));                                                    \
     return nullptr;                                                                                          \
 } void(0)
-
-void ZoodRegisterTest(const QString &mudule_name, const QString &name,const TestType type, const std::function<void*(const int id)> &task);
-void ZoodLogString(const QString &text);
-QMap<int, bool>& TestFlags();

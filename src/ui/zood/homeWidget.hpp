@@ -12,16 +12,16 @@ class HomeView;
 class HomeWidget : public QScrollArea {
     Q_OBJECT
     public:
-    enum DisplayArea {
-        New,
-        Monday,
-        Tuesday,
-        Wednesday,
-        Thursday,
-        Friday,
-        Saturday,
-        Sunday,
-        Recommend,
+    enum DisplayArea : int {
+        Monday = 1,
+        Tuesday = 2,
+        Wednesday = 3,
+        Thursday = 4,
+        Friday = 5,
+        Saturday = 6,
+        Sunday = 7,
+        Recommend = 8,
+        New = 9,
     };
     public:
         HomeWidget(QWidget* parent = nullptr);

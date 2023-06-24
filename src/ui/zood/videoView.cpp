@@ -50,7 +50,7 @@ void VideoView::setImage(const QImage& image, const QString& tooltip) {
     ui->videoIcon->setToolTip(tooltip);
 }
 
-void VideoView::setVideoId(const int videoId) {
+void VideoView::setVideoId(const QString videoId) {
     this->videoId = videoId;
 }
 

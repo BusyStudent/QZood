@@ -1,27 +1,23 @@
 #pragma once
 
 #include "../common/customizeTitleWidget.hpp"
-#include "homeWidget.hpp"
-#include "localWidget.hpp"
 
-#include <QResizeEvent>
-#include <QStackedWidget>
-#include <QComboBox>
-#include <QCompleter>
-#include <QLineEdit>
 
 namespace Ui {
 class Zood;
 }
 
+class ZoodPrivate;
+class HomeWidget;
+class QLineEdit;
+
 class Zood : public CustomizeTitleWidget {
     Q_OBJECT
     public:
         Zood(QWidget *parent = nullptr);
-        inline const HomeWidget* homeWidget() const { return homePage; }
-        inline HomeWidget* homeWidget() { return homePage; }
-        inline const QLineEdit* searchBox() const { return searchEdit; }
-        inline QLineEdit* searchBox() { return searchEdit; }
+        HomeWidget* homeWidget();
+        QLineEdit* searchBox();
+        void refreshAll();
 
     public:
         void resizeEvent(QResizeEvent *event) override;
@@ -34,8 +30,5 @@ class Zood : public CustomizeTitleWidget {
         void editTextChanged(const QString &);
 
     private:
-        Ui::Zood* ui = nullptr;
-        HomeWidget *homePage;
-        QLineEdit* searchEdit = nullptr;
-        QCompleter* searchCompleter = nullptr;
+        ZoodPrivate* d;
 };

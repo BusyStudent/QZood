@@ -9,6 +9,6 @@ end
 target("BLL")
     add_rules("qt.static")
     add_frameworks("QtCore", "QtGui", "QtWidgets")
-    add_frameworks("QtOpenGL", "QtOpenGLWidgets")
+    add_frameworks("QtOpenGL", "QtOpenGLWidgets", "QtNetwork")
     add_files("data/*.cpp")
 target_end()

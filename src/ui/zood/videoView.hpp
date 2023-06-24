@@ -3,7 +3,7 @@
 #include <QWidget>
 
 struct videoData {
-    int videoId;
+    QString videoId;
     QString videoTitle;
     QString videoExtraInformation;
     QString videoSourceInformation;
@@ -25,18 +25,18 @@ class VideoView : public QWidget {
         void setTitle(const QString& str, const QString& tooltip = QString());
         void setExtraInformation(const QString& str, const QString& tooltip = QString());
         void setSourceInformation(const QString& str, const QString& tooltip = QString());
-        void setVideoId(const int videoId);
+        void setVideoId(const QString videoId);
     
     Q_SIGNALS:
-        void clickedImage(const int videoId);
-        void clickedTitle(const int videoId, const QString& title);
-        void clickedExtraInformation(const int videoId, const QString& extraInformation);
-        void clickedSourceInformation(const int videoId, const QString& sourceInformation);
+        void clickedImage(const QString videoId);
+        void clickedTitle(const QString videoId, const QString& title);
+        void clickedExtraInformation(const QString videoId, const QString& extraInformation);
+        void clickedSourceInformation(const QString videoId, const QString& sourceInformation);
 
     public:
         bool eventFilter(QObject* obj, QEvent *event) override;
 
     private:
         Ui::VideoView *ui;
-        int videoId = -1;
+        QString videoId = "";
 };
