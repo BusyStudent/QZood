@@ -14,7 +14,16 @@
    <string>TabWidget</string>
   </property>
   <property name="currentIndex">
-   <number>1</number>
+   <number>2</number>
+  </property>
+  <property name="tabsClosable">
+   <bool>true</bool>
+  </property>
+  <property name="movable">
+   <bool>true</bool>
+  </property>
+  <property name="tabBarAutoHide">
+   <bool>false</bool>
   </property>
   <widget class="QWidget" name="tab">
    <attribute name="title">
@@ -85,6 +94,63 @@
      <widget class="QListWidget" name="searchListWidget">
       <property name="viewMode">
        <enum>QListView::ListMode</enum>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWidget" name="tab_3">
+   <attribute name="title">
+    <string>Play</string>
+   </attribute>
+   <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="10,0">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayout_3" stretch="1,0">
+      <item>
+       <widget class="QWidget" name="canvasWidget" native="true"/>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_2">
+        <item>
+         <widget class="QToolButton" name="playButton">
+          <property name="text">
+           <string>Play</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QSlider" name="progressSlider">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="sourcesBox"/>
+        </item>
+        <item>
+         <widget class="QComboBox" name="danmakusBox"/>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QListWidget" name="episodeWidget">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>0</height>
+       </size>
       </property>
      </widget>
     </item>

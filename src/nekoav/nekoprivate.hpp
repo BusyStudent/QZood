@@ -7,8 +7,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <mutex>
-
-#include <queue>
+#include <deque>
 
 extern "C" {
     #include <libavformat/avformat.h>
@@ -25,6 +24,7 @@ namespace NekoAV {
 inline static auto EofPacket = nullptr;
 inline static auto FlushPacket = reinterpret_cast<AVPacket*>(0x01);
 inline static auto StopPacket = reinterpret_cast<AVPacket*>(0x02);
+inline static auto SyncPacket = reinterpret_cast<AVPacket*>(0x03);
 inline static auto AVSyncThreshold = 0.01;
 inline static auto AVNoSyncThreshold = 10.0;
 inline static auto AudioDiffAvgNB = 20;
@@ -120,11 +120,12 @@ class PacketQueue final {
 
         void flush();
         void put(AVPacket *packet);
+        void unget(AVPacket *packet);
         auto get(bool blocking = true) -> AVPacket *;
         size_t size() const;
         int64_t duration() const;
     private:
-        std::queue<AVPacket*> packets;
+        std::deque<AVPacket*>   packets;
         std::condition_variable cond;
         std::mutex              condMutex;
         int64_t                 packetsDuration = 0; //< Sums of packet duration
@@ -308,6 +309,7 @@ class DemuxerThread final : public QThread {
          * 
          * @return qreal 
          */
+        qreal clock() const;
         qreal position() const;
         qreal bufferedDuration() const;
         float bufferProgress() const;
@@ -338,6 +340,7 @@ class DemuxerThread final : public QThread {
         bool isPictureStream(int idx) const;
         void doUpdateClock();
         bool doSeek();
+        int  interruptHandler();
 
         AVIOContext     *ioCtxt = nullptr; //< Custom IO Context
         AVFormatContext *formatCtxt = nullptr; //< Container of format context
@@ -354,6 +357,9 @@ class DemuxerThread final : public QThread {
         int                 errcode = 0;
         bool                quit = false;
         bool                hasSeek = false;
+        bool                isReading = false;
+        bool                wakeupOnce = false; //< When call wakeup, set it to true, and clear in InterruptHandler
+        bool                afterSeek = false;
         qreal               seekPosition = 0;
         qreal               curPosition = 0;
 
@@ -435,7 +441,6 @@ class MediaPlayerPrivate final : public QObject {
         void demuxerPositionChanged(qreal pos);
         void demuxerMediaLoaded();
         void updateMediaInfo();
-        void audioDeviceLost();
     friend class MediaPlayer;
 };
 
@@ -466,7 +471,7 @@ inline qreal   FFInt64ToDouble(int64_t t) noexcept {
     return t / 1000000.0;
 }
 inline bool    IsSpecialPacket(AVPacket *pak) noexcept {
-    return pak == EofPacket || pak == FlushPacket || pak == StopPacket;
+    return pak == EofPacket || pak == FlushPacket || pak == StopPacket || pak == SyncPacket;
 }
 inline QString FFErrorToString(int errcode) {
     char buffer[AV_ERROR_MAX_STRING_SIZE];

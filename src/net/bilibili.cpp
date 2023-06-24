@@ -605,6 +605,12 @@ public:
     QString title() override {
         return data.title;
     }
+    QString indexTitle() override {
+        return data.title;
+    }
+    QString longTitle() override {
+        return data.longTitle;
+    }
     NetResult<QImage> fetchCover() override {
         auto r = NetResult<QImage>::Alloc();
         client.fetchFile(data.cover).then([r](const Result<QByteArray> &b) mutable {
@@ -622,16 +628,16 @@ public:
         return r;
     }
     QStringList sourcesList() override {
-        return QStringList(BILIBILI_CLIENT_NAME);
+        return QStringList(" ");
     }
     QStringList danmakuSourceList() override {
-        return QStringList(BILIBILI_CLIENT_NAME);
+        return QStringList(" ");
     }
     QString     recommendedSource() override {
-        return BILIBILI_CLIENT_NAME;
+        return " ";
     }
     NetResult<QString> fetchVideo(const QString &sourceString) override {
-        if (sourceString != BILIBILI_CLIENT_NAME) {
+        if (sourceString != " ") {
             return NetResult<QString>::Alloc().putLater(std::nullopt);
         }
         auto r = NetResult<QString>::Alloc();
@@ -645,7 +651,7 @@ public:
         return r;
     }
     NetResult<DanmakuList> fetchDanmaku(const QString &sourceString) override {
-        if (sourceString != BILIBILI_CLIENT_NAME) {
+        if (sourceString != " ") {
             return NetResult<DanmakuList>::Alloc().putLater(std::nullopt);
         }
         return client.fetchDanmaku(data.cid);
@@ -703,9 +709,9 @@ public:
         });
         return r;
     }
-    // QStringList availableSource() override {
-    //     return QStringList(BSourceName);
-    // }
+    QStringList availableSource() override {
+        return QStringList(BILIBILI_CLIENT_NAME);
+    }
     QString description() override {
         return data.evaluate;
     }

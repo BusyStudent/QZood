@@ -157,6 +157,7 @@ class NEKO_API VideoSink  : public QObject {
         void videoFrameChanged(const VideoFrame &frame);
         void videoSizeChanged();
         void subtitleTextChanged(const QString &);
+        void aboutToDestroy();
     private:
         QString    subtitle;
         VideoFrame frame;
@@ -192,7 +193,7 @@ class NEKO_API AudioOutput : public QObject {
     Q_SIGNALS:
         void volumeChanged(float volume);
         void mutedChanged(bool muted);
-        void deviceLost();
+        void aboutToDestroy();
     private:
         QScopedPointer<AudioOutputPrivate> d;
 };

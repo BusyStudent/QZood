@@ -25,15 +25,16 @@ public:
     }
 
     void interceptRequest(QWebEngineUrlRequestInfo &info) override {
-        if (info.requestUrl().toString().endsWith(".m3u8")) {
+        auto url = info.requestUrl().toString();
+        if (url.endsWith(".m3u8") || url.endsWith(".mp4")) {
             // Got
             resultUrl = info.requestUrl().toString();
             page->triggerAction(QWebEnginePage::Stop);
             page->load(QUrl("about:blank"));
             page.reset();
 
-            result.putLater(resultUrl);
             deleteLater();
+            result.putLater(resultUrl);
         }
         qDebug() << "YhdmVideoSpider " << info.requestUrl();
     }
@@ -48,6 +49,14 @@ public:
 class YhdmEpisode : public Episode {
 public:
     QString title() override {
+        return _title;
+    }
+    QString indexTitle() override {
+        auto u8 = _title.toUtf8();
+        int index;
+        if (::sscanf(u8.constData(), u8"第%d集", &index) == 1) {
+            return QString::number(index);
+        }
         return _title;
     }
     QStringList sourcesList() override {
@@ -81,9 +90,9 @@ public:
 
 class YhdmBangumi : public Bangumi {
 public:
-    // QStringList availableSource() override {
-    //     return QStringList(YHDM_CLIENT_NAME);
-    // }
+    QStringList availableSource() override {
+        return QStringList(YHDM_CLIENT_NAME);
+    }
     QString     description() override {
         return _description;
     }

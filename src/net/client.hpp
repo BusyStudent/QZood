@@ -29,6 +29,18 @@ class Episode : public DynRefable {
          */
         virtual QString title() = 0;
         /**
+         * @brief Get title for index the episode
+         * 
+         * @return QString 
+         */
+        virtual QString indexTitle() = 0;
+        /**
+         * @brief Get the long title of the episode
+         * 
+         * @return QString 
+         */
+        virtual QString longTitle();
+        /**
          * @brief Get the cover of the episode
          * 
          * @return NetResult<QImage> 
@@ -90,7 +102,7 @@ class Bangumi : public DynRefable {
          * 
          * @return QStringList 
          */
-        // virtual QStringList availableSource() = 0;
+        virtual QStringList availableSource() = 0;
         /**
          * @brief Get description of the bangumi, probably be null string
          * 
@@ -172,6 +184,9 @@ class VideoInterface : public QObject {
 };
 
 // --- IMPLEMENTATION
+inline QString Episode::longTitle() {
+    return QString();
+}
 inline QString Episode::recommendedSource() {
     return QString();
 }

@@ -240,9 +240,9 @@ void VideoCanvasPrivate::paint(QPainter &painter) {
     paintDanmaku(painter);
 
     // Paint the subtitles
-    if (!subtitleString.isNull()) {
+    if (hasSubtitle) {
         // Calc position
-        auto textSize = QFontMetricsF(subtitleFont).size(Qt::TextSingleLine, subtitleString);
+        auto textSize = subtitleText.size();
 
         qreal x = videoCanvas->width() / 2.0 - textSize.width() / 2.0;
         qreal y = videoCanvas->height() - textSize.height();
@@ -252,10 +252,10 @@ void VideoCanvasPrivate::paint(QPainter &painter) {
         painter.setFont(subtitleFont);
 
         painter.setPen(subtitleOutlineColor);
-        painter.drawText(x + 1, y + 1, subtitleString);
+        painter.drawStaticText(x + 1, y + 1, subtitleText);
 
         painter.setPen(subtitleColor);
-        painter.drawText(x, y, subtitleString);
+        painter.drawStaticText(x, y, subtitleText);
         // painter.setPen(subtitleOutlineColor);
         // painter.drawPath(subtitlePath);
         painter.restore();
@@ -552,7 +552,8 @@ void VideoCanvasPrivate::_on_playerStateChanged(NekoMediaPlayer::PlaybackState s
     }
 }
 void VideoCanvasPrivate::_on_SubtitleTextChanged(const QString &subtitle) {
-    subtitleString = subtitle;
+    subtitleText.setText(subtitle);
+    hasSubtitle = !subtitle.isEmpty();
     videoCanvas->update();
 }
 void VideoCanvasPrivate::_on_VideoFrameChanged(const NekoVideoFrame &frame) {

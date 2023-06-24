@@ -54,11 +54,12 @@ class VideoCanvasPrivate final : public QObject, public QOpenGLFunctions_3_3_Cor
 
         QImage              image;
 
-        QString             subtitleString;
+        QStaticText         subtitleText;
         QFont               subtitleFont = QFont("黑体", 40);
         qreal               subtitleOpacity = 1.0f;
         QColor              subtitleColor = Qt::white;
         QColor              subtitleOutlineColor = Qt::gray;
+        bool                hasSubtitle = false;
 
         // Danmakus
         QFont               danmakuFont = QFont("黑体");

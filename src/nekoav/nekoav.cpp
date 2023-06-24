@@ -17,7 +17,16 @@ PacketQueue::~PacketQueue() {
 
 void PacketQueue::put(AVPacket *packet) {
     std::lock_guard locker(mutex);
-    packets.push(packet);
+    packets.push_back(packet);
+    // Sums packet to let us known the buffered video
+    if (!IsSpecialPacket(packet)) {
+        packetsDuration += packet->duration;
+    }
+    cond.notify_one();
+}
+void PacketQueue::unget(AVPacket *packet) {
+    std::lock_guard locker(mutex);
+    packets.push_front(packet);
     // Sums packet to let us known the buffered video
     if (!IsSpecialPacket(packet)) {
         packetsDuration += packet->duration;
@@ -31,7 +40,7 @@ void PacketQueue::flush() {
         if (!IsSpecialPacket(p)) {
             av_packet_free(&p);
         }
-        packets.pop();
+        packets.pop_front();
     }
     packetsDuration = 0;
 }
@@ -64,7 +73,7 @@ AVPacket *PacketQueue::get(bool block) {
         mutex.lock();
     }
     ret = packets.front();
-    packets.pop();
+    packets.pop_front();
     if (!IsSpecialPacket(ret)) {
         packetsDuration -= ret->duration;
     }
@@ -428,7 +437,7 @@ void VideoThread::run() {
         }
         if (packet == FlushPacket) {
             avcodec_flush_buffers(codecCtxt);
-            
+
             // BTK_LOG(BTK_RED("[VideoThread] ") "Got flush\n");
             continue;
         }
@@ -453,7 +462,7 @@ void VideoThread::run() {
         // TODO : Add sws_scale_duration to adjust the time
         // Sync
         double currentFramePts = srcFrame->pts * av_q2d(stream->time_base);
-        double masterClock = demuxerThread->position();
+        double masterClock = demuxerThread->clock();
         double diff = masterClock - videoClock - swsScaleDuration - videoDecodeDuration;
 
         videoClock = currentFramePts;
@@ -708,14 +717,14 @@ void SubtitleThread::run() {
         double startPts = currentPts + subtitle.start_display_time / NEKOAV_TIME_BASE;
         double endPts = currentPts + subtitle.end_display_time / NEKOAV_TIME_BASE + duration;
 
-        double diff = startPts - demuxerThread->position();
+        double diff = startPts - demuxerThread->clock();
 
         while (diff > 0) {
             // Wait until
             std::unique_lock lock(condMutex);
             cond.wait_for(lock, 10ms);
 
-            diff = startPts - demuxerThread->position();
+            diff = startPts - demuxerThread->clock();
             if (quit) {
                 goto quitLabel;
             }
@@ -723,7 +732,7 @@ void SubtitleThread::run() {
                 goto mainloop;
             }
         }
-        if (demuxerThread->position() > endPts) {
+        if (demuxerThread->clock() > endPts) {
             // Skip it
             continue;
         }
@@ -732,13 +741,13 @@ void SubtitleThread::run() {
         qDebug() << "Puting subtitle " << text << "Started " << startPts << " end " << endPts;
         videoSink->setSubtitleText(text);
 
-        diff = endPts - demuxerThread->position();
+        diff = endPts - demuxerThread->clock();
         while (diff > 0) {
             // Wait until
             std::unique_lock lock(condMutex);
             cond.wait_for(lock, 10ms);
 
-            diff = endPts - demuxerThread->position();
+            diff = endPts - demuxerThread->clock();
 
             if (quit) {
                 goto quitLabel;
@@ -831,11 +840,7 @@ bool DemuxerThread::load() {
 
     // Set interrupt handler
     formatCtxt->interrupt_callback.callback = [](void *_self) -> int {
-        auto self = static_cast<DemuxerThread *>(_self);
-        
-        // Distach event if
-        // self->eventDispatcher()->processEvents(QEventLoop::AllEvents);
-        return self->quit;
+        return static_cast<DemuxerThread *>(_self)->interruptHandler();
     };
     formatCtxt->interrupt_callback.opaque = this;
 
@@ -1091,7 +1096,9 @@ bool DemuxerThread::runDemuxer() {
     return true;
 }
 bool DemuxerThread::readFrame(int *eof) {
+    isReading = true;
     errcode = av_read_frame(formatCtxt, packet);
+    isReading = false;
     if (errcode < 0) {
         if (errcode == AVERROR_EOF) {
             // End of file
@@ -1213,6 +1220,7 @@ bool DemuxerThread::sendError(int errc) {
     return false;
 }
 void DemuxerThread::wakeUp() {
+    wakeupOnce = true;
     cond.notify_one();
 }
 bool DemuxerThread::doSeek() {
@@ -1360,7 +1368,26 @@ void DemuxerThread::doPause(bool v) {
         subtitleThread->pause(v);
     }
 }
-qreal DemuxerThread::position() const {
+int DemuxerThread::interruptHandler() {
+    // Use this mark to slove pause / playing switching for too slow network connections
+    if (wakeupOnce) {
+        wakeupOnce = false;
+
+        if (player->playbackState == PlaybackState::PausedState) {
+            qDebug() << "DemuxerThread::interruptHandler Pause";
+            doPause(true);
+        }
+        else if (player->playbackState == PlaybackState::PlayingState) {
+            if (player->mediaStatus != MediaStatus::BufferingMedia) {
+                // not buffering, we can just play
+                qDebug() << "DemuxerThread::interruptHandler Play";
+                doPause(false);
+            }
+        }
+    }
+    return quit;
+}
+qreal DemuxerThread::clock() const {
     // Has audio, audio master
     if (audioThread) {
         return audioThread->clock();
@@ -1372,6 +1399,12 @@ qreal DemuxerThread::position() const {
         }
     }
     return (av_gettime_relative() - externalClockStart) / NEKOAV_TIME_BASE;
+}
+qreal DemuxerThread::position() const {
+    if (afterSeek) {
+        return seekPosition;
+    }
+    return clock();
 }
 qreal DemuxerThread::bufferedDuration() const {
     if (!audioThread && !videoThread) {
@@ -1586,9 +1619,6 @@ void MediaPlayerPrivate::updateMediaInfo() {
     Q_EMIT player->metaDataChanged();
     Q_EMIT player->tracksChanged();
     Q_EMIT player->activeTracksChanged();
-}
-void MediaPlayerPrivate::audioDeviceLost() {
-    stop();
 }
 
 
@@ -1862,13 +1892,30 @@ void MediaPlayer::setAudioOutput(AudioOutput *output) {
         d->audioOutput->disconnect(d.get());
     }
     if (output) {
-        connect(output, &AudioOutput::deviceLost, d.get(), &MediaPlayerPrivate::audioDeviceLost);
+        connect(output, &AudioOutput::aboutToDestroy, d.get(), [this]() {
+            d->stop();
+            d->audioOutput = nullptr;
+
+            Q_EMIT audioOutputChanged();
+        });
     }
 
     d->audioOutput = output;
     Q_EMIT audioOutputChanged();
 }
 void MediaPlayer::setVideoSink(VideoSink *sink) {
+    if (d->videoSink) {
+        d->videoSink->disconnect(d.get());
+    }
+    if (sink) {
+        connect(sink, &VideoSink::aboutToDestroy, d.get(), [this]() {
+            d->stop();
+            d->videoSink = nullptr;
+
+            Q_EMIT videoOutputChanged();
+        });
+    }
+
     d->videoSink = sink;
     Q_EMIT videoOutputChanged();
 }
@@ -1925,7 +1972,7 @@ VideoSink::VideoSink(QObject *parent) : QObject(parent) {
     addPixelFormat(VideoPixelFormat::RGBA32);
 }
 VideoSink::~VideoSink() {
-
+    Q_EMIT aboutToDestroy();
 }
 void  VideoSink::setVideoFrame(const VideoFrame &f) {
     frame = f;

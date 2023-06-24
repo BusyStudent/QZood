@@ -219,7 +219,7 @@ AudioOutput::AudioOutput(QObject *parent) : QObject(parent), d(new AudioOutputPr
 
 }
 AudioOutput::~AudioOutput() {
-    Q_EMIT deviceLost();
+    Q_EMIT aboutToDestroy();
     d->close();
 }
 
