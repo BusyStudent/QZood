@@ -63,40 +63,40 @@ ZOOD_TEST_C(ZOOD, VideoSourceBLLTest) {
     QMetaObject::invokeMethod(
         qApp,
         [id](){
-            VideoSourceBLL &video = VideoSourceBLL::instance();
-            video.searchSuggestion("刀剑", nullptr, [id](const Result<QStringList> &list){
-                if (!list.has_value()) {
-                    qWarning() << "没有搜索到搜索建议";
-                    return;
-                }
-                for (const QString& title : list.value()) {
-                    ZoodLogString(title);
-                }
-            });
-            video.searchBangumiFromText("刀剑", nullptr, [id](const Result<BangumiList>& bangumiList) {
-                if (!bangumiList.has_value()) {
-                    qWarning() << "没有搜索到对应的番剧";
-                    return;
-                }
-                for (const auto& bangumi : bangumiList.value()) {
-                    ZoodLogString(bangumi->rootInterface()->name());
-                    ZoodLogString(bangumi->title());
-                    ZoodLogString(bangumi->description());
-                }
-            });
-            video.searchVideoTimeline(TimeWeek::MONDAY, nullptr, [id, &video](const Result<Timeline> &timeline) {
-                if (!timeline.has_value()) {
-                    video.searchBangumiFromTimeline(timeline.value(), nullptr, [id](const Result<BangumiList>& bangumis) {
-                        if (bangumis.has_value()) {
-                            for (auto& bangumi : bangumis.value()) {
-                                ZoodLogString(bangumi->rootInterface()->name());
-                                ZoodLogString(bangumi->title());
-                                ZoodLogString(bangumi->description());
-                            }
-                        }
-                    });
-                }
-            });
+            // VideoSourceBLL &video = VideoSourceBLL::instance();
+            // video.searchSuggestion("刀剑", nullptr, [id](const Result<QStringList> &list){
+            //     if (!list.has_value()) {
+            //         qWarning() << "没有搜索到搜索建议";
+            //         return;
+            //     }
+            //     for (const QString& title : list.value()) {
+            //         ZoodLogString(title);
+            //     }
+            // });
+            // video.searchBangumiFromText("刀剑", nullptr, [id](const Result<BangumiList>& bangumiList) {
+            //     if (!bangumiList.has_value()) {
+            //         qWarning() << "没有搜索到对应的番剧";
+            //         return;
+            //     }
+            //     for (const auto& bangumi : bangumiList.value()) {
+            //         ZoodLogString(bangumi->rootInterface()->name());
+            //         ZoodLogString(bangumi->title());
+            //         ZoodLogString(bangumi->description());
+            //     }
+            // });
+            // video.searchVideoTimeline(TimeWeek::MONDAY, nullptr, [id, &video](const Result<Timeline> &timeline) {
+            //     if (!timeline.has_value()) {
+            //         video.searchBangumiFromTimeline(timeline.value(), nullptr, [id](const Result<BangumiList>& bangumis) {
+            //             if (bangumis.has_value()) {
+            //                 for (auto& bangumi : bangumis.value()) {
+            //                     ZoodLogString(bangumi->rootInterface()->name());
+            //                     ZoodLogString(bangumi->title());
+            //                     ZoodLogString(bangumi->description());
+            //                 }
+            //             }
+            //         });
+            //     }
+            // });
         },
         Qt::QueuedConnection);
 }

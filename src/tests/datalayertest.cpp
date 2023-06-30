@@ -159,6 +159,7 @@ ZOOD_TEST(DataLayer, Timeline) {
 
     QObject::connect(load, &QPushButton::clicked, [=]() {
         currentInterface(ui.tlComboBox)->fetchTimeline().then([table](const Result<Timeline> &tm) {
+            table->clear();
             if (!tm) {
                 auto i = new QTreeWidgetItem(table, QStringList("failed to fetch timeline"));
                 table->addTopLevelItem(i);

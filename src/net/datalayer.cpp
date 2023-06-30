@@ -4,6 +4,37 @@
 
 namespace {
     
+template <typename T, typename Client, typename Class, typename ...TArgs, typename ...Args>
+NetPromise<QList<T> > WaitForMultiClient(
+    const QList<Client> & clientList, 
+    NetResult<T> (Class::*method)(TArgs ...), 
+    Args &&...args
+) 
+{
+    struct Data {
+        QList<T> collectedList;
+        int counter = 0;
+    };
+    auto r = NetPromise<QList<T> >::Alloc();
+    auto data = std::make_shared<Data>();
+    data->counter = clientList.size();
+
+    for (const auto &client : clientList) {
+        ((*client).*method)(std::forward<Args>(args)...).then([r, data](const Result<T> &d) mutable {
+            data->counter -= 1;
+            if (d) {
+                data->collectedList.push_back(d.value());
+            }
+            if (data->counter == 0) {
+                r.putResult(data->collectedList);
+            }
+        });
+    }
+
+    return r;
+};
+
+
 class MergedEpisode : public Episode {
 public:
     MergedEpisode(const EpisodeList &ep) : episodeList(ep)  {}
@@ -153,8 +184,37 @@ class MergeTimelineItem : public TimelineItem {
 public:
     MergeTimelineItem(const QList<TimelineItemPtr> &t) : timelineItems(t) { }
 
+
+    QDate date() override {
+        return timelineItems[0]->date();
+    }
+    int   dayOfWeek() override {
+        return timelineItems[0]->dayOfWeek();
+    }
     VideoInterface *rootInterface() override {
         return DataService::instance();
+    }
+    NetResult<BangumiList> fetchBangumiList() override {
+        auto r = NetResult<BangumiList>::Alloc();
+
+        WaitForMultiClient(timelineItems, &TimelineItem::fetchBangumiList)
+            .then([r](const QList<BangumiList> &collectedlist) mutable
+        {
+            // Do merge
+            std::map<QString, BangumiList> map;
+            for (const auto &list : collectedlist) {
+                for (const auto &b : list) {
+                    map[b->title()].push_back(b);
+                }
+            }
+            BangumiList resultList;
+            for (const auto &[key, list] : map) {
+                resultList.push_back(std::make_shared<MergedBangumi>(list));
+            }
+            r.putResult(resultList);
+        });
+
+        return r;
     }
 
     QList<TimelineItemPtr> timelineItems;
@@ -168,39 +228,48 @@ public:
     }
 
     NetResult<Timeline> fetchTimeline() override {
-        return GetVideoInterfaceList()[0]->fetchTimeline();
+        auto r = NetResult<Timeline>::Alloc();
+
+        WaitForMultiClient(GetVideoInterfaceList(), &VideoInterface::fetchTimeline)
+            .then([r](const QList<Timeline> &collectedList) mutable {
+                // Do merge
+                std::map<QDate, QList<TimelineItemPtr>> map;
+                for (const auto &list : collectedList) {
+                    for (const auto &b : list) {
+                        map[b->date()].push_back(b);
+                    }
+                }
+                Timeline resultList;
+                for (const auto &[date, list] : map) {
+                    resultList.push_back(std::make_shared<MergeTimelineItem>(list));
+                }
+                r.putResult(resultList);
+
+            }
+        );
+
+        return r;
     }
     NetResult<BangumiList> searchBangumi(const QString &what) override {
-        struct Data {
-            QList<BangumiList> collectedList;
-            int counter = 0;
-        };
-        auto data = std::make_shared<Data>();
         auto r = NetResult<BangumiList>::Alloc();
-        data->counter = GetVideoInterfaceList().size();
 
-        for (const auto &client : GetVideoInterfaceList()) {
-            client->searchBangumi(what).then([r, data](const Result<BangumiList> &b) mutable {
-                data->counter -= 1;
-                if (b) {
-                    data->collectedList.push_back(b.value());
-                }
-                if (data->counter == 0) {
-                    // Do merge
-                    std::map<QString, BangumiList> map;
-                    for (const auto &list : data->collectedList) {
-                        for (const auto &b : list) {
-                            map[b->title()].push_back(b);
-                        }
+        WaitForMultiClient(GetVideoInterfaceList(), &VideoInterface::searchBangumi, what)
+            .then([r](const QList<BangumiList> &collectedList) mutable {
+                // Do merge
+                std::map<QString, BangumiList> map;
+                for (const auto &list : collectedList) {
+                    for (const auto &b : list) {
+                        map[b->title()].push_back(b);
                     }
-                    BangumiList resultList;
-                    for (const auto &[key, list] : map) {
-                        resultList.push_back(std::make_shared<MergedBangumi>(list));
-                    }
-                    r.putResult(resultList);
                 }
-            });
-        }
+                BangumiList resultList;
+                for (const auto &[key, list] : map) {
+                    resultList.push_back(std::make_shared<MergedBangumi>(list));
+                }
+                r.putResult(resultList);
+
+            }
+        );
 
         return r;
     }

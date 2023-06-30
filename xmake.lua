@@ -14,8 +14,8 @@ if is_mode("release") then
     set_optimize("smallest")
 end
 
-add_requires("libxml2", "protobuf-cpp")
-add_packages("libxml2", "protobuf-cpp")
+add_requires("libxml2")
+add_packages("libxml2")
 
 includes("./src/ui")
 includes("./src/nekoav")
@@ -42,7 +42,7 @@ target("zood")
 
     -- Network
     add_files("./src/net/*")
-    add_files("./src/net/protos/*")
+    -- add_files("./src/net/protos/*")
 
     -- Tests
     add_files("./src/tests/*")

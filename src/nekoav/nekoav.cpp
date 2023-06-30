@@ -892,7 +892,7 @@ bool DemuxerThread::load() {
     }
 
     // Try open
-    auto stdstr = player->url.toUtf8();
+    auto stdstr = player->url.toString().toUtf8();
 
     player->setMediaStatus(MediaStatus::LoadingMedia);
     errcode = avformat_open_input(
@@ -1875,17 +1875,12 @@ void MediaPlayer::setActiveSubtitleTrack(int t)  {
 void MediaPlayer::setSource(const QUrl &url) {
     stop();
     d->ioDevice = nullptr;
-    if (url.isLocalFile()) {
-        d->url = url.toLocalFile();
-    }
-    else {
-        d->url = url.toString();
-    }
+    d->url = url;
 }
 void MediaPlayer::setSourceDevice(QIODevice *dev, const QUrl &url) {
     stop();
     d->ioDevice = dev;
-    d->url = url.toLocalFile();
+    d->url = url;
 }
 void MediaPlayer::setAudioOutput(AudioOutput *output) {
     if (d->audioOutput) {

@@ -1,5 +1,6 @@
 #include "../log.hpp"
 #include "bilibili.hpp"
+#include "cache.hpp"
 #include <QNetworkCookieJar>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -167,52 +168,53 @@ NetResult<QByteArray> BiliClient::fetchFile(const QString &url) {
     request.setUrl(url);
     request.setRawHeader("User-Agent", RandomUserAgent());
 
-    auto result = NetResult<QByteArray>::Alloc();
-    auto reply = manager.get(request);
+    return HttpCacheService::instance()->get(request, manager);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, result]() mutable {
-        qDebug() << "BiliClient::fetchFile " 
-                 << reply->url().toString() 
-                 << " Status code: " 
-                 << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
-        ;
+    // auto result = NetResult<QByteArray>::Alloc();
+    // auto reply = manager.get(request);
 
-        Result<QByteArray> data;
+    // connect(reply, &QNetworkReply::finished, this, [this, reply, result]() mutable {
+    //     qDebug() << "BiliClient::fetchFile " 
+    //              << reply->url().toString() 
+    //              << " Status code: " 
+    //              << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()
+    //     ;
 
-        reply->deleteLater();
-        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) == 200) {
-            data = reply->readAll();
-        }
-        else {
-            qDebug() << "Failed to fetch " << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
-        }
+    //     Result<QByteArray> data;
 
-        result.putResult(data);
-    });
+    //     reply->deleteLater();
+    //     if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) == 200) {
+    //         data = reply->readAll();
+    //     }
+    //     else {
+    //         qDebug() << "Failed to fetch " << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+    //     }
 
-    return result;
+    //     result.putResult(data);
+    // });
+
+    // return result;
 }
 NetResult<QString> BiliClient::convertToCid(const QString &bvid) {
-    QNetworkRequest request;
+    // QNetworkRequest request;
     QString url = "https://api.bilibili.com/x/player/pagelist";
 
     url += QString("?bvid=%1").arg(bvid);
 
     // qDebug() << "Prepare for " << url;
 
-    request.setUrl(url);
-    request.setRawHeader("User-Agent", RandomUserAgent());
+    // request.setUrl(url);
+    // request.setRawHeader("User-Agent", RandomUserAgent());
 
     auto result = NetResult<QString>::Alloc();
-    auto reply = manager.get(request);
+    // auto reply = manager.get(request);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, result]() mutable {
+    fetchFile(url).then(this, [this, result](const Result<QByteArray> &data) mutable {
         Result<QString> cid;
 
-        reply->deleteLater();
-        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) == 200) {
+        if (data) {
             QJsonParseError error;
-            auto doc = QJsonDocument::fromJson(reply->readAll(), &error);
+            auto doc = QJsonDocument::fromJson(data.value(), &error);
 
             // qDebug() << doc;
 
@@ -234,26 +236,25 @@ NetResult<QString> BiliClient::convertToCid(const QString &bvid) {
     return result;
 }
 NetResult<BiliVideoSource> BiliClient::fetchVideoSource(const QString &cid, const QString &bvid) {
-    QNetworkRequest request;
+    // QNetworkRequest request;
     QString url = QString("https://api.bilibili.com/x/player/playurl?qn=64&cid=%1&bvid=%2").arg(cid, bvid);
 
     
     // qDebug() << "Prepare for " << url;
 
-    request.setUrl(url);
-    request.setRawHeader("User-Agent", RandomUserAgent());
+    // request.setUrl(url);
+    // request.setRawHeader("User-Agent", RandomUserAgent());
 
     auto result = NetResult<BiliVideoSource>::Alloc();
-    auto reply = manager.get(request);
+    // auto reply = manager.get(request);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, result]() mutable {
+    fetchFile(url).then(this, [this, result](const Result<QByteArray> &data) mutable {
         // Process response
         Result<BiliVideoSource> source;
 
-        reply->deleteLater();
-        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) == 200) {
+        if (data) {
             QJsonParseError error;
-            auto doc = QJsonDocument::fromJson(reply->readAll(), &error);
+            auto doc = QJsonDocument::fromJson(data.value(), &error);
 
             qDebug() << doc;
 

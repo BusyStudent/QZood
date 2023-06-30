@@ -1,3 +1,4 @@
+#include "../../nekoav/nekoutils.hpp"
 #include "videoBLL.hpp"
 
 #include <QFileInfo>
@@ -210,6 +211,13 @@ VideoBLLPtr VideoBLLLocal::operator+(const VideoBLLPtr v) {
 
 QListWidgetItem* VideoBLLLocal::addToList(QListWidget* listWidget) {
     QListWidgetItem* item = new QListWidgetItem(QIcon(":/icons/loading_bar.png"), title());
+    loadThumbnail([item](const Result<QImage> &image){
+        if (image.has_value()) {
+            item->setIcon(QPixmap::fromImage(image.value()));
+        } else {
+            item->setIcon(QIcon());
+        }
+    });
     listWidget->addItem(item);
     return item;
 }
@@ -239,7 +247,11 @@ void VideoBLLLocal::loadVideoToPlay(QObject*, std::function<void(const Result<QS
 }
 
 void VideoBLLLocal::loadThumbnail(std::function<void(const Result<QImage>&)> callAble) {
-    callAble(QImage());
+    if (sourceList.contains(currentVideoSource)) {
+        callAble(NekoAV::GetMediaFileIcon(filePaths[sourceList.indexOf(currentVideoSource)]));
+    } else {
+        callAble(Result<QImage>());
+    }
 }
 
 void VideoBLLLocal::loadThumbnail(QObject*, std::function<void(const Result<QImage>&)> callAble) {

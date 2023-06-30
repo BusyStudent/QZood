@@ -5,6 +5,7 @@
 #include <QImage>
 #include <QTimer>
 #include "client.hpp"
+#include "cache.hpp"
 #include "yhdm.hpp"
 #include "lxml.hpp"
 
@@ -334,22 +335,19 @@ NetResult<BangumiList> YhdmClient::searchBangumi(const QString &name) {
     return result;
 }
 NetResult<Timeline>    YhdmClient::fetchTimeline() {
-    QNetworkRequest request;
-    request.setUrl(domain());
-    request.setHeader(QNetworkRequest::UserAgentHeader, RandomUserAgent());
+    // QNetworkRequest request;
+    // request.setUrl(domain());
+    // request.setHeader(QNetworkRequest::UserAgentHeader, RandomUserAgent());
 
-    auto reply = manager.get(request);
     auto result = NetResult<Timeline>::Alloc();
-    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, result]() mutable {
-        reply->deleteLater();
-        if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) != 200) {
+    fetchFile(domain()).then(this, [this, result](const Result<QByteArray> &data) mutable {
+        if (!data) {
             result.putResult(std::nullopt);
             return;
         }
-        auto data = reply->readAll();
 
         // Begin parse
-        auto doc = LXml::HtmlDocoument::Parse(data);
+        auto doc = LXml::HtmlDocoument::Parse(data.value());
         if (!doc) {
             result.putResult(std::nullopt);
             return;
@@ -413,7 +411,7 @@ NetResult<QByteArray> YhdmClient::fetchFile(const QString &url) {
     request.setUrl(url);
     request.setRawHeader("User-Agent", RandomUserAgent());
 
-    return WrapQNetworkReply(manager.get(request));
+    return HttpCacheService::instance()->get(request, manager);
 }
 NetResult<QImage> YhdmClient::fetchImage(const QString &url) {
     return WrapHttpImagePromise(fetchFile(url));

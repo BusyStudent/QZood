@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nekoav.hpp"
+#include "nekowrap.hpp"
 
 #include <QThread>
 
@@ -9,15 +10,6 @@
 #include <mutex>
 #include <deque>
 
-extern "C" {
-    #include <libavformat/avformat.h>
-    #include <libavcodec/avcodec.h>
-    #include <libavutil/time.h>
-    #include <libavutil/avutil.h>
-    #include <libavutil/imgutils.h>
-    #include <libswresample/swresample.h>
-    #include <libswscale/swscale.h>
-}
 
 namespace NekoAV {
 
@@ -29,88 +21,10 @@ inline static auto AVSyncThreshold = 0.01;
 inline static auto AVNoSyncThreshold = 10.0;
 inline static auto AudioDiffAvgNB = 20;
 
+template <typename T>
+using Atomic = std::atomic<T>;
+
 using namespace std::chrono_literals;
-
-template <typename T>
-class AVTraits;
-
-template <>
-class AVTraits<AVPacket> {
-    public:
-        void operator()(AVPacket *ptr) {
-            av_packet_free(&ptr);
-        }
-};
-
-template <>
-class AVTraits<AVFrame> {
-    public:
-        void operator()(AVFrame *ptr) {
-            av_frame_free(&ptr);
-        }
-};
-
-template <>
-class AVTraits<AVFormatContext> {
-    public:
-        void operator()(AVFormatContext *ptr) {
-            avformat_close_input(&ptr);
-        }
-};
-
-template <>
-class AVTraits<AVCodecContext> {
-    public:
-        void operator()(AVCodecContext *ptr) {
-            avcodec_free_context(&ptr);
-        }
-};
-
-template <>
-class AVTraits<AVDictionary> {
-    public:
-        void operator()(AVDictionary *ptr) {
-            av_dict_free(&ptr);
-        }
-};
-
-template <>
-class AVTraits<AVSubtitle> {
-    public:
-        void operator()(AVSubtitle *ptr) {
-            avsubtitle_free(ptr);
-        }
-};
-
-template <>
-class AVTraits<SwrContext> {
-    public:
-        void operator()(SwrContext *ptr) {
-            swr_free(&ptr);
-        }
-};
-
-template <>
-class AVTraits<SwsContext> {
-    public:
-        void operator()(SwsContext *ptr) {
-            sws_freeContext(ptr);
-        }
-};
-
-template <>
-class AVTraits<uint8_t> {
-    public:
-        void operator()(uint8_t *ptr) {
-            av_free(ptr);
-        }
-};
-
-template <typename T>
-class AVPtr : public std::unique_ptr<T, AVTraits<T>> {
-    public:
-        using std::unique_ptr<T, AVTraits<T>>::unique_ptr;
-};
 
 class PacketQueue final {
     public:
@@ -183,8 +97,8 @@ class AudioThread final : public QObject {
         bool                 audioInitialized = false;
 
         // Status
-        bool   waitting = false;
-        qreal  audioClock = 0.0f;
+        Atomic<bool>   waitting = false;
+        Atomic<qreal>  audioClock = 0.0f;
 };
 
 class VideoThread final : public QThread {
@@ -232,17 +146,19 @@ class VideoThread final : public QThread {
 
         // Sync 
         std::condition_variable cond;
-        std::mutex condMutex;
-        bool paused = false;
+        std::mutex   condMutex;
 
         // Status
         int64_t videoClockStart = 0; //< Video started time
-        double  videoClock = 0.0f;
         double  swsScaleDuration = 0.0; //< prev Swscale take's time
         double  videoDecodeDuration = 0.0; //< prev video decode duration
-        bool    waitting = false;
         bool    firstFrame = true; //< first frame arrives
         bool    needConvert = true;
+
+        // Atomoic Status 
+        Atomic<bool>   paused = false;
+        Atomic<bool>   waitting = false;
+        Atomic<double> videoClock = 0.0f;
 };
 
 class SubtitleThread final : public QThread {
@@ -275,13 +191,13 @@ class SubtitleThread final : public QThread {
 
         // Sync 
         std::condition_variable cond;
-        std::mutex condMutex;
-        bool paused = false;
-        bool waitting = false;
-        bool quit = false;
-        bool reqSwitch = false;
+        std::mutex   condMutex;
+        Atomic<bool> paused = false;
+        Atomic<bool> waitting = false;
+        Atomic<bool> quit = false;
+        Atomic<bool> reqSwitch = false;
 
-        double subtitleClock = 0.0;
+        Atomic<double> subtitleClock = 0.0;
 };
 
 class DemuxerThread final : public QThread {
@@ -412,7 +328,7 @@ class MediaPlayerPrivate final : public QObject {
         std::mutex    settingsMutex; //< Mutex for protect this
 
         // Begin settingsMutex protect
-        QString       url; //< Player Url
+        QUrl          url; //< Player Url
         QIODevice    *ioDevice; //< IODevice for playback
         AVDictionary *options = nullptr;
         AVInputFormat *inputFormat = nullptr; //< User custom input format
@@ -463,31 +379,8 @@ inline VideoSink   *DemuxerThread::videoSink() const  noexcept {
     return player->videoSink;
 }
 
-// Helper function
-inline int64_t doubelToFFInt64(qreal d) noexcept {
-    return d * 1000000.0;
-}
-inline qreal   FFInt64ToDouble(int64_t t) noexcept {
-    return t / 1000000.0;
-}
 inline bool    IsSpecialPacket(AVPacket *pak) noexcept {
     return pak == EofPacket || pak == FlushPacket || pak == StopPacket || pak == SyncPacket;
-}
-inline QString FFErrorToString(int errcode) {
-    char buffer[AV_ERROR_MAX_STRING_SIZE];
-    return av_make_error_string(buffer, sizeof(buffer), errcode);
-}
-inline AVPtr<uint8_t>  FFAllocateBuffer(size_t n) {
-    return AVPtr<uint8_t>(static_cast<uint8_t*>(av_malloc(n)));
-}
-inline AVPtr<uint8_t> &FFReallocateBuffer(AVPtr<uint8_t> *old, size_t newSize) {
-    old->reset(
-        static_cast<uint8_t*>(av_realloc(
-            old->release(),
-            newSize
-        ))
-    );
-    return *old;
 }
 inline AVPixelFormat ToAVPixelFormat(VideoPixelFormat fmt) {
     switch (fmt) {
@@ -513,31 +406,6 @@ inline VideoPixelFormat ToVideoPixelFormat(AVPixelFormat fmt) {
         case AV_PIX_FMT_NV21 : return VideoPixelFormat::NV21;
         default :              return VideoPixelFormat::Invalid;
     }
-}
-inline std::pair<AVCodecContext*, int> FFCreateDecoderContext(AVStream *stream) {
-    auto codec = avcodec_find_decoder(stream->codecpar->codec_id);
-    int errcode = 0;
-    if (!codec) {
-        // No codec
-        errcode = AVERROR_DECODER_NOT_FOUND;
-        return {nullptr, errcode};
-    }
-    auto codecCtxt = avcodec_alloc_context3(codec);
-    if (!codec) {
-        errcode = AVERROR(ENOMEM);
-        return {nullptr, errcode};
-    }
-    errcode = avcodec_parameters_to_context(codecCtxt, stream->codecpar);
-    if (errcode < 0) {
-        avcodec_free_context(&codecCtxt);
-        return {nullptr, errcode};
-    }
-    errcode = avcodec_open2(codecCtxt, codecCtxt->codec, nullptr);
-    if (errcode < 0) {
-        avcodec_free_context(&codecCtxt);
-        return {nullptr, errcode};
-    }
-    return {codecCtxt, errcode};
 }
 
 }
