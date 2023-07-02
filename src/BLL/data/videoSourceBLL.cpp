@@ -3,20 +3,46 @@
 #include "../../net/client.hpp"
 #include "../../net/bilibili.hpp"
 
-VideoSourceBLL::VideoSourceBLL(QObject *parent) : QObject(parent) {
-    dataSevrice = DataService::instance();
-}
+class VideoSourceBLLHelper {
+public:
+    VideoSourceBLLHelper() {
+        dataSevrice = DataService::instance();
+    }
+    template<typename FuncT, typename ...Arg>
+    void doFunc(QList<FuncT>& queue, Arg&& ...arg) {
+        for (const auto& func : queue) {
+            func(std::forward<Arg>(arg)...);
+        }
+        queue.clear();
+    }
+    void requestTimeline(QObject *obj, std::function<void(const Result<Timeline>&)> func) {
+        timelineQueue.push_back(func);
+        if (timelineQueue.size() > 1) {
+            return;
+        }
+        dataSevrice->fetchTimeline().then(obj, [this](const Result<Timeline>& timeline) {
+            if (timeline.has_value()) {
+                doFunc(timelineQueue, timeline.value());
+            }
+            doFunc(timelineQueue, Result<Timeline>());
+        });
+    }
 
-VideoSourceBLL::~VideoSourceBLL() {
-}
+public:
+    DataService* dataSevrice;
+
+private:
+    QList<std::function<void(const Result<Timeline>&)> > timelineQueue;
+};
+
+VideoSourceBLL::VideoSourceBLL(QObject *parent) : QObject(parent), d(new VideoSourceBLLHelper()), client(new BiliClient()) {}
+
+VideoSourceBLL::~VideoSourceBLL() { }
 
 void VideoSourceBLL::searchSuggestion(const QString& text, QObject *obj, std::function<void(const Result<QStringList>&)> func) {
     // std::shared_ptr<int> counter = std::make_shared<int>(videoSources.size());
     if (obj == nullptr) {
         obj = this;
-    }
-    if (nullptr == client) {
-        client = std::make_shared<BiliClient>();
     }
     client->fetchSearchSuggestions(text).then(obj, func);
 }
@@ -26,27 +52,20 @@ void VideoSourceBLL::searchVideoTimeline(QObject *obj, std::function<void(const 
         obj = this;
     }
     if (dirty & TIMELINE) {
-        dirty ^= TIMELINE;
-        videoTimelineItems.clear();
-        bangumis.clear();
-        videos.clear();
-        // 获取全部源的时间线。
-        dataSevrice->fetchTimeline().then(obj, [this, func](const Result<Timeline>& timeline) {
-            if (timeline.has_value()) {
-                videoTimelineItems.append(timeline.value());
-            }
-            qDebug() << "fetch time line";
+        d->requestTimeline(obj, [this, func](const Result<Timeline>& timeline) {
+            dirty ^= TIMELINE;
+            videoTimelineItems.clear();
+            bangumis.clear();
+            videos.clear();
+            videoTimelineItems = timeline.value();
             func(videoTimelineItems);
         });
-    } else {
-        func(videoTimelineItems);
     }
 }
 
 Timeline VideoSourceBLL::videoInWeek(TimeWeek week) {
     Timeline result;
     for (auto item : videoTimelineItems) {
-        qDebug() << item->dayOfWeek();
         if (item->dayOfWeek() == int(week)) {
             result.push_back(item);
         }
@@ -66,6 +85,7 @@ void VideoSourceBLL::searchBangumiFromTimeline(Timeline t,QObject *obj, std::fun
         // 确认当前番剧列表存在对应数据时直接回调
         func(bangumis[(TimeWeek)(t[0]->dayOfWeek())]);
     } else {
+        bangumis[(TimeWeek)(t[0]->dayOfWeek())].clear();
         // 当前缓存中不存在数据，调用数据接口fetch数据
         std::shared_ptr<int> counter = std::make_shared<int>(t.size());
         for (auto& timelineItem : t) {
@@ -86,11 +106,12 @@ void VideoSourceBLL::searchVideosFromBangumi(BangumiPtr b, QObject *obj, std::fu
     if (obj == nullptr) {
         obj = this;
     }
-    if (videos.contains(b->title())) {
-        func(videos[b->title()]);
+    if (videos.contains(mapToTitle(b)) && videos[mapToTitle(b)].size() > 0) {
+        func(videos[mapToTitle(b)]);
     } else {
         b->fetchEpisodes().then([this, func, title = mapToTitle(b)](const Result<EpisodeList>& episodes){
             if(episodes.has_value()) {
+                videos[title].clear();
                 for (auto& episode : episodes.value()) {
                     videos[title].push_back(createVideoBLL(EpisodeList{episode}));
                 }
@@ -106,7 +127,7 @@ void VideoSourceBLL::searchBangumiFromText(const QString& text, QObject *obj, st
     if (obj == nullptr) {
         obj = this;
     }
-    dataSevrice->searchBangumi(text).then(obj, func);
+    d->dataSevrice->searchBangumi(text).then(obj, func);
 }
 
 void VideoSourceBLL::searchVideosFromTitle(const QString& title, QObject *obj, std::function<void(const Result<VideoBLLList>&)> func) {
@@ -119,29 +140,26 @@ void VideoSourceBLL::searchVideosFromTitle(const QString& title, QObject *obj, s
         return ;
     }
     searchBangumiFromText(title, obj, [this, func, title, obj](const Result<BangumiList>& bangumis) {
-        if (!bangumis.has_value()) {
+        if (!bangumis.has_value() || bangumis->size() == 0) {
             qDebug() << "bangumis for " << title << " are not find";
             func(Result<VideoBLLList>());
             return ;
         }
-        std::shared_ptr<std::atomic_int> counter_videos = std::make_shared<std::atomic_int>(bangumis->size());
-        for (const auto& bangumi : bangumis.value()) {
-            searchVideosFromBangumi(bangumi, obj, [this, counter_videos, title = bangumi->title(), func](const Result<VideoBLLList>& bvideos) {
-                if (bvideos.has_value()){
-                    videos[title] += bvideos.value();
-                }
-                (*counter_videos)--;
-                if (0 == (*counter_videos)) {
-                    if (videos.contains(title)) {
-                        qDebug() << "search videos size : " << videos[title].size();
-                        func(videos[title]);
-                    } else {
-                        qDebug() << "videos for title " << title << " are not find";
-                        func(Result<VideoBLLList>());
-                    }
-                }
-            });
-        }
+        qDebug() << "video size : " << videos[title].size();
+        qDebug() << "bangumiList size : " << bangumis->size();
+        searchVideosFromBangumi(bangumis->back(), obj, [this, title, func](const Result<VideoBLLList>& bvideos) {
+            videos[title].clear();
+            if (bvideos.has_value()){
+                videos[title] = bvideos.value();
+            }
+            if (videos.contains(title)) {
+                qDebug() << "search videos size : " << videos[title].size();
+                func(videos[title]);
+            } else {
+                qDebug() << "videos for title " << title << " are not find";
+                func(Result<VideoBLLList>());
+            }
+        });
     });
 }
 

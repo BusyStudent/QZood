@@ -168,8 +168,10 @@ void PopupWidget::leaveEvent(QEvent* event) {
 }
 
 void PopupWidget::hideLater(int msec) {
-    msec = msec == -1 ? defualt_hide_after_time : msec;
-    timer->start(msec);
+    msec = (msec == -1 ? defualt_hide_after_time : msec);
+    QMetaObject::invokeMethod(this, [this, msec](){
+        timer->start(msec);
+    }, Qt::QueuedConnection);
 }
 
 void PopupWidget::stopHideTimer() {

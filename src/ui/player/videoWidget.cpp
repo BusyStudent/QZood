@@ -1,6 +1,5 @@
 #include "videoWidget.hpp"
 #include "ui_videoSettingView.h"
-#include "ui_customLabel.h"
 #include "ui_SourcesListContainer.h"
 
 #include <QEvent>
@@ -17,6 +16,7 @@
 #include "fullSettingWidget.hpp"
 #include "../common/customSlider.hpp"
 #include "../../player/videocanvas.hpp"
+#include "logWidget.hpp"
 
 static QString timeFormat(int sec) {
     if (sec < 60 * 60) {
@@ -39,7 +39,6 @@ public:
 
     ~VideoWidgetPrivate() {
         delete ui_videoSetting;
-        delete ui_logView;
         delete ui_sourceList;
         if (player->isPlaying()) {
             player->stop();
@@ -88,9 +87,7 @@ public:
         settings->setHideAfterLeave(false);
 
         // 显示信息的标签
-        logWidget = new PopupWidget();
-        ui_logView = new Ui::CustomLabel();
-        ui_logView->setupUi(logWidget);
+        logWidget = new LogWidget();
         logWidget->setAlignment(Qt::AlignLeft | Qt::AlignBottom);
         logWidget->setAuotLayout(true);
         logWidget->setHideAfterLeave(false);
@@ -160,10 +157,8 @@ public:
     }
 
     void videoLog(const QString& msg) {
-        logWidget->hide();
-        ui_logView->label->setText(msg);
-        logWidget->show();
-        logWidget->hideLater(1000);
+        logWidget->setDefualtHideTime(2000);
+        logWidget->pushLog(msg);
     }
 
     void pause() {
@@ -200,10 +195,15 @@ public:
     }
 
     void play(const VideoBLLPtr video) {
+        if (isLoddingVideo) {
+            videoLog("正在加载视频，请不要操作");
+            return;
+        }
         if (player->isPlaying()) {
             stop();
         }
         videoLog("开始加载视频");
+        isLoddingVideo = true;
         updateSourceList(video->sourcesList());
         ui_videoSetting->sourceButton->setText(video->getCurrentVideoSource());
         this->video = video;
@@ -212,8 +212,10 @@ public:
                 player->setSource(url.value());
                 player->play();
                 videoLog("视频加载完成");
+            } esle {
+                videoLog("视频加载失败");
             }
-            videoLog("视频加载失败");
+            QTimer::singleShot(5000, [this](){isLoddingVideo = false;});
         });
     }
 
@@ -330,16 +332,17 @@ private:
         // 结束信号
         QWidget::connect(player, &NekoMediaPlayer::errorOccurred, self, [this](NekoMediaPlayer::Error error, const QString &errorString){
             videoLog(errorString);
-            emit self->finished();
+            // Q_EMIT self->finished();
         });
         QWidget::connect(player, &NekoMediaPlayer::mediaStatusChanged, self, [this](NekoMediaPlayer::MediaStatus status){
             switch (status)
             {
             case NekoMediaPlayer::MediaStatus::InvalidMedia:
                 videoLog("非法文件");
-                emit self->invalidVideo(video);
+                Q_EMIT self->invalidVideo(video);
+                break;
             case NekoMediaPlayer::MediaStatus::EndOfMedia:
-                emit self->finished();
+                Q_EMIT self->finished();
             break;
             
             default:
@@ -535,26 +538,27 @@ private:
     }
 
 public:
-    VideoCanvas* vcanvas;
-    NekoMediaPlayer* player;
-    NekoAudioOutput* audio;
+    VideoCanvas *vcanvas;
+    NekoMediaPlayer *player;
+    NekoAudioOutput *audio;
 
-    PopupWidget* videoSetting = nullptr;
-    Ui::VideoSettingView* ui_videoSetting = nullptr;
-    CustomSlider* videoProgressBar = nullptr;
+    PopupWidget *videoSetting = nullptr;
+    Ui::VideoSettingView *ui_videoSetting = nullptr;
+    CustomSlider *videoProgressBar = nullptr;
 
-    VolumeSettingWidget* volumeSetting = nullptr;
+    VolumeSettingWidget *volumeSetting = nullptr;
 
-    PopupWidget* sourceListWidget = nullptr;
-    Ui::SourceList* ui_sourceList = nullptr;
+    PopupWidget *sourceListWidget = nullptr;
+    Ui::SourceList *ui_sourceList = nullptr;
 
-    FullSettingWidget* settings = nullptr;
+    FullSettingWidget *settings = nullptr;
 
-    PopupWidget* logWidget = nullptr;
-    Ui::CustomLabel *ui_logView = nullptr;
+    LogWidget *logWidget = nullptr;
+
     VideoBLLPtr video;
 
     int skipStep = 10;
+    bool isLoddingVideo = false;
 
 private:
     VideoWidget *self;

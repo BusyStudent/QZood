@@ -40,7 +40,7 @@ class PopupWidget : public QWidget {
         void showed();
         void hided();
 
-    private:
+    protected:
         PopupWidgetPrivate *d;
         QTimer* timer = nullptr;
         QWidget* attach_widget = nullptr;

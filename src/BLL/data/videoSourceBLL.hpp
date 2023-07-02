@@ -14,6 +14,7 @@
 
 class VideoInterface;
 class BiliClient;
+class VideoSourceBLLHelper;
 
 enum TimeWeek : int {
     MONDAY = 1,
@@ -112,7 +113,7 @@ class VideoSourceBLL : public QObject{
         QString mapToTitle(BangumiPtr b);
 
     private:
-        DataService* dataSevrice;
+        RefPtr<VideoSourceBLLHelper> d;
         RefPtr<BiliClient> client;
         QList<TimelineItemPtr> videoTimelineItems;
         QMap<TimeWeek, BangumiList> bangumis;
