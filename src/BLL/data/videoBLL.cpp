@@ -56,6 +56,7 @@ void VideoBLL::setCurrentDanmakuSource(const QString& source) {
 
 VideoBLLEpisode::VideoBLLEpisode(const EpisodeList episodes) : videos(episodes) {
     update();
+    setCurrentVideoSource(sourcesList().size() > 0 ? sourcesList()[0] : "");
 }
 
 VideoBLLPtr VideoBLLEpisode::operator+(const VideoBLLPtr video) {
@@ -135,6 +136,7 @@ void VideoBLLEpisode::loadVideoToPlay(std::function<void(const Result<QString>&)
 }
 
 void VideoBLLEpisode::loadVideoToPlay(QObject *ctxt, std::function<void(const Result<QString>&)> callAble) {
+    qDebug() << "fetch vedio " << title() << " " << mapVideoSourceName[currentVideoSource].first << " in source " << mapVideoSourceName[currentVideoSource].second;
     videos[mapVideoSourceName[currentVideoSource].first]->fetchVideo(mapVideoSourceName[currentVideoSource].second).then(ctxt, callAble);
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../common/customizeTitleWidget.hpp"
+#include "../../BLL/data/videoBLL.hpp"
 
 namespace Ui {
 class PlayerView;
@@ -14,6 +15,9 @@ class PlayerWidget final : public CustomizeTitleWidget {
     public:
         PlayerWidget(QWidget* parent = nullptr);
         virtual ~PlayerWidget();
+        void setVideoList(VideoBLLList videos);
+        void appendVideo(VideoBLLPtr video);
+        void clearVideoList();
 
     public:
         void resizeEvent(QResizeEvent* event) override;

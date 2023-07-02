@@ -58,6 +58,10 @@ class VideoBLL : public DynRefable {
         virtual void setCurrentSubtitleSource(const QString& source);
         virtual void setCurrentDanmakuSource(const QString& source);
 
+        virtual inline QString getCurrentVideoSource() { return currentVideoSource; }
+        virtual inline QString getCurrentDanmakuSource() { return currentDanmakuSource; }
+        virtual inline QString getCurrentSubtitleSource() { return currentSubtitleSource; }
+
         inline void update(DataItem f = ALL) { dirty = f; }
         template<typename ValueT>
         inline void setStatus(const QString& key,const ValueT& value) {

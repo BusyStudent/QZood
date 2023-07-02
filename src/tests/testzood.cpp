@@ -24,18 +24,6 @@ ZOOD_TEST_W(Ui, zoodTest) {
         }
     });
 
-    srand((unsigned)time(NULL));
-
-    QWidget::connect(zood->homeWidget(), &HomeWidget::dataRequest, zood, [zood](HomeWidget::DisplayArea area) {
-        auto video_views = zood->homeWidget()->addItems(area, rand() % 10 + 1);
-        for (auto &video_view : video_views) {
-            video_view->setTitle("我们仍未知道那天盛开的花的名字");
-            video_view->setExtraInformation("这是额外信息，这是一条非常非常非常非常非常非常长的信息。");
-            video_view->setSourceInformation("b站，樱花，异世界。");
-            video_view->setImage(QImage(":/icons/loading_bar.png"));
-        }
-    });
-
     return zood;
 }
 

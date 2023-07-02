@@ -4,10 +4,9 @@
 #include <QScrollArea>
 
 #include "videoView.hpp"
+#include "../../BLL/data/videoBLL.hpp"
 
-namespace Ui {
-class HomeView;
-}
+class HomeWidgetPrivate;
 
 class HomeWidget : public QScrollArea {
     Q_OBJECT
@@ -25,10 +24,14 @@ class HomeWidget : public QScrollArea {
     };
     public:
         HomeWidget(QWidget* parent = nullptr);
-        virtual ~HomeWidget() {}
+        virtual ~HomeWidget();
 
         VideoView* addItem(const DisplayArea& area);
         QList<VideoView *> addItems(const DisplayArea& area, int count);
+        void clearItem(const DisplayArea& area);
+    
+    public Q_SLOTS :
+        void runPlayer(VideoBLLList videos);
     
     public:
         void resizeEvent(QResizeEvent *) override;
@@ -40,18 +43,12 @@ class HomeWidget : public QScrollArea {
         void wheelEvent(QWheelEvent *event) override;
 
     Q_SIGNALS:
-        void refreshRequest(const DisplayArea area);
-        void dataRequest(const DisplayArea area);
+        void refreshRequest();
+        void dataRequest();
 
     public Q_SLOTS:
         void refresh(const QList<videoData>& dataList,const DisplayArea area);
 
     private:
-        void _refresh(QWidget* container, const QList<videoData>& dataList);
-        QList<VideoView* > _addItems(QWidget* container, int count);
-        void _setupUi();
-
-    private:
-        Ui::HomeView* ui;
-        QWidget* contents;
+        HomeWidgetPrivate* d;
 };

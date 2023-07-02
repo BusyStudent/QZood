@@ -75,28 +75,42 @@ public:
         connectSearch();
     }
 
-    void refresh(HomeWidget::DisplayArea area) {
-        VideoSourceBLL &videoSource = VideoSourceBLL::instance();
-        // TODO(llhsdmd) : 有问题，没有更新出数据
-        videoSource.searchVideoTimeline((TimeWeek)area, self, [this, &videoSource, area](const Result<Timeline>& timeline){
+    void refreshAll() {
+        VideoSourceBLL *videoSource = VideoSourceBLL::instance();
+        videoSource->searchVideoTimeline(self, [this](const Result<Timeline>& timeline) {
             if (timeline.has_value()) {
-                videoSource.searchBangumiFromTimeline(timeline.value(), self, [this, area] (const Result<BangumiList>& bangumiList) {
-                    if (!bangumiList.has_value()) {
-                        return;
-                    }
-                    auto bangumis = bangumiList.value();
-                    auto video_views = homePage->addItems(area, bangumis.size());
-                    for (int i = 0; i < video_views.size(); ++i) {
-                        video_views[i]->setVideoId(bangumis[i]->title());
-                        video_views[i]->setTitle(bangumis[i]->title());
-                        video_views[i]->setExtraInformation(bangumis[i]->description());
-                        video_views[i]->setSourceInformation(bangumis[i]->availableSource().join("; "));
-                        video_views[i]->setImage(QImage(":/icons/loading_bar.png"));
-                        bangumis[i]->fetchCover().then(video_views[i], [video_view = video_views[i]](const Result<QImage>& img) {
-                            if (img.has_value()) {
-                                video_view->setImage(img.value());
-                            }
-                        });
+                qDebug() << "timeline size : " << timeline.value().size();
+                refreshWeek(HomeWidget::Monday);
+                refreshWeek(HomeWidget::Tuesday);
+                refreshWeek(HomeWidget::Wednesday);
+                refreshWeek(HomeWidget::Thursday);
+                refreshWeek(HomeWidget::Friday);
+                refreshWeek(HomeWidget::Saturday);
+                refreshWeek(HomeWidget::Sunday);
+            } else {
+                qWarning() << "can't get Timeline!!!";
+            }
+        });
+    }
+
+    void refreshWeek(HomeWidget::DisplayArea area) {
+        VideoSourceBLL *videoSource = VideoSourceBLL::instance();
+        videoSource->searchBangumiFromTimeline(videoSource->videoInWeek((TimeWeek)area), self, [this, area] (const Result<BangumiList>& bangumiList) {
+            if (!bangumiList.has_value()) {
+                return;
+            }
+            homePage->clearItem(area);
+            auto bangumis = bangumiList.value();
+            auto video_views = homePage->addItems(area, bangumis.size());
+            for (int i = 0; i < video_views.size(); ++i) {
+                video_views[i]->setVideoId(bangumis[i]->title());
+                video_views[i]->setTitle(bangumis[i]->title());
+                video_views[i]->setExtraInformation(bangumis[i]->description());
+                video_views[i]->setSourceInformation(bangumis[i]->availableSource().join("; "));
+                video_views[i]->setImage(QImage(":/icons/loading_bar.png"));
+                bangumis[i]->fetchCover().then(video_views[i], [video_view = video_views[i]](const Result<QImage>& img) {
+                    if (img.has_value()) {
+                        video_view->setImage(img.value());
                     }
                 });
             }
@@ -164,13 +178,7 @@ QLineEdit* Zood::searchBox() {
 }
 
 void Zood::refreshAll() {
-    d->refresh(HomeWidget::Monday);
-    d->refresh(HomeWidget::Tuesday);
-    d->refresh(HomeWidget::Wednesday);
-    d->refresh(HomeWidget::Thursday);
-    d->refresh(HomeWidget::Friday);
-    d->refresh(HomeWidget::Saturday);
-    d->refresh(HomeWidget::Sunday);
+    d->refreshAll();
 }
 
 void Zood::setPredictStringList(QStringList indicator) {

@@ -1,12 +1,14 @@
 #include "videoWidget.hpp"
 #include "ui_videoSettingView.h"
 #include "ui_customLabel.h"
+#include "ui_SourcesListContainer.h"
 
 #include <QEvent>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QMimeData>
 #include <QShortcut>
+#include <QPushButton>
 
 #include "../../BLL/data/videoItemModel.hpp"
 #include "../common/popupWidget.hpp"
@@ -33,12 +35,12 @@ class VideoWidgetPrivate {
 public:
     VideoWidgetPrivate(VideoWidget* parent) : self(parent) {
         mainLayout = new QVBoxLayout(self);
-        
     }
 
     ~VideoWidgetPrivate() {
         delete ui_videoSetting;
         delete ui_logView;
+        delete ui_sourceList;
         if (player->isPlaying()) {
             player->stop();
         }
@@ -95,6 +97,14 @@ public:
         logWidget->setStopTimerEnter(false);
         logWidget->setParent(self);
         logWidget->hide();
+
+        // 源列表
+        sourceListWidget = new PopupWidget(self);
+        ui_sourceList = new Ui::SourceList();
+        ui_sourceList->setupUi(sourceListWidget);
+        sourceListWidget->setAssociateWidget(ui_videoSetting->sourceButton);
+        sourceListWidget->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+        sourceListWidget->setAuotLayout();
     }
     
     void setupShortcut() {
@@ -140,6 +150,7 @@ public:
         connectVideoPlayBar();
         connectVideoPlaySetting();
         connectVideoStatus();
+        connectSourceList();
     }
 
     void update() {
@@ -157,20 +168,52 @@ public:
 
     void pause() {
         if (player->isPlaying()) {
+            savePlayStatus();
             player->pause();
         } else {
             videoLog("请先播放视频");
         }
     }
+    
+    void deleteAllChildren(QWidget* widget) {
+        for (auto item : widget->findChildren<QWidget*>()) {
+            item->setParent(nullptr);
+            item->deleteLater();
+        }
+    }
+
+    void updateSourceList(const QStringList& sourceList) {
+        deleteAllChildren(sourceListWidget);
+        for (auto source : sourceList) {
+            QPushButton *button = new QPushButton(sourceListWidget);
+            sourceListWidget->layout()->addWidget(button);
+            button->setText(source);
+            QWidget::connect(button, &QPushButton::clicked, self, [this, source](bool checked){
+                stop();
+                videoLog("正在切换视频源");
+                video->setCurrentVideoSource(source);
+                ui_videoSetting->sourceButton->setText(source);
+                videoLog("切换完成");
+                play(video);
+            });
+        }
+    }
 
     void play(const VideoBLLPtr video) {
-        stop();
+        if (player->isPlaying()) {
+            stop();
+        }
+        videoLog("开始加载视频");
+        updateSourceList(video->sourcesList());
+        ui_videoSetting->sourceButton->setText(video->getCurrentVideoSource());
         this->video = video;
         video->loadVideoToPlay(self, [this](const Result<QString>& url){
             if (url.has_value()) {
                 player->setSource(url.value());
                 player->play();
+                videoLog("视频加载完成");
             }
+            videoLog("视频加载失败");
         });
     }
 
@@ -467,6 +510,13 @@ private:
         settings->setupSetting(self);
     }
 
+    void connectSourceList() {
+        QWidget::connect(ui_videoSetting->sourceButton, &QToolButton::clicked, sourceListWidget, [this](bool checked) {
+            sourceListWidget->show();
+            sourceListWidget->hideLater(5000);
+        });
+    }
+
     void savePlayStatus() {
         video->setStatus("position", position());
     }
@@ -494,6 +544,9 @@ public:
     CustomSlider* videoProgressBar = nullptr;
 
     VolumeSettingWidget* volumeSetting = nullptr;
+
+    PopupWidget* sourceListWidget = nullptr;
+    Ui::SourceList* ui_sourceList = nullptr;
 
     FullSettingWidget* settings = nullptr;
 

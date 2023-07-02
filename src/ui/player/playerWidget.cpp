@@ -62,6 +62,12 @@ public:
         video->addToList(ui->playlist);
     }
 
+    void clear() {
+        itemModel->clear();
+        ui->playlist->clear();
+        videoWidget->stop();
+    }
+
 private:
     /**
      * @brief 标题栏
@@ -169,8 +175,7 @@ private:
         });
         QWidget::connect(ui->clearListButton, &QToolButton::clicked, self, [this](bool clicked){
             setCurrentIndex(-1);
-            ui->playlist->clear();
-            itemModel->clear();
+            clear();
         });
     }
 
@@ -329,4 +334,18 @@ void PlayerWidget::showEvent(QShowEvent *event) {
 
 PlayerWidget::~PlayerWidget() {
     delete d;
+}
+
+void PlayerWidget::setVideoList(VideoBLLList videos) {
+    for (auto video : videos) {
+        d->addVideo(video);
+    }
+}
+
+void PlayerWidget::appendVideo(VideoBLLPtr video) {
+    d->addVideo(video);    
+}
+
+void PlayerWidget::clearVideoList() {
+    d->clear();
 }
