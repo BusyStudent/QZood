@@ -192,6 +192,7 @@ public:
                 play(video);
             });
         }
+        sourceListWidget->resize(sourceListWidget->sizeHint());
     }
 
     void play(const VideoBLLPtr video) {
@@ -215,7 +216,9 @@ public:
             } else {
                 videoLog("视频加载失败");
             }
-            QTimer::singleShot(5000, [this](){isLoddingVideo = false;});
+            QTimer::singleShot(5000, self, [this](){
+                isLoddingVideo = false;
+            });
         });
     }
 
@@ -515,8 +518,13 @@ private:
 
     void connectSourceList() {
         QWidget::connect(ui_videoSetting->sourceButton, &QToolButton::clicked, sourceListWidget, [this](bool checked) {
+            videoSetting->setHideAfterLeave(false);
             sourceListWidget->show();
             sourceListWidget->hideLater(5000);
+        });
+        QWidget::connect(sourceListWidget, &PopupWidget::hided, self, [this]() {
+            videoSetting->setHideAfterLeave(true);
+            videoSetting->hideLater();
         });
     }
 

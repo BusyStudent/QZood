@@ -73,7 +73,7 @@ class VideoSourceBLL : public QObject{
          * @param obj 绑定到该对象的生命周期，nullptr时绑定到该类自己身上
          * @param func 得到搜索结果时的调用
          */
-        void searchBangumiFromTimeline(Timeline t,QObject *obj, std::function<void(const Result<BangumiList>&)> func);
+        void searchBangumiFromTimeline(Timeline t,QObject *obj, std::function<void(const Result<TimelineEpisodeList>&)> func);
         /**
          * @brief 搜索给定番剧的所有视频
          * 
@@ -116,7 +116,8 @@ class VideoSourceBLL : public QObject{
         RefPtr<VideoSourceBLLHelper> d;
         RefPtr<BiliClient> client;
         QList<TimelineItemPtr> videoTimelineItems;
-        QMap<TimeWeek, BangumiList> bangumis;
+        QMap<TimeWeek, TimelineEpisodeList> bangumis;
         QMap<QString, QList<VideoBLLPtr>> videos;
+        QMap<QString, TimelineEpisodePtr> titleToTimelineEpisodeList;
         uint8_t dirty = 0xff;
 };

@@ -22,16 +22,23 @@ class LogWidgetPrivate {
                     self->show();
                     self->hideLater();
                 }
+                ui->label->setText("");
             });
         }
 
         void pushLog(const QString& log) {
-            logs.push_back(log);
-            if (self->isHidden()) {
-                ui->label->setText(log);
-                self->show();
-                self->hideLater();
-            }
+            // logs.push_back(log);
+            // if (self->isHidden()) {
+            //     ui->label->setText(log);
+            //     self->show();
+            //     self->hideLater();
+            // }
+            ui->label->setText(ui->label->text() + "\n" + log);
+            ui->label->resize(ui->label->sizeHint());
+            self->resize(self->sizeHint());
+            self->show();
+            self->stopHideTimer();
+            self->hideLater();
         }
     
     public:

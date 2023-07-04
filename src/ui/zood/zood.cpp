@@ -95,7 +95,7 @@ public:
 
     void refreshWeek(HomeWidget::DisplayArea area) {
         VideoSourceBLL *videoSource = VideoSourceBLL::instance();
-        videoSource->searchBangumiFromTimeline(videoSource->videoInWeek((TimeWeek)area), self, [this, area] (const Result<BangumiList>& bangumiList) {
+        videoSource->searchBangumiFromTimeline(videoSource->videoInWeek((TimeWeek)area), self, [this, area] (const Result<TimelineEpisodeList>& bangumiList) {
             if (!bangumiList.has_value()) {
                 return;
             }
@@ -103,10 +103,10 @@ public:
             auto bangumis = bangumiList.value();
             auto video_views = homePage->addItems(area, bangumis.size());
             for (int i = 0; i < video_views.size(); ++i) {
-                video_views[i]->setVideoId(bangumis[i]->title());
-                video_views[i]->setTitle(bangumis[i]->title());
-                video_views[i]->setExtraInformation(bangumis[i]->description());
-                video_views[i]->setSourceInformation(bangumis[i]->availableSource().join("; "));
+                video_views[i]->setVideoId(bangumis[i]->bangumiTitle());
+                video_views[i]->setTitle(bangumis[i]->bangumiTitle());
+                video_views[i]->setExtraInformation(bangumis[i]->pubIndexTitle());
+                // video_views[i]->setSourceInformation(bangumis[i]->().join("; "));
                 video_views[i]->setImage(QImage(":/icons/loading_bar.png"));
                 bangumis[i]->fetchCover().then(video_views[i], [video_view = video_views[i]](const Result<QImage>& img) {
                     if (img.has_value()) {

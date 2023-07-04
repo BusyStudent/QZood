@@ -112,7 +112,7 @@ void PopupWidget::showEvent(QShowEvent *event) {
     if (auto_layout) {
         // 计算容器（父窗口或屏幕），贴靠对象，自身在容器坐标系下的矩阵
         QRect containerRect, selfRect;
-        QWidget* p = isWindow() ? nullptr : parentWidget();
+        auto p = isWindow() ? nullptr : parentWidget();
         qDebug() << "parent : " << p;
         QPoint topLeft(0, 0);
         if (p != nullptr) {
