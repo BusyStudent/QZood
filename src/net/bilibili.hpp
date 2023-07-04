@@ -7,7 +7,18 @@
 #include "client.hpp"
 #include "../danmaku.hpp"
 
-#define BILIBILI_CLIENT_NAME "Bilibili"
+#define BILIBILI_CLIENT_NAME QStringLiteral("Bilibili")
+
+class BiliClient;
+class BiliEpisode;
+class BiliBangumi;
+class BiliTimelineEpisode;
+class BiliTimelineItem;
+
+using BiliEpisodeList = QList<RefPtr<BiliEpisode>>;
+using BiliBangumiList = QList<RefPtr<BiliBangumi>>;
+using BiliTimeline    = QList<RefPtr<BiliTimelineItem>>;   
+using BiliTimelineEpisodeList = QList<RefPtr<BiliTimelineEpisode>>;
 
 class BiliVideoInfo final {
     public:
@@ -25,7 +36,18 @@ class BiliUrlParse final {
         QString seasonID;  //< ID of season, juat number, like 1234
         QString episodeID; //< ID of episode, juat number, like 1234
 };
-class BiliEpisode final {
+class BiliEpisode final : public Episode {
+    public:
+        QString title() override;
+        QString indexTitle() override;
+        QString longTitle() override;
+        NetResult<QImage> fetchCover() override;
+        QStringList sourcesList() override;
+        QString     recommendedSource() override;
+        NetResult<QString> fetchVideo(const QString &sourceString) override;
+        QStringList danmakuSourceList() override;
+        NetResult<DanmakuList> fetchDanmaku(const QString &what) override;
+        VideoInterface *rootInterface() override;
     public:
         QString id; //< ID of episode, juat number, like 1234
         QString bvid; //< BVID 
@@ -35,22 +57,40 @@ class BiliEpisode final {
         QString cover;
 
         QString subtitle;
-        QString title;
-        QString longTitle;
+        QString _title;
+        QString _longTitle;
+
+        BiliClient *client = nullptr;
 };
-class BiliBangumi final {
+class BiliBangumi final : public Bangumi {
+    public:
+        NetResult<EpisodeList> fetchEpisodes() override;
+        VideoInterface *rootInterface() override;
+        QStringList availableSource() override;
+        QString     description() override;
+        QString     title() override;
+        NetResult<QImage> fetchCover() override;
     public:
         QString seasonID; //< ID of season, juat number, like 1234
         QString cover; //< Url of cover
-        QString title;
         QString alias; //< Alias name
+        QString _title;
         QString jpTitle; //< Title in japanese format
         QString orgTitle; //< Org title
         QString evaluate; //< Evaluate
 
-        QList<BiliEpisode> episodes;
+        BiliEpisodeList episodes;
+
+        BiliClient *client = nullptr;
 };
-class BiliTimelineEpisode final {
+class BiliTimelineEpisode final : public TimelineEpisode {
+    public:
+        QString         bangumiTitle() override;
+        QString         pubIndexTitle() override;
+        VideoInterface *rootInterface() override;
+        bool            hasCover() override;
+        NetResult<QImage> fetchCover() override;
+        NetResult<BangumiPtr> fetchBangumi() override;
     public:
         QString   pubTime;
         QString   pubIndex; //< Index name
@@ -61,18 +101,25 @@ class BiliTimelineEpisode final {
         QString   squareCover;
 
         QString   episodeID; //< ID of episode, juat number, like 1234
+
+        BiliClient *client = nullptr;
 };
-class BiliTimelineDay final {
+class BiliTimelineItem final : public TimelineItem {
     public:
-        QDate date;
-        int   dayOfWeek;
-        QList<BiliTimelineEpisode> episodes;
+        QDate date() override;
+        int   dayOfWeek() override;
+        TimelineEpisodeList episodesList() override;
+        VideoInterface *rootInterface() override;
+    public:
+        QDate _date;
+        int   _dayOfWeek;
+        BiliTimelineEpisodeList episodes;
+
+        BiliClient *client = nullptr;
 };
 
-using BiliBangumiList = QList<BiliBangumi>;
-using BiliTimeline    = QList<BiliTimelineDay>;   
 
-class BiliClient final : public QObject {
+class BiliClient final : public VideoInterface {
     Q_OBJECT
     public:
         BiliClient(QObject *parent = nullptr);
@@ -148,7 +195,7 @@ class BiliClient final : public QObject {
          * @param what 
          * @return NetResult<BiliBangumiList> 
          */
-        NetResult<BiliBangumiList> searchBangumi(const QString &what);
+        NetResult<BiliBangumiList> searchBangumiInternal(const QString &what);
         /**
          * @brief Get the timeline data for the bangumi
          * 
@@ -157,7 +204,7 @@ class BiliClient final : public QObject {
          * @param after 
          * @return NetResult<BiliTimeline> 
          */
-        NetResult<BiliTimeline>    fetchTimeline(int kind = 1, int before = 7, int after = 7);
+        NetResult<BiliTimeline>    fetchTimelineInternal(int kind = 1, int before = 7, int after = 7);
         /**
          * @brief Convert bvid or avid to cid
          * 
@@ -183,6 +230,10 @@ class BiliClient final : public QObject {
 
         static QString  avidToBvid(uint64_t avid);
         static uint64_t bvidToAvid(const QString &bvid);
+    public: //< VideoInterface
+        QString                name();
+        NetResult<BangumiList> searchBangumi(const QString &what);
+        NetResult<Timeline>    fetchTimeline();
     private:
         NetResult<BiliBangumi> fetchBangumiInternal(const QString &seasonID, const QString &episodeID);
         void                   fetchCookie();

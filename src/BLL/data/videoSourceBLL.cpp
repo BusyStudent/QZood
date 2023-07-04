@@ -89,15 +89,16 @@ void VideoSourceBLL::searchBangumiFromTimeline(Timeline t,QObject *obj, std::fun
         // 当前缓存中不存在数据，调用数据接口fetch数据
         std::shared_ptr<int> counter = std::make_shared<int>(t.size());
         for (auto& timelineItem : t) {
-            timelineItem->fetchBangumiList().then([this, counter, func, week = (TimeWeek)(timelineItem->dayOfWeek())](const Result<BangumiList>& bangumiList){
-                if(bangumiList.has_value()) {
-                    bangumis[week].append(bangumiList.value());
-                }
-                (*counter)--;
-                if (0 == (*counter)) {
-                    func(bangumis[week]);
-                }
-            });
+            // TODO : TODO(llhsdmd): 更改到最新的API 
+            // timelineItem->fetchBangumiList().then([this, counter, func, week = (TimeWeek)(timelineItem->dayOfWeek())](const Result<BangumiList>& bangumiList){
+            //     if(bangumiList.has_value()) {
+            //         bangumis[week].append(bangumiList.value());
+            //     }
+            //     (*counter)--;
+            //     if (0 == (*counter)) {
+            //         func(bangumis[week]);
+            //     }
+            // });
         }
     }
 }

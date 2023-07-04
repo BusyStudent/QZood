@@ -13,9 +13,131 @@
 #include "dm.pb.h"
 #endif
 
-BiliClient::BiliClient(QObject *parent) : QObject(parent) {
-    manager.setCookieJar(new QNetworkCookieJar(&manager));
+// Episode
+QString BiliEpisode::title() {
+    return _title;
+}
+QString BiliEpisode::indexTitle() {
+    return _title;
+}
+QString BiliEpisode::longTitle() {
+    return _longTitle;
+}
+NetResult<QImage> BiliEpisode::fetchCover() {
+    return WrapHttpImagePromise(client->fetchFile(cover));
+}
+QStringList BiliEpisode::sourcesList() {
+    return QStringList(" ");
+}
+QStringList BiliEpisode::danmakuSourceList() {
+    return QStringList(" ");
+}
+QString     BiliEpisode::recommendedSource() {
+    return " ";
+}
+NetResult<QString> BiliEpisode::fetchVideo(const QString &sourceString) {
+    if (sourceString != " ") {
+        return NetResult<QString>::Alloc().putLater(std::nullopt);
+    }
+    auto r = NetResult<QString>::Alloc();
+    client->fetchVideoSource(cid, bvid).then([r](const Result<BiliVideoSource> &s) mutable {
+        if (!s) {
+            r.putResult(std::nullopt);
+            return;
+        }
+        r.putResult(s.value().urls.first());
+    });
+    return r;
+}
+NetResult<DanmakuList> BiliEpisode::fetchDanmaku(const QString &sourceString) {
+    if (sourceString != " ") {
+        return NetResult<DanmakuList>::Alloc().putLater(std::nullopt);
+    }
+    return client->fetchDanmaku(cid);
+}
+VideoInterface *BiliEpisode::rootInterface() {
+    return client;
+}
 
+// Bangumi
+NetResult<EpisodeList> BiliBangumi::fetchEpisodes() {
+    auto r = NetResult<EpisodeList>::Alloc();
+    if (episodes.empty()) {
+        client->fetchBangumiByEpisodeID(seasonID).then([r](const Result<BiliBangumi> &bangumi) mutable {
+            if (!bangumi) {
+                return;
+            }
+            r.putLater(ToSuperObjectList<Episode>(bangumi.value().episodes));
+        });
+    }
+    else {
+        r.putLater(ToSuperObjectList<Episode>(episodes));
+    }
+
+    return r;
+}
+NetResult<QImage> BiliBangumi::fetchCover() {
+    return WrapHttpImagePromise(client->fetchFile(cover));
+}
+QStringList     BiliBangumi::availableSource() {
+    return QStringList(BILIBILI_CLIENT_NAME);
+}
+QString         BiliBangumi::description() {
+    return evaluate;
+}
+QString         BiliBangumi::title() {
+    return _title;
+}
+VideoInterface *BiliBangumi::rootInterface() {
+    return client;
+}
+
+// Episode
+QString BiliTimelineEpisode::bangumiTitle() {
+    return title;
+}
+QString BiliTimelineEpisode::pubIndexTitle() {
+    return pubIndex;
+}
+VideoInterface *BiliTimelineEpisode::rootInterface() {
+    return client;
+}
+bool BiliTimelineEpisode::hasCover() {
+    return true;
+}
+NetResult<QImage> BiliTimelineEpisode::fetchCover() {
+    return WrapHttpImagePromise(client->fetchFile(cover));
+}
+NetResult<BangumiPtr> BiliTimelineEpisode::fetchBangumi() {
+    auto r = NetResult<BangumiPtr>::Alloc();
+    client->fetchBangumiByEpisodeID(episodeID).then([r](const Result<BiliBangumi> &bangumi) mutable {
+        if (!bangumi) {
+            r.putResult(std::nullopt);
+            return;
+        }
+        r.putResult(std::make_shared<BiliBangumi>(bangumi.value()));
+    });
+    return r;
+}
+
+// TimelimeItem
+QDate BiliTimelineItem::date() {
+    return _date;
+}
+int   BiliTimelineItem::dayOfWeek() {
+    return _dayOfWeek;
+}
+TimelineEpisodeList BiliTimelineItem::episodesList() {
+    return ToSuperObjectList<TimelineEpisode>(episodes);
+}
+VideoInterface *BiliTimelineItem::rootInterface() {
+    return client;
+}
+
+// Client
+BiliClient::BiliClient(QObject *parent) {
+    manager.setCookieJar(new QNetworkCookieJar(&manager));
+    setParent(parent);
 }
 BiliClient::~BiliClient() {
 
@@ -273,20 +395,20 @@ NetResult<BiliVideoSource> BiliClient::fetchVideoSource(const QString &cid, cons
 
     return result;
 }
-NetResult<BiliBangumiList> BiliClient::searchBangumi(const QString &name) {
+NetResult<BiliBangumiList> BiliClient::searchBangumiInternal(const QString &name) {
     auto result = NetResult<BiliBangumiList>::Alloc();
     // Todo cookie here
     if (!hasCookie) {
         fetchFile("https://www.bilibili.com").then([result, name, this](const Result<QByteArray> &b) mutable {
             hasCookie = true;
-            searchBangumi(name).then([result](const Result<BiliBangumiList> &r) mutable {
+            searchBangumiInternal(name).then([result](const Result<BiliBangumiList> &r) mutable {
                 result.putResult(r);
             });
         });
         return result;
     }
 
-    fetchFile(QString("https://api.bilibili.com/x/web-interface/search/type?search_type=media_bangumi&keyword=%1").arg(name)).then(this, [result](const Result<QByteArray> &data) mutable {
+    fetchFile(QString("https://api.bilibili.com/x/web-interface/search/type?search_type=media_bangumi&keyword=%1").arg(name)).then(this, [this, result](const Result<QByteArray> &data) mutable {
         Result<BiliBangumiList> list;
         if (!data) {
             result.putResult(list);
@@ -309,12 +431,13 @@ NetResult<BiliBangumiList> BiliClient::searchBangumi(const QString &name) {
             BiliBangumi ban;
             ban.seasonID = QString::number(item["season_id"].toInt());
             ban.cover = item["cover"].toString();
-            ban.title = item["title"].toString();
+            ban._title = item["title"].toString();
             ban.orgTitle = item["org_title"].toString();
             ban.evaluate = item["desc"].toString();
+            ban.client = this;
 
             // Clean the title
-            ban.title.replace("\u003cem class=\"keyword\"\u003e", "").replace("\u003c/em\u003e", "");
+            ban._title.replace("\u003cem class=\"keyword\"\u003e", "").replace("\u003c/em\u003e", "");
             ban.orgTitle.replace("\u003cem class=\"keyword\"\u003e", "").replace("\u003c/em\u003e", "");
             
             // For 
@@ -324,13 +447,13 @@ NetResult<BiliBangumiList> BiliClient::searchBangumi(const QString &name) {
                 BiliEpisode episode;
                 episode.id = QString::number(ep["id"].toInt());
                 episode.cover = ep["cover"].toString();
-                episode.title = ep["title"].toString();
-                episode.longTitle = ep["long_title"].toString();
+                episode._title = ep["title"].toString();
+                episode._longTitle = ep["long_title"].toString();
 
-                ban.episodes.push_back(episode);
+                ban.episodes.push_back(std::make_shared<BiliEpisode>(episode));
             }
 
-            blist.push_back(ban);
+            blist.push_back(std::make_shared<BiliBangumi>(ban));
         }
 
         list = blist;
@@ -352,7 +475,7 @@ NetResult<BiliBangumi> BiliClient::fetchBangumiInternal(const QString &seasonID,
     
     auto result = NetResult<BiliBangumi>::Alloc();
 
-    fetchFile(url).then([result](const Result<QByteArray> &data) mutable {
+    fetchFile(url).then([result, this](const Result<QByteArray> &data) mutable {
         Result<BiliBangumi> ban;
         if (data) {
             QJsonParseError error;
@@ -365,8 +488,9 @@ NetResult<BiliBangumi> BiliClient::fetchBangumiInternal(const QString &seasonID,
                 bangumi.alias = result["alias"].toString();
                 bangumi.cover = result["cover"].toString();
                 bangumi.evaluate = result["evaluate"].toString();
-                bangumi.title = result["title"].toString();
+                bangumi._title = result["title"].toString();
                 bangumi.jpTitle  = result["jp_title"].toString();
+                bangumi.client = this;
 
                 for (auto elem : result["episodes"].toArray()) {
                     BiliEpisode eps;
@@ -379,11 +503,13 @@ NetResult<BiliBangumi> BiliClient::fetchBangumiInternal(const QString &seasonID,
 
                     eps.cover = object["cover"].toString();
 
-                    eps.longTitle = object["long_title"].toString();
-                    eps.title = object["title"].toString();
+                    eps._longTitle = object["long_title"].toString();
+                    eps._title = object["title"].toString();
                     eps.subtitle = object["subtitle"].toString();
 
-                    bangumi.episodes.push_back(eps);
+                    eps.client = this;
+
+                    bangumi.episodes.push_back(std::make_shared<BiliEpisode>(eps));
                 }
 
                 ban = bangumi;
@@ -394,14 +520,14 @@ NetResult<BiliBangumi> BiliClient::fetchBangumiInternal(const QString &seasonID,
 
     return result;
 }
-NetResult<BiliTimeline> BiliClient::fetchTimeline(int kind, int before, int after) {
+NetResult<BiliTimeline> BiliClient::fetchTimelineInternal(int kind, int before, int after) {
     auto url = QString("https://api.bilibili.com/pgc/web/timeline?types=%1&before=%2&after=%3").arg(
         QString::number(kind), 
         QString::number(before), 
         QString::number(after)
     );
     auto result = NetResult<BiliTimeline>::Alloc();
-    fetchFile(url).then([result](const Result<QByteArray> &data) mutable {
+    fetchFile(url).then([result, this](const Result<QByteArray> &data) mutable {
         if (!data) {
             result.putResult(std::nullopt);
             return;
@@ -425,10 +551,10 @@ NetResult<BiliTimeline> BiliClient::fetchTimeline(int kind, int before, int afte
         auto years = QDateTime::currentDateTime().date().year();
 
         for (auto _day : json["result"].toArray()) {
-            BiliTimelineDay day;
+            auto item = std::make_shared<BiliTimelineItem>();
             auto data = _day.toObject();
 
-            day.dayOfWeek = data["day_of_week"].toInt();
+            item->_dayOfWeek = data["day_of_week"].toInt();
 
             auto dateString = data["date"].toString();
             // Like 2-3
@@ -436,27 +562,29 @@ NetResult<BiliTimeline> BiliClient::fetchTimeline(int kind, int before, int afte
             int dayt;
             sscanf(dateString.toUtf8().constData(), "%d-%d", &month, &dayt);
 
-            day.date = QDate(years, month, dayt);
+            item->_date = QDate(years, month, dayt);
 
             for (auto _ep : data["episodes"].toArray()) {
-                BiliTimelineEpisode ep;
+                auto ep = std::make_shared<BiliTimelineEpisode>();
                 auto data = _ep.toObject();
 
-                ep.pubTime = data["pub_time"].toString();
-                ep.pubIndex = data["pub_index"].toString();
+                ep->pubTime = data["pub_time"].toString();
+                ep->pubIndex = data["pub_index"].toString();
 
-                ep.epCover = data["ep_cover"].toString();
-                ep.squareCover = data["square_cover"].toString();
-                ep.cover = data["cover"].toString();
+                ep->epCover = data["ep_cover"].toString();
+                ep->squareCover = data["square_cover"].toString();
+                ep->cover = data["cover"].toString();
 
-                ep.title = data["title"].toString();
+                ep->title = data["title"].toString();
 
-                ep.episodeID = QString::number(data["episode_id"].toInteger());
+                ep->episodeID = QString::number(data["episode_id"].toInteger());
 
-                day.episodes.push_back(ep);
+                ep->client = this;
+
+                item->episodes.push_back(ep);
             }
 
-            timeline.push_back(day);
+            timeline.push_back(item);
         }
 
         result.putResult(timeline);
@@ -543,6 +671,31 @@ BiliUrlParse    BiliClient::parseUrl(const QString &url) {
     return result;
 }
 
+QString BiliClient::name() {
+    return BILIBILI_CLIENT_NAME;
+}
+NetResult<Timeline> BiliClient::fetchTimeline() {
+    auto r = NetResult<Timeline>::Alloc();
+    fetchTimelineInternal().then([r](const Result<BiliTimeline> &timeline) mutable {
+        if (!timeline) {
+            r.putResult(std::nullopt);
+            return;
+        }
+        r.putResult(ToSuperObjectList<TimelineItem>(timeline.value()));
+    });
+    return r;
+}
+NetResult<BangumiList> BiliClient::searchBangumi(const QString &what) {
+    auto r = NetResult<BangumiList>::Alloc();
+    searchBangumiInternal(what).then([r](const Result<BiliBangumiList> &list) mutable {
+        if (!list) {
+            r.putResult(std::nullopt);
+            return;
+        }
+        r.putResult(ToSuperObjectList<Bangumi>(list.value()));
+    });
+    return r;
+}
 // Convert Utils
 
 // From https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/docs/other/bvid_desc.md
@@ -590,245 +743,242 @@ uint64_t BiliClient::bvidToAvid(const QString &bvid) {
 		r += trTable[bv[s[i]]] * (uint64_t)pow(58, i);
 	av = (r - ::ADD) ^ ::XOR;
 	return av;
-
 }
 
+ZOOD_REGISTER_VIDEO_INTERFACE(BiliClient);
 
 // BilibiliWrapper
 namespace {
 
-static VideoInterface *staticBInterface = nullptr;
+// static VideoInterface *staticBInterface = nullptr;
 
-class BEpisode : public Episode {
-public:
-    BEpisode(BiliEpisode b, BiliClient &client) : data(b), client(client) { }
+// class BEpisode : public Episode {
+// public:
+//     BEpisode(BiliEpisode b, BiliClient &client) : data(b), client(client) { }
 
-    QString title() override {
-        return data.title;
-    }
-    QString indexTitle() override {
-        return data.title;
-    }
-    QString longTitle() override {
-        return data.longTitle;
-    }
-    NetResult<QImage> fetchCover() override {
-        auto r = NetResult<QImage>::Alloc();
-        client.fetchFile(data.cover).then([r](const Result<QByteArray> &b) mutable {
-            if (!b) {
-                r.putResult(std::nullopt);
-                return;
-            }
-            auto image = QImage::fromData(b.value());
-            if (image.isNull()) {
-                r.putResult(std::nullopt);
-                return;
-            }
-            r.putResult(image);
-        });
-        return r;
-    }
-    QStringList sourcesList() override {
-        return QStringList(" ");
-    }
-    QStringList danmakuSourceList() override {
-        return QStringList(" ");
-    }
-    QString     recommendedSource() override {
-        return " ";
-    }
-    NetResult<QString> fetchVideo(const QString &sourceString) override {
-        if (sourceString != " ") {
-            return NetResult<QString>::Alloc().putLater(std::nullopt);
-        }
-        auto r = NetResult<QString>::Alloc();
-        client.fetchVideoSource(data.cid, data.bvid).then([r](const Result<BiliVideoSource> &s) mutable {
-            if (!s) {
-                r.putResult(std::nullopt);
-                return;
-            }
-            r.putResult(s.value().urls.first());
-        });
-        return r;
-    }
-    NetResult<DanmakuList> fetchDanmaku(const QString &sourceString) override {
-        if (sourceString != " ") {
-            return NetResult<DanmakuList>::Alloc().putLater(std::nullopt);
-        }
-        return client.fetchDanmaku(data.cid);
-    }
-    VideoInterface *rootInterface() override {
-        return staticBInterface;
-    }
-private:
-    BiliEpisode data;
-    BiliClient &client;
-};
+//     QString title() override {
+//         return data.title;
+//     }
+//     QString indexTitle() override {
+//         return data.title;
+//     }
+//     QString longTitle() override {
+//         return data.longTitle;
+//     }
+//     NetResult<QImage> fetchCover() override {
+//         auto r = NetResult<QImage>::Alloc();
+//         client.fetchFile(data.cover).then([r](const Result<QByteArray> &b) mutable {
+//             if (!b) {
+//                 r.putResult(std::nullopt);
+//                 return;
+//             }
+//             auto image = QImage::fromData(b.value());
+//             if (image.isNull()) {
+//                 r.putResult(std::nullopt);
+//                 return;
+//             }
+//             r.putResult(image);
+//         });
+//         return r;
+//     }
+//     QStringList sourcesList() override {
+//         return QStringList(" ");
+//     }
+//     QStringList danmakuSourceList() override {
+//         return QStringList(" ");
+//     }
+//     QString     recommendedSource() override {
+//         return " ";
+//     }
+//     NetResult<QString> fetchVideo(const QString &sourceString) override {
+//         if (sourceString != " ") {
+//             return NetResult<QString>::Alloc().putLater(std::nullopt);
+//         }
+//         auto r = NetResult<QString>::Alloc();
+//         client.fetchVideoSource(data.cid, data.bvid).then([r](const Result<BiliVideoSource> &s) mutable {
+//             if (!s) {
+//                 r.putResult(std::nullopt);
+//                 return;
+//             }
+//             r.putResult(s.value().urls.first());
+//         });
+//         return r;
+//     }
+//     NetResult<DanmakuList> fetchDanmaku(const QString &sourceString) override {
+//         if (sourceString != " ") {
+//             return NetResult<DanmakuList>::Alloc().putLater(std::nullopt);
+//         }
+//         return client.fetchDanmaku(data.cid);
+//     }
+//     VideoInterface *rootInterface() override {
+//         return staticBInterface;
+//     }
+// private:
+//     BiliEpisode data;
+//     BiliClient &client;
+// };
 
-class BBangumi : public Bangumi {
-public:
-    BBangumi(BiliBangumi b, BiliClient &client) : data(b), client(client) { }
+// class BBangumi : public Bangumi {
+// public:
+//     BBangumi(BiliBangumi b, BiliClient &client) : data(b), client(client) { }
 
-    NetResult<EpisodeList> fetchEpisodes() override {
-        if (!hasFullData) {
-            auto result = NetResult<EpisodeList>::Alloc();
-            client.fetchBangumiBySeasonID(data.seasonID).then([result, c = &this->client](const Result<BiliBangumi> &ban) mutable {
-                if (!ban) {
-                    result.putResult(std::nullopt);
-                    return;
-                }
+//     NetResult<EpisodeList> fetchEpisodes() override {
+//         if (!hasFullData) {
+//             auto result = NetResult<EpisodeList>::Alloc();
+//             client.fetchBangumiBySeasonID(data.seasonID).then([result, c = &this->client](const Result<BiliBangumi> &ban) mutable {
+//                 if (!ban) {
+//                     result.putResult(std::nullopt);
+//                     return;
+//                 }
 
-                EpisodeList list;
-                for (const auto &each : ban.value().episodes) {
-                    list.push_back(std::make_shared<BEpisode>(each, *c));
-                }
-                result.putResult(list);
-            });
-            return result;
-        }
+//                 EpisodeList list;
+//                 for (const auto &each : ban.value().episodes) {
+//                     list.push_back(std::make_shared<BEpisode>(each, *c));
+//                 }
+//                 result.putResult(list);
+//             });
+//             return result;
+//         }
 
-        EpisodeList list;
-        for (const auto &each : data.episodes) {
-            list.push_back(std::make_shared<BEpisode>(each, client));
-        }
+//         EpisodeList list;
+//         for (const auto &each : data.episodes) {
+//             list.push_back(std::make_shared<BEpisode>(each, client));
+//         }
 
-        return NetResult<EpisodeList>::AllocWithResult(list);
-    }
-    NetResult<QImage> fetchCover() override {
-        auto r = NetResult<QImage>::Alloc();
-        client.fetchFile(data.cover).then([r](const Result<QByteArray> &b) mutable {
-            if (!b) {
-                r.putResult(std::nullopt);
-                return;
-            }
-            auto image = QImage::fromData(b.value());
-            if (image.isNull()) {
-                r.putResult(std::nullopt);
-                return;
-            }
-            r.putResult(image);
-        });
-        return r;
-    }
-    QStringList availableSource() override {
-        return QStringList(BILIBILI_CLIENT_NAME);
-    }
-    QString description() override {
-        return data.evaluate;
-    }
-    QString title() override {
-        return data.title;
-    }
-    VideoInterface *rootInterface() override {
-        return staticBInterface;
-    }
-private:
-    BiliBangumi data;
-    BiliClient &client;
-    bool        hasFullData = true;
-friend class BClient;
-};
-class BTimelineItem : public TimelineItem, public QObject {
-public:
-    BTimelineItem(BiliTimelineDay b, BiliClient &client) : data(b), client(client) { }
+//         return NetResult<EpisodeList>::AllocWithResult(list);
+//     }
+//     NetResult<QImage> fetchCover() override {
+//         auto r = NetResult<QImage>::Alloc();
+//         client.fetchFile(data.cover).then([r](const Result<QByteArray> &b) mutable {
+//             if (!b) {
+//                 r.putResult(std::nullopt);
+//                 return;
+//             }
+//             auto image = QImage::fromData(b.value());
+//             if (image.isNull()) {
+//                 r.putResult(std::nullopt);
+//                 return;
+//             }
+//             r.putResult(image);
+//         });
+//         return r;
+//     }
+//     QStringList availableSource() override {
+//         return QStringList(BILIBILI_CLIENT_NAME);
+//     }
+//     QString description() override {
+//         return data.evaluate;
+//     }
+//     QString title() override {
+//         return data.title;
+//     }
+//     VideoInterface *rootInterface() override {
+//         return staticBInterface;
+//     }
+// private:
+//     BiliBangumi data;
+//     BiliClient &client;
+//     bool        hasFullData = true;
+// friend class BClient;
+// };
+// class BTimelineItem : public TimelineItem, public QObject {
+// public:
+//     BTimelineItem(BiliTimelineDay b, BiliClient &client) : data(b), client(client) { }
 
-    QDate date() override {
-        return data.date;
-    }
-    int       dayOfWeek() override {
-        return data.dayOfWeek;
-    }
-    NetResult<BangumiList> fetchBangumiList() override {
-        if (requestLeft > 0) {
-            // Has current request
-            return pendingPromise;
-        }
-        if (requestLeft == 0) {
-            // Already fetched
-            return NetResult<BangumiList>::Alloc().putLater(outList);
-        }
+//     QDate date() override {
+//         return data.date;
+//     }
+//     int       dayOfWeek() override {
+//         return data.dayOfWeek;
+//     }
+//     NetResult<BangumiList> fetchBangumiList() override {
+//         if (requestLeft > 0) {
+//             // Has current request
+//             return pendingPromise;
+//         }
+//         if (requestLeft == 0) {
+//             // Already fetched
+//             return NetResult<BangumiList>::Alloc().putLater(outList);
+//         }
 
-        auto r = NetResult<BangumiList>::Alloc();
-        pendingPromise = r;
-        requestLeft = data.episodes.size();
+//         auto r = NetResult<BangumiList>::Alloc();
+//         pendingPromise = r;
+//         requestLeft = data.episodes.size();
 
-        for (const auto &ep : data.episodes) {
-            client.fetchBangumiByEpisodeID(ep.episodeID)
-                .then(this, [this, r](const Result<BiliBangumi> &ban) mutable {
-                    if (ban) {
-                        outList.push_back(std::make_shared<BBangumi>(ban.value(), client));
-                    }
-                    requestLeft -= 1;
+//         for (const auto &ep : data.episodes) {
+//             client.fetchBangumiByEpisodeID(ep.episodeID)
+//                 .then(this, [this, r](const Result<BiliBangumi> &ban) mutable {
+//                     if (ban) {
+//                         outList.push_back(std::make_shared<BBangumi>(ban.value(), client));
+//                     }
+//                     requestLeft -= 1;
 
-                    if (requestLeft == 0) {
-                        // Done
-                        r.putResult(outList);
+//                     if (requestLeft == 0) {
+//                         // Done
+//                         r.putResult(outList);
 
-                        // Unref the value we goted
-                        pendingPromise = NetResult<BangumiList>();
-                    }
-            });
-        }
-        return r;
-    }
-    VideoInterface *rootInterface() override {
-        return staticBInterface;
-    }
-private:
-    BiliTimelineDay data;
-    BiliClient &client;
-    int requestLeft = -1;
-    BangumiList outList;
+//                         // Unref the value we goted
+//                         pendingPromise = NetResult<BangumiList>();
+//                     }
+//             });
+//         }
+//         return r;
+//     }
+//     VideoInterface *rootInterface() override {
+//         return staticBInterface;
+//     }
+// private:
+//     BiliTimelineDay data;
+//     BiliClient &client;
+//     int requestLeft = -1;
+//     BangumiList outList;
 
-    NetResult<BangumiList> pendingPromise;
-};
+//     NetResult<BangumiList> pendingPromise;
+// };
 
-class BClient : public VideoInterface {
-public:
-    BClient() {
-        staticBInterface = this;
-    }
-    QString name() override {
-        return BILIBILI_CLIENT_NAME;
-    }
-    NetResult<BangumiList> searchBangumi(const QString &text) override {
-        auto r = NetResult<BangumiList>::Alloc();
-        client.searchBangumi(text).then(this, [r, this](const Result<BiliBangumiList> &bans) mutable {
-            if (!bans) {
-                r.putResult(std::nullopt);
-                return;
-            }
-            BangumiList outList;
-            for (const auto &each : bans.value()) {
-                auto i = std::make_shared<BBangumi>(each, client);
-                i->hasFullData = false;
-                outList.push_back(i);
+// class BClient : public VideoInterface {
+// public:
+//     BClient() {
+//         staticBInterface = this;
+//     }
+//     QString name() override {
+//         return BILIBILI_CLIENT_NAME;
+//     }
+//     NetResult<BangumiList> searchBangumi(const QString &text) override {
+//         auto r = NetResult<BangumiList>::Alloc();
+//         client.searchBangumiInternal(text).then(this, [r, this](const Result<BiliBangumiList> &bans) mutable {
+//             if (!bans) {
+//                 r.putResult(std::nullopt);
+//                 return;
+//             }
+//             BangumiList outList;
+//             for (const auto &each : bans.value()) {
+//                 auto i = std::make_shared<BBangumi>(each, client);
+//                 i->hasFullData = false;
+//                 outList.push_back(i);
                 
-            }
-            r.putResult(outList);
-        });
-        return r;
-    }
-    NetResult<Timeline> fetchTimeline() override {
-        auto r = NetResult<Timeline>::Alloc();
-        client.fetchTimeline().then(this, [r, this](const Result<BiliTimeline> &t) mutable{
-            if (!t) {
-                r.putResult(std::nullopt);
-                return;
-            }
-            Timeline timeline;
-            for (const auto &each : t.value()) {
-                timeline.push_back(std::make_shared<BTimelineItem>(each, client));
-            }
-            r.putResult(timeline);
-        });
-        return r;
-    }
-private:
-    BiliClient client;
-};
+//             }
+//             r.putResult(outList);
+//         });
+//         return r;
+//     }
+//     NetResult<Timeline> fetchTimeline() override {
+//         auto r = NetResult<Timeline>::Alloc();
+//         client.fetchTimelineInternal().then(this, [r, this](const Result<BiliTimeline> &t) mutable{
+//             if (!t) {
+//                 r.putResult(std::nullopt);
+//                 return;
+//             }
+//             Timeline timeline;
+//             for (const auto &each : t.value()) {
+//                 timeline.push_back(std::make_shared<BTimelineItem>(each, client));
+//             }
+//             r.putResult(timeline);
+//         });
+//         return r;
+//     }
+// private:
+//     BiliClient client;
+// };
 
 }
-
-
-ZOOD_REGISTER_VIDEO_INTERFACE(BClient);

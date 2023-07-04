@@ -180,6 +180,48 @@ public:
     int         requestLeft = -1;
     QList<EpisodeList> collectedList;
 };
+class MergeTimelineEpisode : public TimelineEpisode {
+public:
+    MergeTimelineEpisode(const TimelineEpisodeList &t) : episodesList(t) { }
+
+    QString bangumiTitle() override {
+        return episodesList[0]->bangumiTitle();
+    }
+    QString pubIndexTitle() override {
+        return episodesList[0]->pubIndexTitle();
+    }
+    bool    hasCover() override {
+        return subEpisodeHasCoverIndex() >= 0;
+    }
+    NetResult<QImage> fetchCover() override {
+        if (!hasCover()) {
+            return NetResult<QImage>::AllocWithResult(std::nullopt);
+        }
+        return episodesList[subEpisodeHasCoverIndex()]->fetchCover();
+    }
+    NetResult<BangumiPtr> fetchBangumi() override {
+        return NetResult<BangumiPtr>::AllocWithResult(std::nullopt);
+    }
+    VideoInterface *rootInterface() override {
+        return DataService::instance();
+    }
+    int subEpisodeHasCoverIndex() {
+        if (hasCoverIndex == -2) {
+            int idx = 0;
+            for (const auto &each : episodesList) {
+                if (each->hasCover()) {
+                    hasCoverIndex = idx;
+                    return hasCoverIndex;
+                }
+            }
+            hasCoverIndex = -1;
+        }
+        return hasCoverIndex;
+    }
+
+    TimelineEpisodeList episodesList;
+    int                 hasCoverIndex = -2; //< -2 means unknown
+};
 class MergeTimelineItem : public TimelineItem {
 public:
     MergeTimelineItem(const QList<TimelineItemPtr> &t) : timelineItems(t) { }
@@ -194,27 +236,19 @@ public:
     VideoInterface *rootInterface() override {
         return DataService::instance();
     }
-    NetResult<BangumiList> fetchBangumiList() override {
-        auto r = NetResult<BangumiList>::Alloc();
-
-        WaitForMultiClient(timelineItems, &TimelineItem::fetchBangumiList)
-            .then([r](const QList<BangumiList> &collectedlist) mutable
-        {
-            // Do merge
-            std::map<QString, BangumiList> map;
-            for (const auto &list : collectedlist) {
-                for (const auto &b : list) {
-                    map[b->title()].push_back(b);
-                }
+    TimelineEpisodeList episodesList() override {
+        // Do merge
+        std::map<QString, TimelineEpisodeList> map;
+        for (const auto &item : timelineItems) {
+            for (const auto &b : item->episodesList()) {
+                map[b->bangumiTitle()].push_back(b);
             }
-            BangumiList resultList;
-            for (const auto &[key, list] : map) {
-                resultList.push_back(std::make_shared<MergedBangumi>(list));
-            }
-            r.putResult(resultList);
-        });
-
-        return r;
+        }
+        TimelineEpisodeList resultList;
+        for (const auto &[key, list] : map) {
+            resultList.push_back(std::make_shared<MergeTimelineEpisode>(list));
+        }
+        return resultList;
     }
 
     QList<TimelineItemPtr> timelineItems;

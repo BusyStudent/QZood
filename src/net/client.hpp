@@ -11,6 +11,7 @@ class QNetworkReply;
 class Episode;
 class Bangumi;
 class TimelineItem;
+class TimelineEpisode;
 class VideoInterface;
 
 using EpisodePtr = RefPtr<Episode>;
@@ -18,9 +19,21 @@ using BangumiPtr = RefPtr<Bangumi>;
 using EpisodeList = QList<EpisodePtr>;
 using BangumiList = QList<BangumiPtr>;
 using TimelineItemPtr = RefPtr<TimelineItem>;
+using TimelineEpisodePtr = RefPtr<TimelineEpisode>;
+using TimelineEpisodeList = QList<TimelineEpisodePtr>;
 using Timeline        = QList<TimelineItemPtr>;
 
-class Episode : public DynRefable {
+class DataObject : public DynRefable {
+    public:
+        /**
+         * @brief Get the name belong to the interface
+         * 
+         * @return QString 
+         */
+        virtual VideoInterface *rootInterface() = 0;
+};
+
+class Episode : public DataObject {
     public:
         /**
          * @brief Get title of the episode
@@ -80,16 +93,9 @@ class Episode : public DynRefable {
          * @return NetResult<DanmakuList> 
          */
         virtual NetResult<DanmakuList> fetchDanmaku(const QString &what);
-
-        /**
-         * @brief Get the name belong to the interface
-         * 
-         * @return QString 
-         */
-        virtual VideoInterface *rootInterface() = 0;
 };
 
-class Bangumi : public DynRefable {
+class Bangumi : public DataObject {
     public:
         /**
          * @brief fetch episode list information of it
@@ -121,16 +127,45 @@ class Bangumi : public DynRefable {
          * @return NetResult<QImage> 
          */
         virtual NetResult<QImage> fetchCover() = 0;
+};
 
+class TimelineEpisode : public DataObject {
+    public:
         /**
-         * @brief Get the name belong to the interface
+         * @brief Get the title of the bangumi
          * 
          * @return QString 
          */
-        virtual VideoInterface *rootInterface() = 0;
+        virtual QString bangumiTitle() = 0;
+        /**
+         * @brief Get the pubTitle of the episode
+         * 
+         * @return QString 
+         */
+        virtual QString pubIndexTitle() = 0;
+
+        /**
+         * @brief Check the Episode in timeline proivde the cover
+         * 
+         * @return true 
+         * @return false 
+         */
+        virtual bool    hasCover() = 0;
+        /**
+         * @brief Try to fetch the episode cover
+         * 
+         * @return NetResult<QImage> 
+         */
+        virtual NetResult<QImage> fetchCover() = 0;
+        /**
+         * @brief Get the bangumi of this episode
+         * 
+         * @return NetResult<BangumiPtr> 
+         */
+        virtual NetResult<BangumiPtr> fetchBangumi() = 0;
 };
 
-class TimelineItem : public DynRefable {
+class TimelineItem : public DataObject {
     public:
         /**
          * @brief Get the date of the timelineItem
@@ -145,18 +180,11 @@ class TimelineItem : public DynRefable {
          */
         virtual int   dayOfWeek() = 0;
         /**
-         * @brief Get the list of bangumi that days
+         * @brief Get the episode of the timeline episode
          * 
-         * @return QList<RefPtr<Bangumi>> 
+         * @return TimelineEpisodeList 
          */
-        virtual NetResult<BangumiList> fetchBangumiList() = 0;
-
-        /**
-         * @brief Get the name belong to the interface
-         * 
-         * @return QString 
-         */
-        virtual VideoInterface *rootInterface() = 0;
+        virtual TimelineEpisodeList episodesList() = 0;
 };
 
 /**
@@ -227,3 +255,12 @@ QList<VideoInterface*> &GetVideoInterfaceList();
 
 NetResult<QByteArray>   WrapQNetworkReply(QNetworkReply *reply);
 NetResult<QImage>       WrapHttpImagePromise(NetResult<QByteArray> res);
+
+template <typename T, typename U>
+inline QList<RefPtr<T> > ToSuperObjectList(const QList<RefPtr<U> > &lt) {
+    QList<RefPtr<T> > ret;
+    for (const auto &o : lt) {
+        ret.push_back(o);
+    }
+    return ret;
+}

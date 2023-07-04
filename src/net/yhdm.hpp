@@ -4,7 +4,7 @@
 #include <QNetworkAccessManager>
 #include <QImage>
 
-#define YHDM_CLIENT_NAME u8"樱花动漫"
+#define YHDM_CLIENT_NAME QStringLiteral("樱花动漫")
 
 #if 1
 

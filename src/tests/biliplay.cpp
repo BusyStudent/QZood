@@ -133,8 +133,8 @@ ZOOD_TEST(Network, BiliPlay) {
                     return;
                 }
                 for (auto &ep : b.value().episodes) {
-                    if (result.episodeID == ep.id) {
-                        playByBVID(ep.bvid);
+                    if (result.episodeID == ep->id) {
+                        playByBVID(ep->bvid);
                     }
                 }
             });

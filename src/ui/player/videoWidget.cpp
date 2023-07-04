@@ -212,7 +212,7 @@ public:
                 player->setSource(url.value());
                 player->play();
                 videoLog("视频加载完成");
-            } esle {
+            } else {
                 videoLog("视频加载失败");
             }
             QTimer::singleShot(5000, [this](){isLoddingVideo = false;});

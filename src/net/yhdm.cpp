@@ -12,7 +12,7 @@
 namespace {
 
 // For craling data
-class YhdmVideoSpider : public QWebEngineUrlRequestInterceptor {
+class YhdmVideoSpider final : public QWebEngineUrlRequestInterceptor {
 public:
     YhdmVideoSpider(NetResult<QString> r, const QString &url) : result(r) {
         page->setUrlRequestInterceptor(this);
@@ -27,7 +27,12 @@ public:
 
     void interceptRequest(QWebEngineUrlRequestInfo &info) override {
         auto url = info.requestUrl().toString();
-        if (url.endsWith(".m3u8") || url.endsWith(".mp4")) {
+        if (info.resourceType() == QWebEngineUrlRequestInfo::ResourceTypeImage) {
+            qDebug() << "YhdmVideoSpider Block" << info.requestUrl();
+            info.block(true);
+            return;
+        }
+        else if (url.endsWith(".m3u8") || url.endsWith(".mp4")) {
             // Got
             resultUrl = info.requestUrl().toString();
             page->triggerAction(QWebEnginePage::Stop);
@@ -47,7 +52,7 @@ public:
     NetResult<QString> result; //< Result to notify about
 };
 
-class YhdmEpisode : public Episode {
+class YhdmEpisode final : public Episode {
 public:
     QString title() override {
         return _title;
@@ -89,7 +94,7 @@ public:
         : client(client), _title(title), _url(url) { }
 };
 
-class YhdmBangumi : public Bangumi {
+class YhdmBangumi final : public Bangumi {
 public:
     QStringList availableSource() override {
         return QStringList(YHDM_CLIENT_NAME);
@@ -192,7 +197,48 @@ public:
 
     YhdmBangumi(YhdmClient &client) : client(client) { }
 };
-class YhdmTimelineItem : public TimelineItem {
+
+class YhdmTimelineEpisode final : public TimelineEpisode {
+public:
+    YhdmTimelineEpisode(YhdmClient &client, QString title, QString url, QString pubIdx) : client(client), title(title), url(url), pubIdx(pubIdx) { }
+
+    VideoInterface *rootInterface() override {
+        return &client;
+    }
+    QString bangumiTitle() override {
+        return title;
+    }
+    QString pubIndexTitle() override {
+        return pubIdx;
+    }
+    bool    hasCover() override {
+        return false;
+    }
+    NetResult<QImage> fetchCover() override {
+        return NetResult<QImage>::AllocWithResult(std::nullopt);
+    }
+    NetResult<BangumiPtr> fetchBangumi() override {
+        auto r = NetResult<BangumiPtr>::Alloc();
+        client.fetchFile(url).then([r, c = std::ref(client)](const Result<QByteArray> &html) mutable {
+            if (html) {
+                auto doc = LXml::HtmlDocoument::Parse(html.value());
+                if (doc) {
+                    auto bangumi = YhdmBangumi::ParsePageHtml(c, doc);
+                    r.putResult(bangumi);
+                    return;
+                }
+            }
+            r.putResult(std::nullopt);
+        });
+        return r;
+    }
+
+    YhdmClient &client;
+    QString     title;
+    QString     url;
+    QString     pubIdx;
+};
+class YhdmTimelineItem final : public TimelineItem {
 public:
     YhdmTimelineItem(YhdmClient &client) : client(client) { }
     QDate date() override {
@@ -201,55 +247,23 @@ public:
     int   dayOfWeek() override {
         return _dayOfWeek;
     }
-    NetResult<BangumiList> fetchBangumiList() override {
-        if (requestLeft > 0) {
-            // Has current request
-            return pendingPromise;
-        }
-        if (requestLeft == 0) {
-            // Already fetched
-            return NetResult<BangumiList>::Alloc().putLater(outList);
-        }
-
-        auto r = NetResult<BangumiList>::Alloc();
-        pendingPromise = r;
-        requestLeft = urls.size();
-
-        for (const auto &u : urls) {
-            client.fetchFile(u).then([this, r, holder = shared_from_this()](const Result<QByteArray> &html) mutable {
-                if (html) {
-                    auto doc = LXml::HtmlDocoument::Parse(html.value());
-                    if (doc) {
-                        outList.push_back(YhdmBangumi::ParsePageHtml(client, doc));
-                    }
-                }
-                requestLeft -= 1;
-
-                if (requestLeft == 0) {
-                    // Done
-                    r.putResult(outList);
-
-                    // Unref the value we goted
-                    pendingPromise = NetResult<BangumiList>();
-                }
-            });
-        }
-        return r;
-    }
     VideoInterface *rootInterface() override {
         return &client;
+    }
+    TimelineEpisodeList episodesList() override {
+        TimelineEpisodeList r;
+        for (auto n = 0; n < titles.size(); n++) {
+            r.push_back(std::make_shared<YhdmTimelineEpisode>(client, titles[n], urls[n], pubIndexTitles[n]));
+        }
+        return r;
     }
 
     YhdmClient &client;
     QStringList titles;
     QStringList urls; //< Url for play page
+    QStringList pubIndexTitles; //< PubIndexTitles for play page like ("第一集")
     int        _dayOfWeek = 0;
     QDate      _date;
-
-    // Fetch bangumi list
-    int         requestLeft = -1;
-    BangumiList outList;
-    NetResult<BangumiList> pendingPromise;
 };
 
 }
@@ -381,6 +395,13 @@ NetResult<Timeline>    YhdmClient::fetchTimeline() {
 
                 item->urls.push_back(domain() + QString::fromUtf8(href).removeFirst());
                 item->titles.push_back(QString::fromUtf8(title));
+
+                // Find previus span/a
+                auto span = a->parent()->findChild("span");
+                if (span) {
+                    auto subA = span->findChild("a");
+                    item->pubIndexTitles.push_back(QString::fromUtf8(subA->content()));
+                }
 
                 qDebug() << "href : " << item->urls.back() << " title : " << item->titles.back();
             }

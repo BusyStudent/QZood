@@ -167,28 +167,17 @@ ZOOD_TEST(DataLayer, Timeline) {
             }
 
             for (const auto &each : tm.value()) {
-                each->fetchBangumiList().then([each, table](const Result<BangumiList> &list) {
-                    auto i = new QTreeWidgetItem(table, QStringList(each->date().toString("yyyy.MM.dd")));
-                    table->addTopLevelItem(i);
-
-                    // i->setText(QString::number(each->dayOfWeek()));
-                    if (!list) {
-                        // table->addItem("Failed to fetch");
-                        new QTreeWidgetItem(i, QStringList("Failed to fetch"));
-                        return;
-                    }
-                    for (const auto &ep : list.value()) {
-                        // table->addItem(ep->title());
-                        // table->addItem(ep->description());
-                        auto sub = new QTreeWidgetItem(i, QStringList(ep->title()));
-                        sub->setText(1,  ep->description());
-                        ep->fetchCover().then([sub](const Result<QImage> &image) {
-                            if (image) {
-                                sub->setIcon(0, QPixmap::fromImage(image.value()));
-                            }
-                        });
-                    }
-                });
+                auto i = new QTreeWidgetItem(table, QStringList(each->date().toString("yyyy.MM.dd")));
+                table->addTopLevelItem(i);
+                for(const auto &ep : each->episodesList()) {
+                    auto sub = new QTreeWidgetItem(i, QStringList(ep->bangumiTitle()));
+                    sub->setText(1,  ep->pubIndexTitle());
+                    ep->fetchCover().then([sub](const Result<QImage> &image) {
+                        if (image) {
+                            sub->setIcon(0, QPixmap::fromImage(image.value()));
+                        }
+                    });
+                }
             }
         });
     });
