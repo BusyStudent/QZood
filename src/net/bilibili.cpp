@@ -63,7 +63,7 @@ VideoInterface *BiliEpisode::rootInterface() {
 NetResult<EpisodeList> BiliBangumi::fetchEpisodes() {
     auto r = NetResult<EpisodeList>::Alloc();
     if (episodes.empty()) {
-        client->fetchBangumiByEpisodeID(seasonID).then([r](const Result<BiliBangumi> &bangumi) mutable {
+        client->fetchBangumiBySeasonID(seasonID).then([r](const Result<BiliBangumi> &bangumi) mutable {
             if (!bangumi) {
                 return;
             }
@@ -105,12 +105,16 @@ VideoInterface *BiliTimelineEpisode::rootInterface() {
 bool BiliTimelineEpisode::hasCover() {
     return true;
 }
+QStringList BiliTimelineEpisode::availableSource() {
+    return QStringList(BILIBILI_CLIENT_NAME);
+}
 NetResult<QImage> BiliTimelineEpisode::fetchCover() {
     return WrapHttpImagePromise(client->fetchFile(cover));
 }
 NetResult<BangumiPtr> BiliTimelineEpisode::fetchBangumi() {
+    // TODO : episodeWrong
     auto r = NetResult<BangumiPtr>::Alloc();
-    client->fetchBangumiByEpisodeID(episodeID).then([r](const Result<BiliBangumi> &bangumi) mutable {
+    client->fetchBangumiBySeasonID(seasonID).then([r](const Result<BiliBangumi> &bangumi) mutable {
         if (!bangumi) {
             r.putResult(std::nullopt);
             return;
@@ -449,6 +453,7 @@ NetResult<BiliBangumiList> BiliClient::searchBangumiInternal(const QString &name
                 episode.cover = ep["cover"].toString();
                 episode._title = ep["title"].toString();
                 episode._longTitle = ep["long_title"].toString();
+                episode.client = this;
 
                 ban.episodes.push_back(std::make_shared<BiliEpisode>(episode));
             }
@@ -514,6 +519,9 @@ NetResult<BiliBangumi> BiliClient::fetchBangumiInternal(const QString &seasonID,
 
                 ban = bangumi;
             }
+            else {
+                qDebug() << doc;
+            }
         }
         result.putResult(ban);
     });
@@ -578,6 +586,7 @@ NetResult<BiliTimeline> BiliClient::fetchTimelineInternal(int kind, int before, 
                 ep->title = data["title"].toString();
 
                 ep->episodeID = QString::number(data["episode_id"].toInteger());
+                ep->seasonID = QString::number(data["season_id"].toInteger());
 
                 ep->client = this;
 

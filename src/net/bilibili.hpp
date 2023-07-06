@@ -89,6 +89,7 @@ class BiliTimelineEpisode final : public TimelineEpisode {
         QString         pubIndexTitle() override;
         VideoInterface *rootInterface() override;
         bool            hasCover() override;
+        QStringList     availableSource() override;
         NetResult<QImage> fetchCover() override;
         NetResult<BangumiPtr> fetchBangumi() override;
     public:
@@ -101,6 +102,7 @@ class BiliTimelineEpisode final : public TimelineEpisode {
         QString   squareCover;
 
         QString   episodeID; //< ID of episode, juat number, like 1234
+        QString   seasonID; //< ID of season, juat number, like 1234
 
         BiliClient *client = nullptr;
 };

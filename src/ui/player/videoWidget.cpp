@@ -196,6 +196,11 @@ public:
     }
 
     void play(const VideoBLLPtr video) {
+        player->setHttpReferer("https://www.bilibili.com");
+        player->setHttpUseragent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537");
+        player->setOption("multiple_requests", "1");
+
+
         if (isLoddingVideo) {
             videoLog("正在加载视频，请不要操作");
             return;

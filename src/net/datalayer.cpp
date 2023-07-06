@@ -35,7 +35,7 @@ NetPromise<QList<T> > WaitForMultiClient(
 };
 
 
-class MergedEpisode : public Episode {
+class MergedEpisode final : public Episode {
 public:
     MergedEpisode(const EpisodeList &ep) : episodeList(ep)  {}
 
@@ -96,7 +96,7 @@ public:
 
     EpisodeList episodeList;
 };
-class MergedBangumi : public Bangumi {
+class MergedBangumi final : public Bangumi {
 public:
     MergedBangumi(const BangumiList &b) : bangumiList(b) {}
 
@@ -180,9 +180,9 @@ public:
     int         requestLeft = -1;
     QList<EpisodeList> collectedList;
 };
-class MergeTimelineEpisode : public TimelineEpisode {
+class MergedTimelineEpisode final : public TimelineEpisode {
 public:
-    MergeTimelineEpisode(const TimelineEpisodeList &t) : episodesList(t) { }
+    MergedTimelineEpisode(const TimelineEpisodeList &t) : episodesList(t) { }
 
     QString bangumiTitle() override {
         return episodesList[0]->bangumiTitle();
@@ -200,10 +200,29 @@ public:
         return episodesList[subEpisodeHasCoverIndex()]->fetchCover();
     }
     NetResult<BangumiPtr> fetchBangumi() override {
-        return NetResult<BangumiPtr>::AllocWithResult(std::nullopt);
+        // TODO :
+        auto r = NetResult<BangumiPtr>::Alloc();
+        WaitForMultiClient(episodesList, &TimelineEpisode::fetchBangumi)
+            .then([r](const QList<BangumiPtr> &list) mutable {
+            
+            if (list.isEmpty()) {
+                r.putResult(std::nullopt);
+                return;
+            }
+
+            r.putResult(std::make_shared<MergedBangumi>(list));
+        });
+        return r;
     }
     VideoInterface *rootInterface() override {
         return DataService::instance();
+    }
+    QStringList     availableSource() override {
+        QStringList l;
+        for (const auto &b : episodesList) {
+            l.append(b->availableSource());
+        }
+        return l;
     }
     int subEpisodeHasCoverIndex() {
         if (hasCoverIndex == -2) {
@@ -222,7 +241,7 @@ public:
     TimelineEpisodeList episodesList;
     int                 hasCoverIndex = -2; //< -2 means unknown
 };
-class MergeTimelineItem : public TimelineItem {
+class MergeTimelineItem final : public TimelineItem {
 public:
     MergeTimelineItem(const QList<TimelineItemPtr> &t) : timelineItems(t) { }
 
@@ -246,7 +265,7 @@ public:
         }
         TimelineEpisodeList resultList;
         for (const auto &[key, list] : map) {
-            resultList.push_back(std::make_shared<MergeTimelineEpisode>(list));
+            resultList.push_back(std::make_shared<MergedTimelineEpisode>(list));
         }
         return resultList;
     }
@@ -254,7 +273,7 @@ public:
     QList<TimelineItemPtr> timelineItems;
 };
 
-class DataServicePrivate : public DataService {
+class DataServicePrivate final : public DataService {
 public:
     DataServicePrivate(QObject *parent) {
         setParent(parent);
@@ -308,7 +327,7 @@ public:
         return r;
     }
     QString name() override {
-        return "DataService";
+        return QStringLiteral("DataService");
     }
 
 

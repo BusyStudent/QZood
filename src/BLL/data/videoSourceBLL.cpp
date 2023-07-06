@@ -153,6 +153,7 @@ void VideoSourceBLL::searchVideosFromTitle(const QString& title, QObject *obj, s
                 });
             }
         });
+        return;
     }
     searchBangumiFromText(title, obj, [this, func, title, obj](const Result<BangumiList>& bangumis) {
         if (!bangumis.has_value() || bangumis->size() == 0) {

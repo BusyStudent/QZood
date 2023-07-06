@@ -217,6 +217,9 @@ public:
     NetResult<QImage> fetchCover() override {
         return NetResult<QImage>::AllocWithResult(std::nullopt);
     }
+    QStringList       availableSource() override {
+        return QStringList(YHDM_CLIENT_NAME);
+    }
     NetResult<BangumiPtr> fetchBangumi() override {
         auto r = NetResult<BangumiPtr>::Alloc();
         client.fetchFile(url).then([r, c = std::ref(client)](const Result<QByteArray> &html) mutable {

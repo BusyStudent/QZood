@@ -151,6 +151,14 @@ class TimelineEpisode : public DataObject {
          * @return false 
          */
         virtual bool    hasCover() = 0;
+
+        /**
+         * @brief Get the available source
+         * 
+         * @return QStringList 
+         */
+        virtual QStringList availableSource() = 0;
+
         /**
          * @brief Try to fetch the episode cover
          * 
