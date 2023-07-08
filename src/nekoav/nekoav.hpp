@@ -25,6 +25,10 @@
 
 #define NEKO_USING(n) using Neko##n = NekoAV::n
 
+struct AVFrame;
+struct AVDictionary;
+struct AVInputFormat;
+
 namespace NekoAV {
 
 class GraphicsVideoItemPrivate;
@@ -88,16 +92,40 @@ class NEKO_API VideoFrame {
         VideoFrame &operator =(const VideoFrame &);
         VideoFrame &operator =(VideoFrame &&);
         
-        static VideoFrame fromAVFrame(void *avf);
+        static VideoFrame fromAVFrame(AVFrame *avf);
     private:
         QSharedPointer<VideoFramePrivate> d;
 };
 
-class NEKO_API MediaMetaData : public QMap<QString, QString> {
+class NEKO_API Dictionary : public QMap<QString, QString> {
     public:
         using QMap<QString, QString>::QMap;
 
+        void          load(const AVDictionary *dict);
+        AVDictionary *toAVDictionary() const;
+        
+        static Dictionary fromAVDictionary(const AVDictionary *dict) {
+            Dictionary d;
+            d.load(dict);
+            return d;
+        }
+};
+
+class NEKO_API MediaMetaData : public Dictionary {
+    public:
+        using Dictionary::Dictionary;
+
         static constexpr auto Title = "title";
+
+        QString title() const {
+            return value(Title);
+        }
+
+        static MediaMetaData fromAVDictionary(const AVDictionary *dict) {
+            MediaMetaData d;
+            d.load(dict);
+            return d;
+        }
 };
 
 class NEKO_API GraphicsVideoItem : public QGraphicsObject {
@@ -300,7 +328,7 @@ class NEKO_API MediaPlayer : public QObject {
         void setHttpUseragent(const QString &useragent);
         void setHttpReferer(const QString &referer);
 
-        void setInputFormat(void *avInputFormat);
+        void setInputFormat(AVInputFormat *avInputFormat);
 
         static QStringList supportedMediaTypes();
         static QStringList supportedProtocols();
@@ -348,6 +376,18 @@ class NEKO_API MediaPlayer : public QObject {
     private:
         QScopedPointer<MediaPlayerPrivate> d;
 };
+
+inline size_t GetBytesPerSample(AudioSampleFormat fmt) {
+    switch (fmt) {
+        case AudioSampleFormat::Uint8: return sizeof(uint8_t);
+        case AudioSampleFormat::Sint16: return sizeof(int16_t);
+        case AudioSampleFormat::Sint32: return sizeof(uint32_t);
+        case AudioSampleFormat::Float32: return sizeof(float);
+    }
+}
+inline size_t GetBytesPerFrame(AudioSampleFormat fmt, int channels) {
+    return GetBytesPerSample(fmt) * channels;
+}
 
 }
 

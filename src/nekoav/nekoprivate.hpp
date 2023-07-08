@@ -15,7 +15,6 @@ namespace NekoAV {
 
 inline static auto EofPacket = nullptr;
 inline static auto FlushPacket = reinterpret_cast<AVPacket*>(0x01);
-inline static auto StopPacket = reinterpret_cast<AVPacket*>(0x02);
 inline static auto SyncPacket = reinterpret_cast<AVPacket*>(0x03);
 inline static auto AVSyncThreshold = 0.01;
 inline static auto AVNoSyncThreshold = 10.0;
@@ -35,14 +34,17 @@ class PacketQueue final {
         void flush();
         void put(AVPacket *packet);
         void unget(AVPacket *packet);
+        void requestStop();
         auto get(bool blocking = true) -> AVPacket *;
         size_t size() const;
         int64_t duration() const;
+        bool    stopRequested() const;
     private:
         std::deque<AVPacket*>   packets;
         std::condition_variable cond;
         std::mutex              condMutex;
-        int64_t                 packetsDuration = 0; //< Sums of packet duration
+        Atomic<int64_t>         packetsDuration = 0; //< Sums of packet duration
+        Atomic<bool>            stop = false;
         mutable std::mutex      mutex;
 };
 
@@ -73,16 +75,17 @@ class AudioThread final : public QObject {
         }
         void pause(bool v);
     private:
-        void audioOutputLost();
         void audioCallback(void *data, int datasize);
         int  audioDecodeFrame();
         int  audioResample(int outSamples);
+        void run();
 
         DemuxerThread  *demuxerThread = nullptr;
         AVCodecContext *codecCtxt = nullptr;
         AVStream       *stream = nullptr;
 
         AudioOutput    *audioOutput = nullptr;
+        QThread        *decoderThread = nullptr;
 
         PacketQueue     queue;
 
@@ -96,12 +99,16 @@ class AudioThread final : public QObject {
         bool                 needResample = false;
         bool                 audioInitialized = false;
 
+        AudioSampleFormat    outputSampleFormat{ };
+        int                  outputSampleRate{ };
+        int                  outputChannels{ };
+
         // Status
         Atomic<bool>   waitting = false;
         Atomic<qreal>  audioClock = 0.0f;
 };
 
-class VideoThread final : public QThread {
+class VideoThread final : public QObject {
     Q_OBJECT
     public:
         VideoThread(DemuxerThread *parent, AVStream *stream, AVCodecContext *ctxt);
@@ -125,7 +132,7 @@ class VideoThread final : public QThread {
         bool videoDecodeFrame(AVPacket *packet, AVFrame **ret);
         void videoWriteFrame(AVFrame *source);
         void tryHardwareInit();
-        void run() override;
+        void run();
 
         DemuxerThread  *demuxerThread = nullptr;
         AVCodecContext *codecCtxt = nullptr;
@@ -133,6 +140,9 @@ class VideoThread final : public QThread {
 
         VideoSink      *videoSink = nullptr;
         PacketQueue     queue;
+
+        // Thread
+        QThread        *presentThread = nullptr; //< for Write frames
 
         // Frame
         AVPtr<SwsContext> swsCtxt;
@@ -159,6 +169,8 @@ class VideoThread final : public QThread {
         Atomic<bool>   paused = false;
         Atomic<bool>   waitting = false;
         Atomic<double> videoClock = 0.0f;
+        Atomic<uint64_t> videoFrameCount = 0; //< All frames received count
+        Atomic<uint64_t> videoDropedFrameCount = 0; //< Droped frame count
 };
 
 class SubtitleThread final : public QThread {
@@ -179,6 +191,7 @@ class SubtitleThread final : public QThread {
         }
         void pause(bool v);
         void switchStream(AVStream *stream);
+        void refresh();
     private:
         void run() override;
 
@@ -194,8 +207,7 @@ class SubtitleThread final : public QThread {
         std::mutex   condMutex;
         Atomic<bool> paused = false;
         Atomic<bool> waitting = false;
-        Atomic<bool> quit = false;
-        Atomic<bool> reqSwitch = false;
+        Atomic<bool> reqRefresh = false;
 
         Atomic<double> subtitleClock = 0.0;
 };
@@ -380,7 +392,7 @@ inline VideoSink   *DemuxerThread::videoSink() const  noexcept {
 }
 
 inline bool    IsSpecialPacket(AVPacket *pak) noexcept {
-    return pak == EofPacket || pak == FlushPacket || pak == StopPacket || pak == SyncPacket;
+    return pak == EofPacket || pak == FlushPacket || pak == SyncPacket;
 }
 inline AVPixelFormat ToAVPixelFormat(VideoPixelFormat fmt) {
     switch (fmt) {

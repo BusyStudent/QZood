@@ -62,17 +62,13 @@ VideoInterface *BiliEpisode::rootInterface() {
 // Bangumi
 NetResult<EpisodeList> BiliBangumi::fetchEpisodes() {
     auto r = NetResult<EpisodeList>::Alloc();
-    if (episodes.empty()) {
-        client->fetchBangumiBySeasonID(seasonID).then([r](const Result<BiliBangumi> &bangumi) mutable {
-            if (!bangumi) {
-                return;
-            }
-            r.putLater(ToSuperObjectList<Episode>(bangumi.value().episodes));
-        });
-    }
-    else {
-        r.putLater(ToSuperObjectList<Episode>(episodes));
-    }
+    auto cb = [r](const Result<BiliBangumi> &bangumi) mutable {
+        if (!bangumi) {
+            return;
+        }
+        r.putResult(ToSuperObjectList<Episode>(bangumi.value().episodes));
+    };
+    client->fetchBangumiBySeasonID(seasonID).then(cb);
 
     return r;
 }
@@ -480,7 +476,7 @@ NetResult<BiliBangumi> BiliClient::fetchBangumiInternal(const QString &seasonID,
     
     auto result = NetResult<BiliBangumi>::Alloc();
 
-    fetchFile(url).then([result, this](const Result<QByteArray> &data) mutable {
+    fetchFile(url).then([result, this, seasonID, episodeID](const Result<QByteArray> &data) mutable {
         Result<BiliBangumi> ban;
         if (data) {
             QJsonParseError error;
@@ -495,6 +491,7 @@ NetResult<BiliBangumi> BiliClient::fetchBangumiInternal(const QString &seasonID,
                 bangumi.evaluate = result["evaluate"].toString();
                 bangumi._title = result["title"].toString();
                 bangumi.jpTitle  = result["jp_title"].toString();
+                bangumi.seasonID = seasonID;
                 bangumi.client = this;
 
                 for (auto elem : result["episodes"].toArray()) {

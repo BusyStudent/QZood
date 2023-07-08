@@ -16,6 +16,9 @@ PacketQueue::~PacketQueue() {
 }
 
 void PacketQueue::put(AVPacket *packet) {
+    if (!packet) {
+        return;
+    }
     std::lock_guard locker(mutex);
     packets.push_back(packet);
     // Sums packet to let us known the buffered video
@@ -44,6 +47,13 @@ void PacketQueue::flush() {
     }
     packetsDuration = 0;
 }
+bool PacketQueue::stopRequested() const {
+    return stop;
+}
+void PacketQueue::requestStop() {
+    stop = true;
+    cond.notify_all();
+}
 
 size_t PacketQueue::size() const {
     std::lock_guard locker(mutex);
@@ -58,12 +68,14 @@ AVPacket *PacketQueue::get(bool block) {
     AVPacket *ret = nullptr;
     mutex.lock();
     while (packets.empty()) {
+        mutex.unlock();
         if (!block) {
-            mutex.unlock();
+            return nullptr;
+        }
+        if (stop) {
             return nullptr;
         }
 
-        mutex.unlock();
 
         qDebug() << "PacketQueue waiting for more packets...";
 
@@ -90,17 +102,18 @@ AudioThread::AudioThread(DemuxerThread *parent, AVStream *stream, AVCodecContext
       codecCtxt(ctxt),
       audioOutput(parent->audioOutput())
 {
-    AudioSampleFormat outputFormat = AudioSampleFormat::Float32;
-
+    outputSampleFormat = AudioSampleFormat::Float32;
+    outputSampleRate = ctxt->sample_rate;
+    outputChannels = ctxt->channels;
     needResample = false;
     switch (ctxt->sample_fmt) {
-        case AV_SAMPLE_FMT_U8 : outputFormat = AudioSampleFormat::Uint8; break;
-        case AV_SAMPLE_FMT_S16 : outputFormat = AudioSampleFormat::Sint16; break;
-        // case AV_SAMPLE_FMT_S32 : outputFormat = AudioSampleFormat::Sint32; break;
+        case AV_SAMPLE_FMT_U8 : outputSampleFormat = AudioSampleFormat::Uint8; break;
+        case AV_SAMPLE_FMT_S16 : outputSampleFormat = AudioSampleFormat::Sint16; break;
+        // case AV_SAMPLE_FMT_S32 : outputSampleFormat = AudioSampleFormat::Sint32; break;
         // May has S24 but input like AV_SAMPLE_FMT_S32
         // I didnot how to handle it, so just convert
-        case AV_SAMPLE_FMT_FLT : outputFormat = AudioSampleFormat::Float32; break;
-        default : needResample = true; outputFormat = AudioSampleFormat::Float32; break;
+        case AV_SAMPLE_FMT_FLT : outputSampleFormat = AudioSampleFormat::Float32; break;
+        default : needResample = true; outputSampleFormat = AudioSampleFormat::Float32; break;
     }
     if (!needResample) {
         qDebug() << "AudioThread: output supported format, passthrough";
@@ -111,9 +124,9 @@ AudioThread::AudioThread(DemuxerThread *parent, AVStream *stream, AVCodecContext
         audioCallback(data, n);
     });   
     audioOutput->open(
-        outputFormat,
-        ctxt->sample_rate,
-        ctxt->channels
+        outputSampleFormat,
+        outputSampleRate,
+        outputChannels
     );
     audioOutput->pause(true);
     audioInitialized = audioOutput->isOpen();
@@ -149,6 +162,9 @@ void AudioThread::audioCallback(void *data, int len) {
         
         len -= left;
         bufferIndex += left;
+
+        // Update current clock
+        audioClock = audioClock + qreal(left) / GetBytesPerFrame(outputSampleFormat, outputChannels) / outputSampleRate; 
     }
 
     // Make slience
@@ -172,10 +188,6 @@ int AudioThread::audioDecodeFrame() {
 
             // BTK_LOG(BTK_RED("[AudioThread] ") "Got flush\n");
             continue;
-        }
-        if (packet == StopPacket) {
-            waitting = true;
-            return -1;
         }
         if (packet == nullptr) {
             // No Data
@@ -327,7 +339,6 @@ int AudioThread::audioResample(int wanted_samples) {
 
 // VideoThread
 VideoThread::VideoThread(DemuxerThread *parent, AVStream *stream, AVCodecContext *ctxt) :
-    QThread(),
     demuxerThread(parent),
     stream(stream),
     codecCtxt(ctxt)    
@@ -337,15 +348,20 @@ VideoThread::VideoThread(DemuxerThread *parent, AVStream *stream, AVCodecContext
     
     videoSink = demuxerThread->videoSink();
 
-    start();
     pause(true);
+
+    // Create the video thread
+    presentThread = QThread::create(&VideoThread::run, this);
+    presentThread->setObjectName("NekoAV VideoPresentThread");
+    presentThread->start();
 }
 VideoThread::~VideoThread() {
     queue.flush();
-    queue.put(StopPacket);
+    queue.requestStop();
     pause(false);
     // Wait
-    wait();
+    presentThread->wait();
+    delete presentThread;
 
     avcodec_free_context(&codecCtxt);
 }
@@ -423,7 +439,7 @@ void VideoThread::run() {
     swsScaleDuration = 0.0;
     // Try get packet
     int ret;
-    while (true) {
+    while (!queue.stopRequested()) {
         if (paused) {
             std::unique_lock lock(condMutex);
             cond.wait(lock);
@@ -440,10 +456,6 @@ void VideoThread::run() {
 
             // BTK_LOG(BTK_RED("[VideoThread] ") "Got flush\n");
             continue;
-        }
-        if (packet == StopPacket) {
-            waitting = true;
-            break; //< It tell us, it time to stop
         }
         if (packet == nullptr) {
             // No Data
@@ -466,6 +478,7 @@ void VideoThread::run() {
         double diff = masterClock - videoClock - swsScaleDuration - videoDecodeDuration;
 
         videoClock = currentFramePts;
+        videoFrameCount += 1;
 
         if (diff < 0 && -diff < AVNoSyncThreshold) {
             // We are too fast
@@ -477,7 +490,8 @@ void VideoThread::run() {
         else if (diff > 0.3) {
             // We are too slow, drop
             // BTK_LOG(BTK_RED("[VideoThread] ") "A-V = %lf Too slow, drop sws_duration = %lf\n", diff, sws_scale_duration);
-            qDebug() << "VideoThread drop frame";
+            videoDropedFrameCount += 1;
+            qDebug() << "VideoThread drop frame for " << videoDropedFrameCount << " / " << videoFrameCount;
             continue;
         }
         else if (diff < AVSyncThreshold) {
@@ -639,8 +653,7 @@ SubtitleThread::SubtitleThread(DemuxerThread *parent, AVStream *stream, AVCodecC
 
 SubtitleThread::~SubtitleThread() {
     queue.flush();
-    queue.put(StopPacket);
-    quit = true;
+    queue.requestStop();
     pause(false);
     cond.notify_one();
     // Wait
@@ -656,10 +669,10 @@ void SubtitleThread::run() {
     AVSubtitle subtitle;
     QRegularExpression reg("{.*?}");
     QString text;
-    while (!quit) {
+    while (!queue.stopRequested()) {
         mainloop : 
-        if (reqSwitch) {
-            reqSwitch = false;
+        if (reqRefresh) {
+            reqRefresh = false;
         }
         if (paused) {
             waitting = true;
@@ -678,10 +691,6 @@ void SubtitleThread::run() {
             
             // BTK_LOG(BTK_RED("[VideoThread] ") "Got flush\n");
             continue;
-        }
-        if (packet == StopPacket) {
-            waitting = true;
-            break; //< It tell us, it time to stop
         }
         if (packet == nullptr) {
             // No Data
@@ -725,10 +734,10 @@ void SubtitleThread::run() {
             cond.wait_for(lock, 10ms);
 
             diff = startPts - demuxerThread->clock();
-            if (quit) {
+            if (queue.stopRequested()) {
                 goto quitLabel;
             }
-            if (reqSwitch) {
+            if (reqRefresh) {
                 goto mainloop;
             }
         }
@@ -749,10 +758,10 @@ void SubtitleThread::run() {
 
             diff = endPts - demuxerThread->clock();
 
-            if (quit) {
+            if (queue.stopRequested()) {
                 goto quitLabel;
             }
-            if (reqSwitch) {
+            if (reqRefresh) {
                 goto mainloop;
             }
         }
@@ -771,10 +780,7 @@ void SubtitleThread::pause(bool v) {
     cond.notify_one();
 }
 void SubtitleThread::switchStream(AVStream* stream) {
-    reqSwitch = true;
-    queue.flush();
-    queue.put(FlushPacket);
-    cond.notify_one();
+    refresh();
 
     while (!waitting) { 
         std::this_thread::sleep_for(1ms);
@@ -783,6 +789,12 @@ void SubtitleThread::switchStream(AVStream* stream) {
     avcodec_free_context(&codecCtxt);
     auto [ctxt, errcode] = FFCreateDecoderContext(stream);
     codecCtxt = ctxt;
+}
+void SubtitleThread::refresh() {
+    reqRefresh = true;
+    queue.flush();
+    queue.put(FlushPacket);
+    cond.notify_one();
 }
 
 // Demuxer here
@@ -892,12 +904,18 @@ bool DemuxerThread::load() {
     }
 
     // Try open
-    auto stdstr = player->url.toString().toUtf8();
+    QByteArray url;
+    if (player->url.isLocalFile()) {
+        url = player->url.toLocalFile().toUtf8();
+    }
+    else {
+        url = player->url.toString().toUtf8();
+    }
 
     player->setMediaStatus(MediaStatus::LoadingMedia);
     errcode = avformat_open_input(
         &formatCtxt,
-        stdstr.data(),
+        url.data(),
         player->inputFormat,
         &player->options
     );
@@ -914,7 +932,7 @@ bool DemuxerThread::load() {
     }
 
     // Dump info
-    av_dump_format(formatCtxt, 0, stdstr.data(), 0);
+    av_dump_format(formatCtxt, 0, url.data(), 0);
 
     player->setMediaStatus(MediaStatus::LoadedMedia);
     player->loaded = true;
@@ -933,7 +951,7 @@ bool DemuxerThread::load() {
     Q_EMIT ffmpegMediaLoaded();
 
     // Check the URL if is network stream
-    if (stdstr.startsWith("http")) {
+    if (url.startsWith("http")) {
         // TODO : Add more checking
         isLocalSource = false;
     }
@@ -974,6 +992,8 @@ bool DemuxerThread::prepareCodec(int streamid) {
         errcode = retCode;
         return sendError(errcode);
     }
+
+    qDebug() << "DemuxerThread Create Codec " << codecCtxt->codec->name << " fullname" << codecCtxt->codec->long_name;
 
     // Common init done
     if (codecCtxt->codec_type == AVMEDIA_TYPE_AUDIO) {
@@ -1235,14 +1255,6 @@ bool DemuxerThread::doSeek() {
         audioThread->pause(true);
         audioThread->packetQueue().flush();
         audioThread->packetQueue().put(FlushPacket);
-
-        // Do seek
-        int64_t pos = seekPosition / av_q2d(formatCtxt->streams[player->audioStream]->time_base);
-        errcode = av_seek_frame(formatCtxt, player->audioStream, pos, AVSEEK_FLAG_BACKWARD);
-        if (errcode < 0) {
-            qDebug() << "DemuxerThread failed to seek audioStream ";
-            return sendError(errcode);
-        }
     }
     if (videoThread && !isPictureStream(player->videoStream)) {
         // We didnot seek if it is a audio cover
@@ -1250,26 +1262,21 @@ bool DemuxerThread::doSeek() {
         videoThread->pause(true);
         videoThread->packetQueue().flush();
         videoThread->packetQueue().put(FlushPacket);
-
-        int64_t pos = seekPosition / av_q2d(formatCtxt->streams[player->videoStream]->time_base);
-        errcode = av_seek_frame(formatCtxt, player->videoStream, pos, AVSEEK_FLAG_BACKWARD);
-        if (errcode < 0) {
-            qDebug() << "DemuxerThread failed to seek videoStream ";
-            return sendError(errcode);
-        }
     }
     if (subtitleThread) {
         restoreSubtitle = !subtitleThread->isPaused();
         subtitleThread->pause(true);
         subtitleThread->packetQueue().flush();
         subtitleThread->packetQueue().put(FlushPacket);
+        subtitleThread->refresh();
+    }
 
-        int64_t pos = seekPosition / av_q2d(formatCtxt->streams[player->subtitleStream]->time_base);
-        errcode = av_seek_frame(formatCtxt, player->subtitleStream, pos, AVSEEK_FLAG_BACKWARD);
-        if (errcode < 0) {
-            qDebug() << "DemuxerThread failed to seek subtitleStream ";
-            return sendError(errcode);
-        }
+    // Do seek
+    int64_t pos = seekPosition * NEKOAV_TIME_BASE;
+    errcode = av_seek_frame(formatCtxt, -1, pos, AVSEEK_FLAG_BACKWARD);
+    if (errcode < 0) {
+        qDebug() << "DemuxerThread failed to seek subtitleStream ";
+        return sendError(errcode);
     }
 
     // Set external Clock 
@@ -1742,16 +1749,8 @@ static auto getTracks(AVFormatContext *ctxt, AVMediaType type) -> QList<MediaMet
         if (ctxt->streams[idx]->codecpar->codec_type != type) {
             continue;
         }
-        MediaMetaData data;
         AVDictionary *metadata = ctxt->streams[idx]->metadata;
-        AVDictionaryEntry *cur = av_dict_get(metadata, "", nullptr, AV_DICT_IGNORE_SUFFIX);
-        while (cur) {
-            data.insert(cur->key, cur->value);
-
-            cur = av_dict_get(metadata, "", cur, AV_DICT_IGNORE_SUFFIX);
-        }
-
-        tracks.push_back(data);
+        tracks.push_back(MediaMetaData::fromAVDictionary(metadata));
     }
 
     return tracks;
@@ -1929,8 +1928,8 @@ void MediaPlayer::setHttpUseragent(const QString &useragent) {
 void MediaPlayer::setHttpReferer(const QString &referer) {
     av_dict_set(&d->options, "referer", referer.toUtf8().data(), 0);
 }
-void MediaPlayer::setInputFormat(void *i) {
-    d->inputFormat = static_cast<AVInputFormat*>(i);
+void MediaPlayer::setInputFormat(AVInputFormat *i) {
+    d->inputFormat = i;
 }
 void MediaPlayer::clearOptions() {
     av_dict_free(&d->options);
@@ -2112,7 +2111,7 @@ VideoPixelFormat VideoFrame::pixelFormat() const {
     return ToVideoPixelFormat(AVPixelFormat(d->frame->format));
 }
 
-VideoFrame VideoFrame::fromAVFrame(void *avframe) {
+VideoFrame VideoFrame::fromAVFrame(AVFrame *avframe) {
     VideoFrame f;
     // if (avframe) {
     //     f.d = static_cast<VideoFramePrivate*>(av_frame_clone(static_cast<AVFrame*>(avframe)));
@@ -2137,5 +2136,22 @@ VideoFrame VideoFrame::fromAVFrame(void *avframe) {
 // }
 VideoFrame &VideoFrame::operator =(const VideoFrame &other) = default;
 VideoFrame &VideoFrame::operator =(VideoFrame &&other) = default;
+
+// Dictionary
+void Dictionary::load(const AVDictionary *dict) {
+    AVDictionaryEntry *cur = av_dict_get(dict, "", nullptr, AV_DICT_IGNORE_SUFFIX);
+    while (cur) {
+        insert(cur->key, cur->value);
+
+        cur = av_dict_get(dict, "", cur, AV_DICT_IGNORE_SUFFIX);
+    }
+}
+AVDictionary *Dictionary::toAVDictionary() const {
+    AVDictionary *dict = nullptr;
+    for (const auto &key : keys()) {
+        av_dict_set(&dict, key.toUtf8().constData(), value(key).toUtf8().constData(), 0);
+    }
+    return dict;
+}
 
 }

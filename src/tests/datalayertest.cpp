@@ -170,8 +170,9 @@ ZOOD_TEST(DataLayer, Timeline) {
                 auto i = new QTreeWidgetItem(table, QStringList(each->date().toString("yyyy.MM.dd")));
                 table->addTopLevelItem(i);
                 for(const auto &ep : each->episodesList()) {
-                    auto sub = new QTreeWidgetItem(i, QStringList(ep->bangumiTitle()));
+                    auto sub = new QTreeWidgetItem(i, QStringList(QString("%1 Source %2").arg(ep->bangumiTitle(), ep->availableSource().join(", "))));
                     sub->setText(1,  ep->pubIndexTitle());
+                    sub->setData(0, Qt::UserRole, QVariant::fromValue(ep));
                     ep->fetchCover().then([sub](const Result<QImage> &image) {
                         if (image) {
                             sub->setIcon(0, QPixmap::fromImage(image.value()));
@@ -213,35 +214,27 @@ ZOOD_TEST(DataLayer, Timeline) {
                 QMessageBox::critical(container, "Error", "Failed to fetch episodes");
                 return;
             }
-            // QStringList names;
-            // for (const auto &e : eps.value()) {
-            //     names.push_back(e->indexTitle());
-            // }
-            // auto ret = QInputDialog::getItem(container, "Select a episode", "Select", names);
-            // for (const auto &e : eps.value()) {
-            //     if (e->indexTitle() == ret) {
-            //         QString w;
-            //         auto s = e->sourcesList();
-                    
-            //         if (s.size() != 1) {
-            //             w = QInputDialog::getItem(container, "Select a source", "Select", s);
-            //         }
-            //         else {
-            //             w = s.first();
-            //         }
-
-            //         e->fetchVideo(w).then([=](const Result<QString> &url) {
-            //             if (!url) {
-            //                 QMessageBox::critical(container, "Error", "Failed to get video url");
-            //                 return;
-            //             }
-            //             auto t = QInputDialog::getText(container, "Get your url here", "Url", QLineEdit::Normal, url.value());
-            //             QApplication::clipboard()->setText(t);
-            //         });
-            //         return;
-            //     }
-            // }
             addPlayPage(eps.value());
+        });
+    });
+    QObject::connect(ui.tlTreeWidget, &QTreeWidget::itemDoubleClicked, [=](QTreeWidgetItem *item) {
+        auto ptr = item->data(0, Qt::UserRole).value<TimelineEpisodePtr>();
+        if (!ptr) {
+            return;
+        }
+        ptr->fetchBangumi().then([=](const Result<BangumiPtr> &ban) mutable {
+            if (!ban) {
+                QMessageBox::critical(container, "Error", "Failed to fetch bangumi");
+                return;
+            }
+            ban.value()->fetchEpisodes().then([=](const Result<EpisodeList> &eps) mutable {
+                if (!eps) {
+                    QMessageBox::critical(container, "Error", "Failed to fetch episodes");
+                    return;
+                }
+                addPlayPage(eps.value());
+            });
+
         });
     });
 

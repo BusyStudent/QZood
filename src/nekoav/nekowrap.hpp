@@ -8,8 +8,15 @@ extern "C" {
     #include <libavutil/time.h>
     #include <libavutil/avutil.h>
     #include <libavutil/imgutils.h>
+    #include <libavutil/fifo.h>
     #include <libswresample/swresample.h>
     #include <libswscale/swscale.h>
+
+#if __has_include(<libavfilter/avfilter.h>)
+    #include <libavfilter/avfilter.h>
+    #include <libavfilter/buffersink.h>
+    #include <libavfilter/buffersrc.h>
+#endif
 }
 
 namespace NekoAV {
@@ -94,6 +101,40 @@ class AVPtr : public std::unique_ptr<T, AVTraits<T> > {
     public:
         using Base = std::unique_ptr<T, AVTraits<T> >;
         using Base::unique_ptr;
+};
+
+template <typename T>
+class Fifo {
+    public:
+        Fifo(size_t numelems) : b(av_fifo_alloc_array(numelems, sizeof(T))) { }
+        Fifo(const Fifo &) = delete;
+        ~Fifo() {
+            av_fifo_freep(&b);
+        }
+        bool read(T *addr, size_t n = 1) {
+            return av_fifo_generic_read(b, addr, n * sizeof(T), nullptr) >= 0;
+        }
+        bool write(const T *addr, size_t n = 1) {
+            return av_fifo_generic_write(b, addr, n * sizeof(T), nullptr) >= 0;
+        }
+        bool grow(size_t n) {
+            return av_fifo_grow(b, sizeof(T) * n) >= 0;
+        }
+
+        size_t size() const {
+            return av_fifo_size(b) / sizeof(T);
+        }
+        size_t space() const {
+            return av_fifo_space(b) / sizeof(T);
+        }
+        bool   canRead() const {
+            return size() > 0;
+        }
+        bool   canWrite() const {
+            return space() > 0;
+        }
+    private:
+        AVFifoBuffer *b;
 };
 
 class AVError {

@@ -1,6 +1,10 @@
+#include <QCryptographicHash>
 #include <QNetworkReply>
 #include <QMutexLocker>
 #include <QApplication>
+#include <QFileInfo>
+#include <QFile>
+#include <QDir>
 #include <list>
 #include "cache.hpp"
 
@@ -89,6 +93,17 @@ public:
             }
             return qUncompress(iter->second.data);
         }
+
+        // Try disk cache
+        auto filename = urlToLocalPath(url);
+        QFileInfo info(filename);
+        if (info.exists()) {
+            QFile file(filename);
+            if (file.open(QFile::ReadOnly)) {
+                qDebug() << "Reading cached data from " << filename;
+                return file.readAll();
+            }
+        }
         return QByteArray();
     }
 
@@ -108,6 +123,10 @@ public:
             iter = cachedIndexList.erase(iter);
         }
         qDebug() << "HttpCacheService: current cached size is " << cachedMaxSize / 1024.0 / 1024.0 << " MiB, after cleanup";
+    }
+
+    inline QString  urlToLocalPath(const QString &url) {
+        return "./caches/" + QCryptographicHash::hash(url.toUtf8(), QCryptographicHash::Sha1).toHex();
     }
 };
 
@@ -172,15 +191,25 @@ NetResult<QByteArray> HttpCacheService::wrapReply(QNetworkReply *reply) {
         qDebug() << prefix << " " << reply->url() << "Status code : " << statusCode << " " << ((statusCode == 200) ? "OK" : "FAILED");
         
         if (statusCode == 200) {
-            CompressionLevel level = NoCompression;
             r.putResult(data); //< Callback
 
             // Check mime type
             if (!contentType.startsWith("image/")) {
-                level = BestCompression;
+                putData(reply->request().url().toString(), data, BestCompression); //< Cache data
+            }
+            else {
+                // Directly write to disk
+                auto filename = d->urlToLocalPath(reply->request().url().toString());
+                if (!QDir("./caches").exists()) {
+                    QDir("./").mkdir("./caches");
+                }
+                QFile f(filename);
+                if (f.open(QIODevice::WriteOnly)) {
+                    f.write(data);
+                    f.close();
+                }
             }
 
-            putData(reply->request().url().toString(), data, level); //< Cache data
         }
         else {
             r.putResult(std::nullopt);
