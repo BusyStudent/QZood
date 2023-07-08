@@ -79,21 +79,23 @@ public:
         volumeSetting->setAssociateWidget(ui_videoSetting->voiceSettingButton);
         volumeSetting->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
         volumeSetting->setAuotLayout();
+        volumeSetting->setOutside(true);
         // 播放设置控件
         settings = new FullSettingWidget(self, Qt::Popup | Qt::WindowStaysOnTopHint);
         settings->setAssociateWidget(ui_videoSetting->settingButton);
         settings->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
         settings->setAuotLayout();
         settings->setHideAfterLeave(false);
-
+        settings->setOutside(true);
         // 显示信息的标签
-        logWidget = new LogWidget();
-        logWidget->setAlignment(Qt::AlignLeft | Qt::AlignBottom);
+        logWidget = new LogWidget(self);
+        logWidget->setAssociateWidget(videoSetting);
+        logWidget->setAlignment(Qt::AlignLeft | Qt::AlignTop);
         logWidget->setAuotLayout(true);
         logWidget->setHideAfterLeave(false);
         logWidget->setStopTimerEnter(false);
-        logWidget->setParent(self);
         logWidget->hide();
+        logWidget->setOutside(true);
 
         // 源列表
         sourceListWidget = new PopupWidget(self);
@@ -102,6 +104,7 @@ public:
         sourceListWidget->setAssociateWidget(ui_videoSetting->sourceButton);
         sourceListWidget->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
         sourceListWidget->setAuotLayout();
+        sourceListWidget->setOutside(true);
     }
     
     void setupShortcut() {
@@ -184,12 +187,14 @@ public:
             sourceListWidget->layout()->addWidget(button);
             button->setText(source);
             QWidget::connect(button, &QPushButton::clicked, self, [this, source](bool checked){
-                stop();
-                videoLog("正在切换视频源");
-                video->setCurrentVideoSource(source);
-                ui_videoSetting->sourceButton->setText(source);
-                videoLog("切换完成");
-                play(video);
+                if (video->getCurrentVideoSource() != source) {
+                    stop();
+                    videoLog("正在切换视频源");
+                    video->setCurrentVideoSource(source);
+                    ui_videoSetting->sourceButton->setText(source);
+                    videoLog("切换完成");
+                    play(video);
+                }
             });
         }
         sourceListWidget->resize(sourceListWidget->sizeHint());
@@ -681,6 +686,14 @@ void VideoWidget::setSaturation(int v) {
     qInfo() << "TODO(setSaturation)";
 }
 // 弹幕设置
+void VideoWidget::setDanmaku(const QString& danmakuSource) {
+    currentVideo()->setCurrentDanmakuSource(danmakuSource);
+    currentVideo()->loadDanmaku(this, [this](const Result<DanmakuList>& danmakulist) {
+        if (danmakulist.has_value()) {
+            d->vcanvas->setDanmakuList(danmakulist.value());
+        }
+    });
+}
 void VideoWidget::setDanmakuShowArea(qreal occupationRatio) {
     d->vcanvas->setDanmakuTracksLimit(occupationRatio);
 }

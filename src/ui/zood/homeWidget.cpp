@@ -133,11 +133,9 @@ public:
             QWidget::connect(videoView, &VideoView::clickedImage, self, [this](QString Id){
                 auto videoSource = VideoSourceBLL::instance();
                 QApplication::setOverrideCursor(Qt::WaitCursor);
-                videoSource->searchVideosFromTitle(Id, self, [this](const Result<VideoBLLList>& videos){
+                videoSource->searchVideosFromTitle(Id, self, [this, Id](const Result<VideoBLLList>& videos){
                     if (videos.has_value()){
-                        qDebug() << "player videos";
-                        qDebug() << videos.value().size();
-                        self->runPlayer(videos.value());
+                        self->runPlayer(videos.value(), Id);
                     }
                     QApplication::restoreOverrideCursor();
                 });
@@ -250,8 +248,9 @@ QList<VideoView *> HomeWidget::addItems(const DisplayArea& area, int count) {
     return d->addItems(d->areaToWidget[area], count);
 }
 
-void HomeWidget::runPlayer(VideoBLLList videos) {
+void HomeWidget::runPlayer(VideoBLLList videos,const QString &bangumiName) {
     PlayerWidget* player = new PlayerWidget();
+    player->setTitle(bangumiName);
     player->setAttribute(Qt::WA_DeleteOnClose);
     player->setVideoList(videos);
     player->show();

@@ -31,7 +31,7 @@ class HomeWidget : public QScrollArea {
         void clearItem(const DisplayArea& area);
     
     public Q_SLOTS :
-        void runPlayer(VideoBLLList videos);
+        void runPlayer(VideoBLLList videos, const QString &title);
     
     public:
         void resizeEvent(QResizeEvent *) override;

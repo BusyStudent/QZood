@@ -53,6 +53,7 @@ class VideoWidget : public QWidget{
         void setHue(int v);
         void setSaturation(int v);
         // 弹幕设置
+        void setDanmaku(const QString& danmakuSource);
         void setDanmakuShowArea(qreal OccupationRatio);
         void setDanmakuSize(qreal ratio);
         void setDanmakuSpeed(int speed);

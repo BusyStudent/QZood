@@ -117,6 +117,8 @@ QStringList VideoBLLEpisode::danmakuSourceList() {
     if (DANMAKUSOURCE & dirty) {
         dirty ^= DANMAKUSOURCE;
         danmakuList.clear();
+        danmakuList.push_back("无");
+        mapDanmakuSourceName.insert(danmakuList.back(), qMakePair(-1, "无"));
         for (int index = 0;index < videos.size(); ++index) {
             for (auto& sourceName : videos[index]->danmakuSourceList()) {
                 danmakuList.push_back(sourceName);
@@ -136,7 +138,6 @@ void VideoBLLEpisode::loadVideoToPlay(std::function<void(const Result<QString>&)
 }
 
 void VideoBLLEpisode::loadVideoToPlay(QObject *ctxt, std::function<void(const Result<QString>&)> callAble) {
-    qDebug() << "fetch vedio " << title() << " " << mapVideoSourceName[currentVideoSource].first << " in source " << mapVideoSourceName[currentVideoSource].second;
     videos[mapVideoSourceName[currentVideoSource].first]->fetchVideo(mapVideoSourceName[currentVideoSource].second).then(ctxt, callAble);
 }
 

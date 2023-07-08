@@ -18,7 +18,7 @@ class PopupWidgetPrivate {
          */
         int layoutH(int l1, int r1, int l2, int r2, Qt::Alignment align) {
             if (align & Qt::AlignLeft) {
-                if (r1 - l1 < r2 - l2) {
+                if (self->outside()) {
                     return l1 - r2 + l2;
                 }
                 return l1;
@@ -29,7 +29,7 @@ class PopupWidgetPrivate {
                 return l2 + center - center1;
             }
             if (align & Qt::AlignRight) {
-                if (r1 - l1 < r2 - l2) {
+                if (self->outside()) {
                     return r1;
                 }
                 return r1 - r2 + l2;
@@ -38,7 +38,7 @@ class PopupWidgetPrivate {
         }
         int layoutV(int t1, int b1, int t2, int b2, Qt::Alignment align) {
             if (align & Qt::AlignTop) {
-                if (b2 - t2 > b1 - t1) {
+                if (self->outside()) {
                     return t1 - b2 + t2;
                 }
                 return t1;
@@ -49,7 +49,7 @@ class PopupWidgetPrivate {
                 return t2 + center - center1;
             }
             if (align & Qt::AlignBottom) {
-                if (b2 - t2 > b1 - t1) {
+                if (self->outside()) {
                     return b1;
                 }
                 return b1 - b2 + t2;
@@ -84,9 +84,9 @@ class PopupWidgetPrivate {
 
 
 PopupWidget::PopupWidget(QWidget* parent, Qt::WindowFlags f) : QWidget(parent, f), d(new PopupWidgetPrivate(this)) {
-    timer = new QTimer(this);
-    timer->setSingleShot(true);
-    connect(timer, &QTimer::timeout, this, &PopupWidget::hide);
+    m_timer = new QTimer(this);
+    m_timer->setSingleShot(true);
+    connect(m_timer, &QTimer::timeout, this, &PopupWidget::hide);
     hide();
 }
 
@@ -95,7 +95,7 @@ PopupWidget::~PopupWidget() {
 }
 
 void PopupWidget::enterEvent(QEnterEvent* event) {
-    if (stop_timer_enter) {
+    if (m_stop_timer_enter) {
         stopHideTimer();
     }
     QWidget::enterEvent(event);
@@ -109,7 +109,7 @@ void PopupWidget::hideEvent(QHideEvent *event) {
 
 void PopupWidget::showEvent(QShowEvent *event) {
     stopHideTimer();
-    if (auto_layout) {
+    if (m_auto_layout) {
         // 计算容器（父窗口或屏幕），贴靠对象，自身在容器坐标系下的矩阵
         QRect containerRect, selfRect;
         auto p = isWindow() ? nullptr : parentWidget();
@@ -118,16 +118,16 @@ void PopupWidget::showEvent(QShowEvent *event) {
         if (p != nullptr) {
             containerRect = p->rect();
             selfRect = rect();
-            if (attach_widget != nullptr) {
-                topLeft = p->mapFromGlobal(d->doLayout(attach_widget, aligns));
+            if (m_attach_widget != nullptr) {
+                topLeft = p->mapFromGlobal(d->doLayout(m_attach_widget, m_aligns));
             } else {
-                topLeft = p->mapFromGlobal(d->doLayout(p, aligns));
+                topLeft = p->mapFromGlobal(d->doLayout(p, m_aligns));
             }
         } else {
             containerRect = QApplication::primaryScreen()->availableGeometry();
             selfRect = QRect(parentWidget()->mapToGlobal(QPoint(0, 0)), size());
-            if (attach_widget != nullptr) {
-                topLeft = d->doLayout(attach_widget, aligns);
+            if (m_attach_widget != nullptr) {
+                topLeft = d->doLayout(m_attach_widget, m_aligns);
             }
         }
         // 根据自身超出容器范围进行位置调整
@@ -161,21 +161,21 @@ bool PopupWidget::eventFilter(QObject* obj, QEvent* event) {
 }
 
 void PopupWidget::leaveEvent(QEvent* event) {
-    if (hide_after_leave) {
+    if (m_hide_after_leave) {
         hideLater();
     }
     QWidget::leaveEvent(event);
 }
 
 void PopupWidget::hideLater(int msec) {
-    msec = (msec == -1 ? defualt_hide_after_time : msec);
+    msec = (msec == -1 ? m_defualt_hide_after_time : msec);
     QMetaObject::invokeMethod(this, [this, msec](){
-        timer->start(msec);
+        m_timer->start(msec);
     }, Qt::QueuedConnection);
 }
 
 void PopupWidget::stopHideTimer() {
-    if (timer->isActive()) {
-        timer->stop();
+    if (m_timer->isActive()) {
+        m_timer->stop();
     }
 }

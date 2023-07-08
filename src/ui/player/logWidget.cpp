@@ -1,6 +1,8 @@
 #include "logWidget.hpp"
 #include "ui_customLabel.h"
 
+#include <QFontMetrics>
+
 class LogWidgetPrivate {
     public:
         LogWidgetPrivate(LogWidget *parent) : self(parent), ui(new Ui::CustomLabel()) {
@@ -13,7 +15,7 @@ class LogWidgetPrivate {
         void setupUi() {
             ui->setupUi(self);
 
-            QWidget::connect(self->timer, &QTimer::timeout, self, [this]() {
+            QWidget::connect(self->m_timer, &QTimer::timeout, self, [this]() {
                 if (logs.size() > 0) {
                     logs.pop_front();
                 }
@@ -23,19 +25,23 @@ class LogWidgetPrivate {
                     self->hideLater();
                 }
                 ui->label->setText("");
+                count = 0;
             });
         }
 
         void pushLog(const QString& log) {
-            // logs.push_back(log);
-            // if (self->isHidden()) {
-            //     ui->label->setText(log);
-            //     self->show();
-            //     self->hideLater();
-            // }
-            ui->label->setText(ui->label->text() + "\n" + log);
-            ui->label->resize(ui->label->sizeHint());
-            self->resize(self->sizeHint());
+            ui->label->setText((ui->label->text().isEmpty() ? "" : (ui->label->text() + "\n")) + log);
+            count ++;
+            if (count > 10) {
+                int index = ui->label->text().indexOf("\n");
+                ui->label->setText(ui->label->text().mid(index + 1));
+                count --;
+            }
+            QFontMetrics metrics(ui->label->font());
+            QSize size = metrics.boundingRect(QRect(0, 0, 200, 200), Qt::TextWordWrap, ui->label->text()).size();
+            ui->label->resize(size + QSize(20, 20));
+            self->resize(ui->label->size());
+            self->hide();
             self->show();
             self->stopHideTimer();
             self->hideLater();
@@ -44,6 +50,7 @@ class LogWidgetPrivate {
     public:
         Ui_CustomLabel* ui;
         QStringList logs;
+        int count = 0;
     
     private:
         LogWidget *self;

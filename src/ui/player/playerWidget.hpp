@@ -18,6 +18,7 @@ class PlayerWidget final : public CustomizeTitleWidget {
         void setVideoList(VideoBLLList videos);
         void appendVideo(VideoBLLPtr video);
         void clearVideoList();
+        void setTitle(const QString &title);
 
     public:
         void resizeEvent(QResizeEvent* event) override;

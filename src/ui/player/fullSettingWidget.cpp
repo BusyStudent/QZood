@@ -167,7 +167,7 @@ private:
         ui->danmakuFontComboBox->setCurrentFont(videoWidget->danmakuFont());
 
         QWidget::connect(ui->danmakuCombobox, &QComboBox::currentTextChanged, videoWidget, [videoWidget](const QString &danmakuSource) {
-            videoWidget->currentVideo()->setCurrentDanmakuSource(danmakuSource);
+            videoWidget->setDanmaku(danmakuSource);
         });
         QWidget::connect(ui->loadDanmakuButton, &QToolButton::clicked, videoWidget, [videoWidget](bool clicked){
             auto filePath = QFileDialog::getOpenFileName(videoWidget, videoWidget->tr("请选择弹幕文件"), "./", ".*");

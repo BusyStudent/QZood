@@ -106,7 +106,7 @@ public:
                 video_views[i]->setVideoId(bangumis[i]->bangumiTitle());
                 video_views[i]->setTitle(bangumis[i]->bangumiTitle());
                 video_views[i]->setExtraInformation(bangumis[i]->pubIndexTitle());
-                // video_views[i]->setSourceInformation(bangumis[i]->().join("; "));
+                video_views[i]->setSourceInformation(bangumis[i]->availableSource().join("; "));
                 video_views[i]->setImage(QImage(":/icons/loading_bar.png"));
                 bangumis[i]->fetchCover().then(video_views[i], [video_view = video_views[i]](const Result<QImage>& img) {
                     if (img.has_value()) {

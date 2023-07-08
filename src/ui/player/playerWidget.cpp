@@ -269,6 +269,10 @@ PlayerWidget::PlayerWidget(QWidget* parent) : CustomizeTitleWidget(parent), d(ne
     setAcceptDrops(true); // 支持从文件夹拖拽
 }
 
+void PlayerWidget::setTitle(const QString &title) {
+    d->ui->winTitle->setText(title);
+}
+
 void PlayerWidget::resizeEvent(QResizeEvent *event) {
     static bool is_maximized = false;
 	if (isMaximized() && !is_maximized) {

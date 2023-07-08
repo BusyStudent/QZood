@@ -45,7 +45,7 @@ void VideoView::setSourceInformation(const QString &str, const QString &tooltip)
 }
 
 void VideoView::setImage(const QImage &image, const QString &tooltip) {
-    ui->videoIcon->setPixmap(QPixmap::fromImage(image.scaled({width() - 10, height()}, Qt::KeepAspectRatio)));
+    ui->videoIcon->setPixmap(QPixmap::fromImage(image.scaled(ui->videoIcon->size(), Qt::AspectRatioMode::KeepAspectRatio, Qt::TransformationMode::SmoothTransformation)));
     ui->videoIcon->setAlignment(Qt::AlignCenter);
     ui->videoIcon->setToolTip(tooltip);
 }
