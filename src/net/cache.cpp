@@ -181,7 +181,7 @@ NetResult<QByteArray> HttpCacheService::wrapReply(QNetworkReply *reply) {
         switch (reply->operation()) {
             case QNetworkAccessManager::GetOperation : prefix = "GET"; break;
             case QNetworkAccessManager::PostOperation : prefix = "POST"; break;
-            default : qFatal() << "Impossible Operation in HttpCacheService::wrapReply"; break;
+            default : qDebug() << "Impossible Operation in HttpCacheService::wrapReply"; break;
         }
 
         auto contentType = reply->header(QNetworkRequest::ContentTypeHeader).toString();

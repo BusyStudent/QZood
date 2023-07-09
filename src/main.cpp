@@ -31,8 +31,6 @@ void OpenTerminal(QWidget *parent) { }
 #endif
 
 int main(int argc, char **argv) {
-    QApplication a(argc, argv);
-
     QSurfaceFormat format;
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
@@ -40,6 +38,8 @@ int main(int argc, char **argv) {
     format.setProfile(QSurfaceFormat::CoreProfile);
     format.setSwapBehavior(QSurfaceFormat::SwapBehavior::TripleBuffer);
     QSurfaceFormat::setDefaultFormat(format);
+
+    QApplication a(argc, argv);
 
     ZoodTestWindow* twin = new ZoodTestWindow();
     twin->setAttribute(Qt::WA_DeleteOnClose, true);

@@ -185,7 +185,7 @@ public:
         auto urlsNode = ctxt.eval("//div[@class='movurl']/ul/li/a");
         if (urlsNode.nodeTab()) {
             for (auto node : urlsNode) {
-                QString url = client.domain() + QString::fromUtf8(node->property("href")).removeFirst();
+                QString url = client.domain() + QString::fromUtf8(node->property("href")).remove(0, 1);
                 QString title = QString::fromUtf8(node->content());
 
                 self->episodeList.push_back(qMakePair(title, url));
@@ -334,7 +334,7 @@ NetResult<BangumiList> YhdmClient::searchBangumi(const QString &name) {
                 result.putResult(std::nullopt);
                 return;
             }
-            url = domain() + QString::fromUtf8(aNode->property("href")).removeFirst();
+            url = domain() + QString::fromUtf8(aNode->property("href")).remove(0, 1);
             cover = QString::fromUtf8(imgNode->property("src"));
             title = QString::fromUtf8(imgNode->property("alt"));
 
@@ -396,7 +396,7 @@ NetResult<Timeline>    YhdmClient::fetchTimeline() {
                 auto href = a->property("href");
                 auto title = a->property("title");
 
-                item->urls.push_back(domain() + QString::fromUtf8(href).removeFirst());
+                item->urls.push_back(domain() + QString::fromUtf8(href).remove(0, 1));
                 item->titles.push_back(QString::fromUtf8(title));
 
                 // Find previus span/a

@@ -40,51 +40,51 @@ QImage GetMediaFileIcon(const QString &filename) {
     ::DeleteObject(bitmap);
     return image;
 #else
-    AVPtr<AVFormatContext> formatContext;
-    AVPtr<AVCodecContext>  codecContext;
-    AVPtr<AVPacket>        packet {av_packet_alloc()};
-    AVPtr<AVFrame>         frame {av_frame_alloc()};
-    int errcode = avformat_open_input(&formatContext, filename.toUtf8().constData(), nullptr, nullptr);
-    if (errcode < 0) {
-        return QImage();
-    }
-    errcode = avformat_find_stream_info(formatContext.get(), nullptr);
-    if (errcode < 0) {
-        return QImage();
-    }
-    int videoStream = av_find_best_stream(formatContext.get(), AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
-    if (videoStream < 0) {
-        return QImage();
-    }
-    auto [createCodecContext, createErrcode] = FFCreateDecoderContext(formatContext->streams[videoStream]);
-    if (createErrcode < 0) {
-        return QImage();
-    }
-    codecContext.reset(createCodecContext);
+    // AVPtr<AVFormatContext> formatContext;
+    // AVPtr<AVCodecContext>  codecContext;
+    // AVPtr<AVPacket>        packet {av_packet_alloc()};
+    // AVPtr<AVFrame>         frame {av_frame_alloc()};
+    // int errcode = avformat_open_input(&formatContext, filename.toUtf8().constData(), nullptr, nullptr);
+    // if (errcode < 0) {
+    //     return QImage();
+    // }
+    // errcode = avformat_find_stream_info(formatContext.get(), nullptr);
+    // if (errcode < 0) {
+    //     return QImage();
+    // }
+    // int videoStream = av_find_best_stream(formatContext.get(), AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+    // if (videoStream < 0) {
+    //     return QImage();
+    // }
+    // auto [createCodecContext, createErrcode] = FFCreateDecoderContext(formatContext->streams[videoStream]);
+    // if (createErrcode < 0) {
+    //     return QImage();
+    // }
+    // codecContext.reset(createCodecContext);
 
-    // Set AVDISCARD_ALL 	
-    for (int i = 0; i < formatContext->nb_streams; i++) {
-        if (i != videoStream) {
-            formatContext->streams[i]->discard = AVDISCARD_ALL;
-        }
-    }
+    // // Set AVDISCARD_ALL 	
+    // for (int i = 0; i < formatContext->nb_streams; i++) {
+    //     if (i != videoStream) {
+    //         formatContext->streams[i]->discard = AVDISCARD_ALL;
+    //     }
+    // }
 
-    errcode = av_read_frame(formatContext.get(), packet.get());
-    if (errcode < 0) {
-        return QImage();
-    }
-    errcode = avcodec_send_packet(codecContext.get(), packet.get());
-    av_packet_unref(packet.get());
-    if (errcode < 0) {
-        return QImage();
-    }
-    errcode = avcodec_receive_frame(codecContext.get(), frame.get());
-    if (errcode < 0) {
-        return QImage();
-    }
+    // errcode = av_read_frame(formatContext.get(), packet.get());
+    // if (errcode < 0) {
+    //     return QImage();
+    // }
+    // errcode = avcodec_send_packet(codecContext.get(), packet.get());
+    // av_packet_unref(packet.get());
+    // if (errcode < 0) {
+    //     return QImage();
+    // }
+    // errcode = avcodec_receive_frame(codecContext.get(), frame.get());
+    // if (errcode < 0) {
+    //     return QImage();
+    // }
 
-    int width = frame->width;
-    int height = frame->height;
+    // int width = frame->width;
+    // int height = frame->height;
 
     // TODO : Convert to RGBA and write
 

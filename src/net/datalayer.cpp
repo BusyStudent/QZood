@@ -43,7 +43,7 @@ public:
         return episodeList[0]->title();
     }
     QString indexTitle() override {
-        return episodeList[0]->title();
+        return episodeList[0]->indexTitle();
     }
     QString longTitle() override {
         return episodeList[0]->longTitle();

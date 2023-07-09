@@ -4,6 +4,7 @@
 #include <QAbstractEventDispatcher>
 #include <QRegularExpression>
 #include <QIODevice>
+#include <thread>
 
 #define NEKOAV_TIME_BASE 1000000.0
 
@@ -386,53 +387,55 @@ void VideoThread::tryHardwareInit() {
             return;
         }
 
-        if (conf->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) {
-            // Got
-            hardwarePixfmt = conf->pix_fmt;
-            hardwareType = conf->device_type;
-            break;
+        if (!(conf->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX)) {
+            continue;
         }
-    }
+        // Got
+        hardwarePixfmt = conf->pix_fmt;
+        hardwareType = conf->device_type;
 
-    // Override HW get format
-    hardwareCtxt->opaque = this;
-    hardwareCtxt->get_format = [](struct AVCodecContext *s, const enum AVPixelFormat * fmt) {
-        auto self = static_cast<VideoThread*>(s->opaque);
-        auto p = fmt;
-        while (*p != -1) {
-            if (*p == self->hardwarePixfmt) {
-                return self->hardwarePixfmt;
+        // Override HW get format
+        hardwareCtxt->opaque = this;
+        hardwareCtxt->get_format = [](struct AVCodecContext *s, const enum AVPixelFormat * fmt) {
+            auto self = static_cast<VideoThread*>(s->opaque);
+            auto p = fmt;
+            while (*p != -1) {
+                if (*p == self->hardwarePixfmt) {
+                    return self->hardwarePixfmt;
+                }
+                if (*(p + 1) == AV_PIX_FMT_NONE) {
+                    qWarning() << "Cannot get hardware format, fallback to " << av_pix_fmt_desc_get(*p)->name;
+                    return *p;
+                }
+                p ++;
             }
-            if (*(p + 1) == AV_PIX_FMT_NONE) {
-                qWarning() << "Cannot get hardware format, fallback to " << av_pix_fmt_desc_get(*p)->name;
-                return *p;
-            }
-            p ++;
+            // Almost impossible, first is none pixfmt
+            abort();
+        };
+
+        // Try init hw
+        AVBufferRef *hardwareDeviceCtxt = nullptr;
+        if (av_hwdevice_ctx_create(&hardwareDeviceCtxt, hardwareType, nullptr, nullptr, 0) < 0) {
+            // Failed
+            continue;
         }
-        // Almost impossible, first is none pixfmt
-        abort();
-    };
+        // hardwareCtxt->hw_device_ctx = av_buffer_ref(hardwareDeviceCtxt);
+        hardwareCtxt->hw_device_ctx = hardwareDeviceCtxt;
 
-    // Try init hw
-    AVBufferRef *hardwareDeviceCtxt = nullptr;
-    if (av_hwdevice_ctx_create(&hardwareDeviceCtxt, hardwareType, nullptr, nullptr, 0) < 0) {
-        // Failed
+        // Init codec
+        if (avcodec_open2(hardwareCtxt.get(), codec, nullptr) < 0) {
+            continue;
+        }
+
+        // Done
+        avcodec_free_context(&codecCtxt);
+        codecCtxt = hardwareCtxt.release();
+
+        qDebug() << "VideoThread tryHardwareInit ok " << av_hwdevice_get_type_name(hardwareType) 
+                << " hardwareFormat " << av_pix_fmt_desc_get(hardwarePixfmt)->name;
+
         return;
     }
-    // hardwareCtxt->hw_device_ctx = av_buffer_ref(hardwareDeviceCtxt);
-    hardwareCtxt->hw_device_ctx = hardwareDeviceCtxt;
-
-    // Init codec
-    if (avcodec_open2(hardwareCtxt.get(), codec, nullptr) < 0) {
-        return;
-    }
-
-    // Done
-    avcodec_free_context(&codecCtxt);
-    codecCtxt = hardwareCtxt.release();
-
-    qDebug() << "VideoThread tryHardwareInit ok " << av_hwdevice_get_type_name(hardwareType) 
-             << " hardwareFormat " << av_pix_fmt_desc_get(hardwarePixfmt)->name;
 }
 void VideoThread::run() {
     videoClockStart = av_gettime_relative();
