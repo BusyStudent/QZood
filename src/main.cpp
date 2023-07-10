@@ -1,6 +1,7 @@
 #include <QApplication>
 #include <QMainWindow>
 #include <QSurfaceFormat>
+#include <QThreadPool>
 
 #include "tests/testwindow.hpp"
 #include "ui/common/customizeTitleWidget.hpp"
@@ -11,7 +12,7 @@
 #include <QWindow>
 #include <QListWidget>
 #include <QHBoxLayout>
-void OpenTerminal(QWidget *parent)
+static void OpenTerminal(QWidget *parent)
 {    
     AllocConsole();
     freopen("CON","w",stdout);
@@ -30,16 +31,28 @@ void OpenTerminal(QWidget *parent)
 void OpenTerminal(QWidget *parent) { }
 #endif
 
-int main(int argc, char **argv) {
+static void SetDefaultFormat() {
     QSurfaceFormat format;
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
     format.setVersion(3, 3);
     format.setProfile(QSurfaceFormat::CoreProfile);
-    format.setSwapBehavior(QSurfaceFormat::SwapBehavior::TripleBuffer);
     QSurfaceFormat::setDefaultFormat(format);
+}
+
+int main(int argc, char **argv) {
+
+#if !defined(_WIN32)
+    SetDefaultFormat();
+#endif
 
     QApplication a(argc, argv);
+
+#if defined(_WIN32)
+    SetDefaultFormat();
+#endif
+
+    QThreadPool::globalInstance()->setMaxThreadCount(4);
 
     ZoodTestWindow* twin = new ZoodTestWindow();
     twin->setAttribute(Qt::WA_DeleteOnClose, true);

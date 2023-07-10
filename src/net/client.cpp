@@ -1,7 +1,7 @@
 #include "client.hpp"
 #include <QApplication>
 #include <QNetworkReply>
-
+#include <QThreadPool>
 
 NetPromiseHelper::NetPromiseHelper(QObject *p) : QObject(p) {
 
@@ -94,6 +94,9 @@ NetResult<QByteArray>   WrapQNetworkReply(QNetworkReply *reply) {
 
     return result;
 }
+
+static QThreadPool *decodeThreadPool = nullptr;
+
 NetResult<QImage>       WrapHttpImagePromise(NetResult<QByteArray> prev) {
     auto r = NetResult<QImage>::Alloc();
     prev.then([r](const Result<QByteArray> &b) mutable {
@@ -101,12 +104,14 @@ NetResult<QImage>       WrapHttpImagePromise(NetResult<QByteArray> prev) {
             r.putResult(std::nullopt);
             return;
         }
-        auto image = QImage::fromData(b.value());
-        if (image.isNull()) {
-            r.putResult(std::nullopt);
-            return;
-        }
-        r.putResult(image);
+        QThreadPool::globalInstance()->start([r, rawData = b.value()]() mutable {
+            auto image = QImage::fromData(rawData);
+            if (image.isNull()) {
+                r.putResult(std::nullopt, Qt::BlockingQueuedConnection);
+                return;
+            }
+            r.putResult(image, Qt::BlockingQueuedConnection);
+        });
     });
     return r;
 }

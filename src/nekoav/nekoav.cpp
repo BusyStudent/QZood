@@ -95,6 +95,67 @@ AVPacket *PacketQueue::get(bool block) {
 
     return ret;
 }
+bool PacketQueue::seek(int64_t pos) {
+    std::lock_guard locker(mutex);
+    // Try to find start position
+    int64_t startTs = AV_NOPTS_VALUE;
+    auto beginIter = packets.begin();
+    for (; beginIter != packets.end(); ++beginIter) {
+        if (IsSpecialPacket(*beginIter) || !*beginIter) {
+            continue;
+        }
+        startTs = (*beginIter)->pts;
+        break;
+    }
+    if (startTs == AV_NOPTS_VALUE) {
+        return false;
+    }
+
+    // Check the position is in range
+    if (pos < startTs || pos > startTs + packetsDuration) {
+        return false;
+    }
+
+    // Try to find the current position
+    auto keyIter = packets.end();
+    for (; beginIter != packets.end(); ++beginIter) {
+        if (IsSpecialPacket(*beginIter) || !*beginIter) {
+            continue;
+        }
+        auto pak = *beginIter;
+        if (!(pak->flags & AV_PKT_FLAG_KEY)) {
+            // Not key packet
+            continue;
+        }
+        if (pos >= pak->pts) {
+            // Backword to key frame
+            keyIter = beginIter;
+        }
+        else {
+            // End search
+            break;
+        }
+    }
+    if (keyIter == packets.end()) {
+        // No data
+        return false;
+    }
+
+    // Erase the range
+    int64_t dur = 0;
+    for (auto cur = packets.begin(); cur != keyIter; ++cur) {
+        if (IsSpecialPacket(*cur) || !*cur) {
+            ++beginIter;
+            continue;
+        }
+        dur += (*cur)->duration;
+        av_packet_free(&*cur);
+    }
+    packetsDuration -= dur;
+    packets.erase(packets.begin(), keyIter);
+    packets.push_front(FlushPacket);
+    return true;
+}
 
 // AudioThread    
 AudioThread::AudioThread(DemuxerThread *parent, AVStream *stream, AVCodecContext *ctxt) 
@@ -1247,44 +1308,80 @@ void DemuxerThread::wakeUp() {
     cond.notify_one();
 }
 bool DemuxerThread::doSeek() {
-    // Pause all worker needed
-    hasSeek = false;
-    
+    // Pause all worker needed    
     bool restoreAudio = false;
     bool restoreVideo = false;
     bool restoreSubtitle = false;
+    bool seekInQueue = true;
+    qreal curSeekPosition = seekPosition;
+
+    // Pause thread & Try directly seek in queue
     if (audioThread) {
         restoreAudio = !audioThread->isPaused();
         audioThread->pause(true);
-        audioThread->packetQueue().flush();
-        audioThread->packetQueue().put(FlushPacket);
+        if (seekInQueue) {
+            int64_t pos = curSeekPosition / av_q2d(formatCtxt->streams[player->audioStream]->time_base);
+            seekInQueue = audioThread->packetQueue().seek(pos); //< Left thread will do this if prev is successful
+        }
     }
     if (videoThread && !isPictureStream(player->videoStream)) {
         // We didnot seek if it is a audio cover
         restoreVideo = !videoThread->isPaused();
         videoThread->pause(true);
-        videoThread->packetQueue().flush();
-        videoThread->packetQueue().put(FlushPacket);
+        if (seekInQueue) {
+            int64_t pos = curSeekPosition / av_q2d(formatCtxt->streams[player->videoStream]->time_base);
+            seekInQueue = videoThread->packetQueue().seek(pos); //< Left thread will do this if prev is successful
+        }
     }
     if (subtitleThread) {
         restoreSubtitle = !subtitleThread->isPaused();
         subtitleThread->pause(true);
-        subtitleThread->packetQueue().flush();
-        subtitleThread->packetQueue().put(FlushPacket);
-        subtitleThread->refresh();
+        if (seekInQueue) {
+            int64_t pos = curSeekPosition / av_q2d(formatCtxt->streams[player->subtitleStream]->time_base);
+            seekInQueue = subtitleThread->packetQueue().seek(pos); //< Left thread will do this if prev is successful
+        }
     }
 
-    // Do seek
-    int64_t pos = seekPosition * NEKOAV_TIME_BASE;
-    errcode = av_seek_frame(formatCtxt, -1, pos, AVSEEK_FLAG_BACKWARD);
-    if (errcode < 0) {
-        qDebug() << "DemuxerThread failed to seek subtitleStream ";
-        return sendError(errcode);
+    if (!seekInQueue) {
+        // Failed to seek in the queue, flush the queue and seek the file
+        if (audioThread) {
+            audioThread->packetQueue().flush();
+            audioThread->packetQueue().put(FlushPacket);
+        }
+        if (videoThread && !isPictureStream(player->videoStream)) {
+            videoThread->packetQueue().flush();
+            videoThread->packetQueue().put(FlushPacket);
+        }
+        if (subtitleThread) {
+            subtitleThread->packetQueue().flush();
+            subtitleThread->packetQueue().put(FlushPacket);
+            subtitleThread->refresh();
+        }
+
+        // Do seek
+        int64_t pos = curSeekPosition * NEKOAV_TIME_BASE;
+        errcode = av_seek_frame(formatCtxt, -1, pos, AVSEEK_FLAG_BACKWARD);
+        if (errcode < 0) {
+            qDebug() << "DemuxerThread failed to seek subtitleStream ";
+            return sendError(errcode);
+        }
+    }
+    else {
+        qDebug() << "DemuxerThread seek position in buffer, done";
     }
 
     // Set external Clock 
-    externalClock = seekPosition;
+    externalClock = curSeekPosition;
     externalClockStart = av_gettime_relative() - externalClock * NEKOAV_TIME_BASE;
+
+    if (seekPosition == curSeekPosition) {
+        // User didnot seek at our do seeking
+        qDebug() << "DemuxerThread seek Done, user didnot seek at our do seeking";
+        hasSeek = false;
+    }
+    else {
+        qDebug() << "DemuxerThread seek at our do seek position";
+    }
 
     if (restoreAudio) {
         audioThread->pause(false);

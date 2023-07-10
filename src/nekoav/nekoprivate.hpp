@@ -34,6 +34,7 @@ class PacketQueue final {
         void flush();
         void put(AVPacket *packet);
         void unget(AVPacket *packet);
+        bool seek(int64_t pos);
         void requestStop();
         auto get(bool blocking = true) -> AVPacket *;
         size_t size() const;
