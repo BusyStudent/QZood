@@ -1,5 +1,4 @@
 #include "volumeSettingWidget.hpp"
-#include "ui_volumeSettingView.h"
 
 VolumeSettingWidget::VolumeSettingWidget(QWidget* parent) : PopupWidget(parent), ui(new Ui::VolumeSettingView) {
     ui->setupUi(this);

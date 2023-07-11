@@ -1,4 +1,5 @@
 #include "../common/popupWidget.hpp"
+#include "ui_customLabel.h"
 
 class LogWidgetPrivate;
 
@@ -10,7 +11,7 @@ class LogWidget : public PopupWidget {
         void pushLog(const QString& log);
 
     private:
-        LogWidgetPrivate *d = nullptr;
+        QScopedPointer<LogWidgetPrivate> d;
 
     friend class LogWidgetPrivate;
 };

@@ -209,7 +209,7 @@ VideoBLLLocal::VideoBLLLocal(const QStringList filepaths) : filePaths(filepaths)
 VideoBLLPtr VideoBLLLocal::operator+(const VideoBLLPtr v) {
     auto vl = dynamic_cast<const VideoBLLLocal *>(v.get());
     auto files = filePaths + (vl == nullptr ? QStringList() : vl->filePaths);
-    return std::shared_ptr<VideoBLLLocal>(new VideoBLLLocal(files));
+    return VideoBLLPtr(new VideoBLLLocal(files));
 }
 
 QListWidgetItem* VideoBLLLocal::addToList(QListWidget* listWidget) {

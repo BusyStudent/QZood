@@ -43,7 +43,7 @@ class PopupWidget : public QWidget {
         void hided();
 
     protected:
-        PopupWidgetPrivate *d;
+        QScopedPointer<PopupWidgetPrivate> d;
         QTimer* m_timer = nullptr;
         QWidget* m_attach_widget = nullptr;
         Qt::Alignment m_aligns = Qt::AlignBottom | Qt::AlignHCenter;

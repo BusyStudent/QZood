@@ -1,4 +1,3 @@
-
 #include "ui_videoView.h"
 #include "videoView.hpp"
 
@@ -10,6 +9,8 @@ VideoView::VideoView(QWidget *parent) : QWidget(parent), ui(new Ui::VideoView())
     ui->videoExtraInfo->installEventFilter(this);
     ui->videoSource->installEventFilter(this);
 }
+
+VideoView::~VideoView() { }
 
 void VideoView::setTitle(const QString &str, const QString &tooltip) {
     QFontMetrics fontWidth(ui->videoTitle->font());

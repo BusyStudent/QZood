@@ -90,9 +90,7 @@ PopupWidget::PopupWidget(QWidget* parent, Qt::WindowFlags f) : QWidget(parent, f
     hide();
 }
 
-PopupWidget::~PopupWidget() {
-    delete d;
-}
+PopupWidget::~PopupWidget() { }
 
 void PopupWidget::enterEvent(QEnterEvent* event) {
     if (m_stop_timer_enter) {

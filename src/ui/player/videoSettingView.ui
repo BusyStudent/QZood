@@ -56,7 +56,7 @@ QSlider#videoProgressBar::sub-page {
 }
 
 QToolButton {
-	background: transparent;
+	background: rgba(0, 0, 0, 0);
 	color: white;
 	font-weight: bold;
 }
@@ -110,7 +110,7 @@ QToolButton#showFullScreenButton:checked {
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <property name="spacing">
-       <number>0</number>
+       <number>3</number>
       </property>
       <property name="leftMargin">
        <number>0</number>

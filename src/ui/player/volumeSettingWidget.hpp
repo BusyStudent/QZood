@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../common/popupWidget.hpp"
+#include "ui_volumeSettingView.h"
 
 namespace Ui {
 class VolumeSettingView;
@@ -19,5 +20,5 @@ class VolumeSettingWidget : public PopupWidget{
         void setValue(int value);
     
     private:
-        Ui::VolumeSettingView* ui;
+        QScopedPointer<Ui::VolumeSettingView> ui;
 };

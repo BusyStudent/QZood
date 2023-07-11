@@ -99,5 +99,5 @@ class VideoWidget : public QWidget{
         // void setSubtitle();
 
     private:
-        VideoWidgetPrivate* d;
+        QScopedPointer<VideoWidgetPrivate> d;
 };

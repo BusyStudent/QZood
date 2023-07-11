@@ -70,7 +70,7 @@ QLabel#animaLabel1 {
     <number>0</number>
    </property>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout">
+    <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0">
      <property name="spacing">
       <number>0</number>
      </property>
@@ -105,15 +105,15 @@ QLabel#animaLabel1 {
      <item>
       <widget class="QListWidget" name="timeTab">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
        </property>
        <property name="minimumSize">
         <size>
-         <width>282</width>
-         <height>30</height>
+         <width>0</width>
+         <height>0</height>
         </size>
        </property>
        <property name="maximumSize">
@@ -121,6 +121,15 @@ QLabel#animaLabel1 {
          <width>16777215</width>
          <height>30</height>
         </size>
+       </property>
+       <property name="verticalScrollBarPolicy">
+        <enum>Qt::ScrollBarAlwaysOff</enum>
+       </property>
+       <property name="horizontalScrollBarPolicy">
+        <enum>Qt::ScrollBarAlwaysOff</enum>
+       </property>
+       <property name="sizeAdjustPolicy">
+        <enum>QAbstractScrollArea::AdjustIgnored</enum>
        </property>
        <property name="autoScroll">
         <bool>false</bool>
@@ -132,7 +141,7 @@ QLabel#animaLabel1 {
         <enum>QListView::LeftToRight</enum>
        </property>
        <property name="resizeMode">
-        <enum>QListView::Fixed</enum>
+        <enum>QListView::Adjust</enum>
        </property>
        <property name="batchSize">
         <number>8</number>
@@ -183,6 +192,9 @@ QLabel#animaLabel1 {
       <spacer name="horizontalSpacer">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeType">
+        <enum>QSizePolicy::Expanding</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>

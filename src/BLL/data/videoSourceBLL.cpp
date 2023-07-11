@@ -87,7 +87,7 @@ void VideoSourceBLL::searchBangumiFromTimeline(Timeline t,QObject *obj, std::fun
     } else {
         bangumis[(TimeWeek)(t[0]->dayOfWeek())].clear();
         // 当前缓存中不存在数据，调用数据接口fetch数据
-        std::shared_ptr<int> counter = std::make_shared<int>(t.size());
+        QSharedPointer<int> counter(new int(t.size()));
         for (auto& timelineItem : t) {
             bangumis[(TimeWeek)(timelineItem->dayOfWeek())].append(timelineItem->episodesList());
             for (auto item : timelineItem->episodesList()) {

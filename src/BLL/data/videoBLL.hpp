@@ -14,6 +14,7 @@ template <typename SourceT>
 inline VideoBLLPtr createVideoBLL(const SourceT) {
     class __ShouldNotBeUsedStruct {};
     static_assert(std::is_same_v<SourceT,__ShouldNotBeUsedStruct>, "对应类型的视频资源转换没有实现！");
+    return nullptr;
 }
 
 class VideoBLL : public DynRefable {

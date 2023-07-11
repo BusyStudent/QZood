@@ -3,11 +3,6 @@
 #include "../common/customizeTitleWidget.hpp"
 #include "../../BLL/data/videoBLL.hpp"
 
-namespace Ui {
-class PlayerView;
-class VideoSettingView;
-}
-
 class PlayerWidgetPrivate;
 
 class PlayerWidget final : public CustomizeTitleWidget {
@@ -30,5 +25,5 @@ class PlayerWidget final : public CustomizeTitleWidget {
         void showEvent(QShowEvent* event) override;
 
     private:
-        PlayerWidgetPrivate *d;
+        QScopedPointer<PlayerWidgetPrivate> d;
 };

@@ -9,9 +9,7 @@
 class FullSettingWidgetPrivate {
 public:
     FullSettingWidgetPrivate(FullSettingWidget *parent) : ui(new Ui::FullSettingView()), self(parent) {}
-    ~FullSettingWidgetPrivate() {
-        delete ui;
-    }
+    ~FullSettingWidgetPrivate() { }
 
     void setupUi() {
         ui->setupUi(self);
@@ -380,7 +378,7 @@ private:
     }
 
 public:
-    Ui::FullSettingView* ui;
+    QScopedPointer<Ui::FullSettingView> ui;
 
 private:
     FullSettingWidget *self;
@@ -389,6 +387,8 @@ private:
 FullSettingWidget::FullSettingWidget(QWidget* parent, Qt::WindowFlags f) : PopupWidget(parent, f), d(new FullSettingWidgetPrivate(this)) {
     d->setupUi();
 }
+
+FullSettingWidget::~FullSettingWidget() { }
 
 void FullSettingWidget::initDanmakuSetting(VideoBLLPtr video) {
     d->ui->danmakuCombobox->addItems(video->danmakuSourceList());

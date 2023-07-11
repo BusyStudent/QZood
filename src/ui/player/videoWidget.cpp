@@ -38,8 +38,6 @@ public:
     }
 
     ~VideoWidgetPrivate() {
-        delete ui_videoSetting;
-        delete ui_sourceList;
         if (player->isPlaying()) {
             player->stop();
         }
@@ -61,7 +59,7 @@ public:
 
         // 实例化视频播放进度条及设置栏
         videoSetting = new PopupWidget();
-        ui_videoSetting = new Ui::VideoSettingView();
+        ui_videoSetting.reset(new Ui::VideoSettingView());
         ui_videoSetting->setupUi(videoSetting);
         mainLayout->addWidget(videoSetting);
         ui_videoSetting->playerButton->setCheckable(false);
@@ -99,7 +97,7 @@ public:
 
         // 源列表
         sourceListWidget = new PopupWidget(self);
-        ui_sourceList = new Ui::SourceList();
+        ui_sourceList.reset(new Ui::SourceList());
         ui_sourceList->setupUi(sourceListWidget);
         sourceListWidget->setAssociateWidget(ui_videoSetting->sourceButton);
         sourceListWidget->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
@@ -561,13 +559,13 @@ public:
     NekoAudioOutput *audio;
 
     PopupWidget *videoSetting = nullptr;
-    Ui::VideoSettingView *ui_videoSetting = nullptr;
+    QScopedPointer<Ui::VideoSettingView> ui_videoSetting;
     CustomSlider *videoProgressBar = nullptr;
 
     VolumeSettingWidget *volumeSetting = nullptr;
 
     PopupWidget *sourceListWidget = nullptr;
-    Ui::SourceList *ui_sourceList = nullptr;
+    QScopedPointer<Ui::SourceList> ui_sourceList;
 
     FullSettingWidget *settings = nullptr;
 
@@ -769,6 +767,4 @@ void VideoWidget::setSubtitle(int index) {
     d->player->setActiveSubtitleTrack(index);
 }
 
-VideoWidget::~VideoWidget() {
-    delete d;
-}
+VideoWidget::~VideoWidget() { }

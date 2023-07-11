@@ -18,7 +18,7 @@ class VideoView : public QWidget {
     Q_OBJECT
     public:
         VideoView(QWidget *parent = nullptr);
-        virtual ~VideoView() {}
+        virtual ~VideoView();
 
     public Q_SLOTS:
         void setImage(const QImage &image, const QString &tooltip = QString());
@@ -37,6 +37,6 @@ class VideoView : public QWidget {
         bool eventFilter(QObject* obj, QEvent *event) override;
 
     private:
-        Ui::VideoView *ui;
+        QScopedPointer<Ui::VideoView> ui;
         QString videoId = "";
 };

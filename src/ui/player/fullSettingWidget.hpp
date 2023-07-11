@@ -10,6 +10,7 @@ class FullSettingWidget : public PopupWidget {
     Q_OBJECT
     public:
         FullSettingWidget(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::Popup);
+        ~FullSettingWidget();
         void setupSetting(VideoWidget *VideoWidget);
         void initDanmakuSetting(VideoBLLPtr video);
         void initSubtitleSetting(VideoBLLPtr video);
@@ -18,5 +19,5 @@ class FullSettingWidget : public PopupWidget {
         void show();
 
     private:
-        FullSettingWidgetPrivate* d;
+        QScopedPointer<FullSettingWidgetPrivate> d;
 };

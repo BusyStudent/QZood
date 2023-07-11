@@ -50,5 +50,5 @@ class HomeWidget : public QScrollArea {
         void refresh(const QList<videoData>& dataList,const DisplayArea area);
 
     private:
-        HomeWidgetPrivate* d;
+        QScopedPointer<HomeWidgetPrivate> d;
 };

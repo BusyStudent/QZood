@@ -34,9 +34,7 @@ QScrollBar::sub-line:horizontal {
 class HomeWidgetPrivate {
 public:
     HomeWidgetPrivate(HomeWidget* self) : self(self), ui(new Ui::HomeView) { }
-    ~HomeWidgetPrivate() {
-        delete ui;
-    }
+    ~HomeWidgetPrivate() { }
 
     void setupUi() {
         centralWidget = new QWidget();
@@ -171,7 +169,7 @@ public:
     }
 
 public:
-    Ui::HomeView* ui;
+    QScopedPointer<Ui::HomeView> ui;
     QWidget* centralWidget;
     QMap<HomeWidget::DisplayArea, QWidget*> areaToWidget;
 
@@ -184,9 +182,7 @@ HomeWidget::HomeWidget(QWidget* parent) : QScrollArea(parent), d(new HomeWidgetP
     d->setupUi();
 }
 
-HomeWidget::~HomeWidget() {
-    delete d;
-}
+HomeWidget::~HomeWidget() { }
 
 void HomeWidget::refresh(const QList<videoData>& dataList,const DisplayArea area) {
     d->refresh(d->areaToWidget[area], dataList);

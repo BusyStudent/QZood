@@ -7,7 +7,7 @@
 
 class CustomSliderPrivate {
     public:
-        CustomSliderPrivate(CustomSlider* parent) : parent(parent), tipLabel(new QLabel(parent)) {
+        CustomSliderPrivate(CustomSlider* parent) : self(parent), tipLabel(new QLabel(parent)) {
             setupUi();
         }
 
@@ -27,13 +27,13 @@ class CustomSliderPrivate {
     
         void updateGrooveRect() {
             QStyleOptionSlider opt;
-            parent->initStyleOption(&opt);
-            grooveRect = parent->style()->subControlRect(QStyle::CC_Slider, &opt, QStyle::SC_SliderGroove, parent);
+            self->initStyleOption(&opt);
+            grooveRect = self->style()->subControlRect(QStyle::CC_Slider, &opt, QStyle::SC_SliderGroove, self);
         }
 
     private:
         int preloadValue = 0;
-        CustomSlider* parent;
+        CustomSlider* self;
         QLabel* tipLabel = nullptr;
         bool flagShowTip = true;
         QRect grooveRect;
@@ -146,6 +146,4 @@ void CustomSlider::hideEvent(QHideEvent* ev) {
     d->tipLabel->hide();
 }
 
-CustomSlider::~CustomSlider() {
-    delete d;
-}
+CustomSlider::~CustomSlider() { }

@@ -32,7 +32,7 @@ class CustomSlider : public QSlider
         void hideEvent(QHideEvent* ev) override;
     
     private:
-        CustomSliderPrivate* d;
+        QScopedPointer<CustomSliderPrivate> d;
 
     friend class CustomSliderPrivate;
 };

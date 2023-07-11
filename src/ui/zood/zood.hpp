@@ -2,7 +2,6 @@
 
 #include "../common/customizeTitleWidget.hpp"
 
-
 namespace Ui {
 class Zood;
 }
@@ -15,6 +14,7 @@ class Zood : public CustomizeTitleWidget {
     Q_OBJECT
     public:
         Zood(QWidget *parent = nullptr);
+        virtual ~Zood();
         HomeWidget* homeWidget();
         QLineEdit* searchBox();
         void refreshAll();
@@ -30,5 +30,5 @@ class Zood : public CustomizeTitleWidget {
         void editTextChanged(const QString &);
 
     private:
-        ZoodPrivate* d;
+        QScopedPointer<ZoodPrivate> d;
 };

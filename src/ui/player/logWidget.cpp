@@ -1,5 +1,4 @@
 #include "logWidget.hpp"
-#include "ui_customLabel.h"
 
 #include <QFontMetrics>
 
@@ -8,9 +7,7 @@ class LogWidgetPrivate {
         LogWidgetPrivate(LogWidget *parent) : self(parent), ui(new Ui::CustomLabel()) {
 
         }
-        ~LogWidgetPrivate() {
-            delete ui;
-        }
+        ~LogWidgetPrivate() { }
 
         void setupUi() {
             ui->setupUi(self);
@@ -48,7 +45,7 @@ class LogWidgetPrivate {
         }
     
     public:
-        Ui_CustomLabel* ui;
+        QScopedPointer<Ui_CustomLabel> ui;
         QStringList logs;
         int count = 0;
     
@@ -60,9 +57,7 @@ LogWidget::LogWidget(QWidget *parent) : PopupWidget(parent), d(new LogWidgetPriv
     d->setupUi();
 }
 
-LogWidget::~LogWidget() {
-    delete d;
-}
+LogWidget::~LogWidget() { }
 
 void LogWidget::pushLog(const QString& log) {
     d->pushLog(log);

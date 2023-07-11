@@ -18,13 +18,10 @@
 class PlayerWidgetPrivate {
 public:
     PlayerWidgetPrivate(PlayerWidget* parent) : self(parent), ui(new Ui::PlayerView()) {
-        itemModel = new VideoItemModel();
+        itemModel.reset(new VideoItemModel());
     }
 
-    ~PlayerWidgetPrivate() {
-        delete ui;
-        delete itemModel;
-    }
+    ~PlayerWidgetPrivate() { }
 
     void setupUi() {
         ui->setupUi(self);
@@ -40,7 +37,7 @@ public:
 
         // 播放顺序设置界面
         playOrderSettingWidget = new PopupWidget(self);
-        ui_playOrderSettingView = new Ui::PlayOrderSettingView();
+        ui_playOrderSettingView.reset(new Ui::PlayOrderSettingView());
         ui_playOrderSettingView->setupUi(playOrderSettingWidget);
         playOrderSettingWidget->setAssociateWidget(ui->playOrder);
         playOrderSettingWidget->setAlignment(Qt::AlignBottom | Qt::AlignHCenter);
@@ -247,14 +244,14 @@ public:
 
 public:
     PlayerWidget* self;
-    Ui::PlayerView* ui;
+    QScopedPointer<Ui::PlayerView> ui;
 
     VideoWidget* videoWidget = nullptr;
 
     PopupWidget* playOrderSettingWidget = nullptr;
-    Ui::PlayOrderSettingView* ui_playOrderSettingView = nullptr;
+    QScopedPointer<Ui::PlayOrderSettingView> ui_playOrderSettingView;
 
-    VideoItemModel* itemModel;
+    QScopedPointer<VideoItemModel> itemModel;
 
     int _index = -1;
     Order _order = Order::IN_ORDER;
@@ -336,9 +333,7 @@ void PlayerWidget::showEvent(QShowEvent *event) {
     createShadow(d->ui->containerWidget);
 }
 
-PlayerWidget::~PlayerWidget() {
-    delete d;
-}
+PlayerWidget::~PlayerWidget() { }
 
 void PlayerWidget::setVideoList(VideoBLLList videos) {
     for (auto video : videos) {
@@ -347,7 +342,7 @@ void PlayerWidget::setVideoList(VideoBLLList videos) {
 }
 
 void PlayerWidget::appendVideo(VideoBLLPtr video) {
-    d->addVideo(video);    
+    d->addVideo(video);
 }
 
 void PlayerWidget::clearVideoList() {
