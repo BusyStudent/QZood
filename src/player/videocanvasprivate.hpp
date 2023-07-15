@@ -26,9 +26,10 @@ class DanmakuPaintItem final {
 using DanmakuTracks = std::list<std::list<DanmakuPaintItem>>;
 using DanmakuTrack  = std::list<DanmakuPaintItem>;
 
-class VideoCanvasPrivate final : public QObject, public QOpenGLFunctions_3_3_Core {
+class VideoCanvasPrivate final : public QObject {
     Q_OBJECT
     public:
+        using GLFunctions = QScopedPointer<QOpenGLFunctions_3_3_Core>;
         VideoCanvasPrivate(VideoCanvas *parent);
 
         enum ShaderType {
@@ -51,6 +52,7 @@ class VideoCanvasPrivate final : public QObject, public QOpenGLFunctions_3_3_Cor
         GLuint programObjects[Shader_NbFormats] {};
 
         int    currentShader = 0; //< Index of current shader
+        GLFunctions gl; //< OpenGL Functions
 
         QImage              image;
 

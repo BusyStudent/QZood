@@ -1,7 +1,13 @@
+#if defined(QZOOD_WEBENGINE_CORE)
 #include <QWebEngineUrlRequestInterceptor>
 #include <QWebEnginePage>
+#endif
+
+#include <QRandomGenerator>
+#include <QNetworkCookieJar>
 #include <QNetworkReply>
 #include <QUrlQuery>
+#include <QJsonDocument>
 #include <QImage>
 #include <QTimer>
 #include "client.hpp"
@@ -11,6 +17,7 @@
 
 namespace {
 
+#if defined(QZOOD_WEBENGINE_CORE)
 // For craling data
 class YhdmVideoSpider final : public QWebEngineUrlRequestInterceptor {
 public:
@@ -32,7 +39,7 @@ public:
             info.block(true);
             return;
         }
-        else if (url.endsWith(".m3u8") || url.endsWith(".mp4")) {
+        else if ((url.contains(".m3u8") && !url.contains("player/")) || url.endsWith(".mp4")) {
             // Got
             resultUrl = info.requestUrl().toString();
             page->triggerAction(QWebEnginePage::Stop);
@@ -51,6 +58,111 @@ public:
     QString resultUrl;
     NetResult<QString> result; //< Result to notify about
 };
+#endif
+
+// Directly use yhdm javascript algo
+class YhdmJSSpider : public QObject {
+public:
+    YhdmJSSpider(YhdmClient &client, NetResult<QString> r, const QString &url) : 
+        client(client), result(r), url(url), requestUrl(GenerateUrl(url)) 
+    {
+        sendReuqest(RandomUserAgent());
+    }
+    void sendReuqest(const QByteArray &us) {
+        QNetworkRequest req;
+        req.setUrl(requestUrl);
+        req.setHeader(QNetworkRequest::UserAgentHeader, us);
+        req.setRawHeader("Referer", url.toUtf8());
+
+        auto reply = client.networkManager().get(req);
+        connect(reply, &QNetworkReply::finished, [this, reply]() mutable {
+            reply->deleteLater();
+            if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) != 200) {
+                fail();
+                return;
+            }
+            auto data = reply->readAll();
+            if (data.startsWith("ipchk")) {
+                // We need restart
+                retryLeft -= 1;
+                if (retryLeft == 0) {
+                    fail();
+                    return;
+                }
+                sendReuqest(reply->request().header(QNetworkRequest::UserAgentHeader).toString().toUtf8());
+                return;
+            }
+            // Try parse
+            auto json = ParseData(QString::fromUtf8(data));
+            // Try parse json
+            auto doc = QJsonDocument::fromJson(json.toUtf8());
+            if (doc.isEmpty()) {
+                fail();
+                return;
+            }
+            resultUrl = doc["vurl"].toString();
+            if (resultUrl.isEmpty()) {
+                fail();
+                return;
+            }
+            resultUrl = QUrl::fromPercentEncoding(resultUrl.toUtf8());
+            qDebug() << resultUrl;
+            result.putResult(resultUrl);
+            deleteLater();
+        });
+    }
+    void fail() {
+        qDebug() << "Failed to Get for" << url;
+        result.putResult(std::nullopt);
+        deleteLater();
+    }
+
+    static QString GenerateUrl(const QString &url) {
+        QStringList parts = url.split("/");
+
+        if (parts.size() < 2) {
+            return "";
+        }
+
+        QStringList aidParts = parts.last().split("-");
+
+        if (aidParts.size() != 3) {
+            return "";
+        }
+
+        QString aid = aidParts.at(0);
+        QString playindex = aidParts.at(1);
+        QString epindex = aidParts.at(2).split(".").first();
+
+        double randomValue = QRandomGenerator::global()->generateDouble();
+
+        QString u = "playurl?aid=" + aid + "&playindex=" + playindex + "&epindex=" + epindex + "&r=" + QString::number(randomValue);
+
+        return "https://" + QUrl(url).host() + '/' + u;
+
+    }
+    static QString ParseData(const QString &data) {
+        QString output;
+        const int magic = 1561;
+        const int len = data.length();
+        for (int cur = 0; cur < len; cur += 2) {
+            QString hex = QString(data[cur]) + QString(data[cur + 1]);
+            bool ok;
+            int ret = hex.toInt(&ok, 16);
+            if (ok) {
+                ret = (((ret + 1048576) - magic) - (((len / 2) - 1) - (cur / 2))) % 256;
+                output = QString(QChar(ret)) + output;
+            }
+        }
+        return output;
+    }
+    YhdmClient &client;
+    QString url; //< Start Url
+    QString requestUrl;
+    QString resultUrl;
+    NetResult<QString> result;
+    int retryLeft = 3;
+};
 
 class YhdmEpisode final : public Episode {
 public:
@@ -58,6 +170,45 @@ public:
         return _title;
     }
     QString indexTitle() override {
+        return toIndexTitle(_title);
+    }
+    QStringList sourcesList() override {
+        int idx = 1;
+        QStringList ret;
+        for (const auto &s : _urls) {
+            ret.push_back(u8"线路" + QString::number(idx));
+            idx += 1;
+        }
+        return ret;
+    }
+    QString     recommendedSource() override {
+        return QStringLiteral("线路1");
+    }
+    NetResult<QString> fetchVideo(const QString &sourceString) override {
+        if (!_videoUrl.isEmpty()) {
+            return NetResult<QString>::AllocWithResult(_videoUrl);
+        }
+        int idx;
+        if (::sscanf(sourceString.toUtf8().constData(), "线路%d",&idx) != 1) {
+            return NetResult<QString>::AllocWithResult(_videoUrl);
+        }
+        idx -= 1; //< To program Index
+        if (idx >= _urls.size()) {
+            return NetResult<QString>::AllocWithResult(_videoUrl);
+        }
+        auto result = NetResult<QString>::Alloc();
+#if     defined(QZOOD_WEBENGINE_CORE)
+        auto tools = new YhdmVideoSpider(result, _urls[idx]);
+#else
+        auto tools = new YhdmJSSpider(client, result, _urls[idx]);
+#endif
+        return result;
+    }
+    VideoInterface *rootInterface() override {
+        return &client;
+    }
+
+    static QString toIndexTitle(const QString &_title) {
         auto u8 = _title.toUtf8();
         int index;
         if (::sscanf(u8.constData(), u8"第%d集", &index) == 1) {
@@ -65,33 +216,16 @@ public:
         }
         return _title;
     }
-    QStringList sourcesList() override {
-        return QStringList(" ");
-    }
-    QString     recommendedSource() override {
-        return QString(" ");
-    }
-    NetResult<QString> fetchVideo(const QString &sourceString) override {
-        if (!_videoUrl.isEmpty()) {
-            return NetResult<QString>::AllocWithResult(_videoUrl);
-        }
-        auto result = NetResult<QString>::Alloc();
-        auto tools = new YhdmVideoSpider(result, _url);
-        return result;
-    }
-    VideoInterface *rootInterface() override {
-        return &client;
-    }
 
 
     YhdmClient &client;
     // QStringList _sourceList;
+    QStringList _urls;
     QString    _title;
-    QString    _url;
     QString    _videoUrl;
 
-    YhdmEpisode(YhdmClient &client, const QString &title, const QString &url) 
-        : client(client), _title(title), _url(url) { }
+    YhdmEpisode(YhdmClient &client, const QString &title, const QStringList &urls) 
+        : client(client), _title(title), _urls(urls) { }
 };
 
 class YhdmBangumi final : public Bangumi {
@@ -128,16 +262,16 @@ public:
 
                 // Parse done
                 EpisodeList list;
-                for (const auto &[title, url] : episodeList) {
-                    list.push_back(std::make_shared<YhdmEpisode>(client, title, url));
+                for (const auto &[title, urls] : episodeList) {
+                    list.push_back(std::make_shared<YhdmEpisode>(client, title, urls));
                 }
                 result.putResult(list);
             });
             return result;
         }
         EpisodeList list;
-        for (const auto &[title, url] : episodeList) {
-            list.push_back(std::make_shared<YhdmEpisode>(client, title, url));
+        for (const auto &[title, urls] : episodeList) {
+            list.push_back(std::make_shared<YhdmEpisode>(client, title, urls));
         }
         return NetResult<EpisodeList>::AllocWithResult(list);
     }
@@ -151,7 +285,7 @@ public:
     QString _description;
     QString _url; //< Page url
 
-    QList<QPair<QString, QString>> episodeList;
+    QList<QPair<QString, QStringList>> episodeList;
     //< List for source
 
     static RefPtr<YhdmBangumi> ParsePageHtml(YhdmClient &client, const LXml::HtmlDocoument &doc) {
@@ -163,36 +297,68 @@ public:
         // Get cover url
         auto imgNode = ctxt.eval("//div[@class='thumb l']/img");
         if (imgNode.nodeTab()) {
-            self->_cover = QString::fromUtf8(imgNode.nodeTab()[0]->property("src"));
+            self->_cover = imgNode.nodeTab()[0]->property("src");
         }
+        qDebug() << imgNode;
 
         //div[@class='info']
         // For description
         auto descriptionNode = ctxt.eval("//div[@class='info']");
         if (descriptionNode.nodeTab()) {
-            self->_description = QString::fromUtf8(descriptionNode.nodeTab()[0]->content());
+            self->_description = descriptionNode.nodeTab()[0]->content();
         }
 
         //div[@class='rate r']/h1
         // title
         auto titleNode = ctxt.eval("//div[@class='rate r']/h1");
         if (titleNode.nodeTab()) {
-            self->_title = QString::fromUtf8(titleNode.nodeTab()[0]->content());
+            self->_title = titleNode.nodeTab()[0]->content();
         }
 
         // Urls
         //div[@class='movurl']/ul/li/a
         auto urlsNode = ctxt.eval("//div[@class='movurl']/ul/li/a");
+        std::map<QString, QStringList> maps; //< Title & Url Pairs
         if (urlsNode.nodeTab()) {
             for (auto node : urlsNode) {
-                QString url = client.domain() + QString::fromUtf8(node->property("href")).remove(0, 1);
-                QString title = QString::fromUtf8(node->content());
+                QString url = client.domain() + node->property("href").remove(0, 1);
+                QString title = node->content();
 
-                self->episodeList.push_back(qMakePair(title, url));
+                // self->episodeList.push_back(qMakePair(title, url));
+                maps[title].push_back(url);
+            }
+        }
+        // Generate pair here
+        for (const auto &[title, urls] : maps) {
+            self->episodeList.push_back(qMakePair(title, urls));
+        }
+        // Sort the episodeList
+        self->sortEpisodeList();
+
+
+        return self;
+    }
+    void sortEpisodeList() {
+        decltype(episodeList) sortedList;
+        decltype(episodeList) leftList;
+
+        for (const auto &t : episodeList) {
+            bool ok;
+            YhdmEpisode::toIndexTitle(t.first).toInt(&ok);
+            if (ok) {
+                sortedList.push_back(t);
+            }
+            else {
+                leftList.push_back(t);
             }
         }
 
-        return self;
+        std::sort(sortedList.begin(), sortedList.end(), [](const auto &a, const auto &b) {
+            return YhdmEpisode::toIndexTitle(a.first).toInt() < YhdmEpisode::toIndexTitle(b.first).toInt();
+        });
+
+        sortedList.append(leftList);
+        episodeList = sortedList;
     }
 
     YhdmBangumi(YhdmClient &client) : client(client) { }
@@ -272,6 +438,7 @@ public:
 }
 
 YhdmClient::YhdmClient(QObject *parent)  {
+    manager.setCookieJar(new QNetworkCookieJar(this));
     setParent(parent);
 }
 YhdmClient::~YhdmClient() {
@@ -283,19 +450,21 @@ QString YhdmClient::name() {
 NetResult<BangumiList> YhdmClient::searchBangumi(const QString &name) {
     auto result = NetResult<BangumiList>::Alloc();
 
-    QString url = domain() + "search/" + name;
-    QUrlQuery query;
-    query.addQueryItem("m", "search");
-    query.addQueryItem("c", "index");
-    query.addQueryItem("a", "init");
-    query.addQueryItem("q", name);
+    // QString url = domain() + "search/" + name;
+    // QUrlQuery query;
+    // query.addQueryItem("m", "search");
+    // query.addQueryItem("c", "index");
+    // query.addQueryItem("a", "init");
+    // query.addQueryItem("q", name);
+    QString url = domain() + "s_all?ex=1&kw=" + name;
 
     QNetworkRequest request;
     request.setUrl(url);
     request.setHeader(QNetworkRequest::UserAgentHeader, RandomUserAgent());
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/x-www-form-urlencoded");
 
-    auto reply = manager.post(request, query.query().toUtf8());
+    // auto reply = manager.post(request, query.query().toUtf8());
+    auto reply = manager.get(request);
     QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, result]() mutable {
         reply->deleteLater();
         if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) != 200) {
@@ -317,7 +486,7 @@ NetResult<BangumiList> YhdmClient::searchBangumi(const QString &name) {
             auto descriptionNode = node->findChild("p");
             QString description;
             if (descriptionNode) {
-                description = QString::fromUtf8(descriptionNode->content());
+                description = descriptionNode->content();
             }
             auto aNode = node->findChild("a");
             QString title;
@@ -334,9 +503,9 @@ NetResult<BangumiList> YhdmClient::searchBangumi(const QString &name) {
                 result.putResult(std::nullopt);
                 return;
             }
-            url = domain() + QString::fromUtf8(aNode->property("href")).remove(0, 1);
-            cover = QString::fromUtf8(imgNode->property("src"));
-            title = QString::fromUtf8(imgNode->property("alt"));
+            url = domain() + aNode->property("href").remove(0, 1);
+            cover = imgNode->property("src");
+            title = imgNode->property("alt");
 
             auto ban = std::make_shared<YhdmBangumi>(*this);
             ban->_url = url;
@@ -396,14 +565,14 @@ NetResult<Timeline>    YhdmClient::fetchTimeline() {
                 auto href = a->property("href");
                 auto title = a->property("title");
 
-                item->urls.push_back(domain() + QString::fromUtf8(href).remove(0, 1));
-                item->titles.push_back(QString::fromUtf8(title));
+                item->urls.push_back(domain() + href.remove(0, 1));
+                item->titles.push_back(title);
 
                 // Find previus span/a
                 auto span = a->parent()->findChild("span");
                 if (span) {
                     auto subA = span->findChild("a");
-                    item->pubIndexTitles.push_back(QString::fromUtf8(subA->content()));
+                    item->pubIndexTitles.push_back(subA->content());
                 }
 
                 qDebug() << "href : " << item->urls.back() << " title : " << item->titles.back();

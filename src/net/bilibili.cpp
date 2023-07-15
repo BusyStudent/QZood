@@ -681,8 +681,13 @@ QString BiliClient::name() {
     return BILIBILI_CLIENT_NAME;
 }
 NetResult<Timeline> BiliClient::fetchTimeline() {
+    int before, after;
+    auto dayOfWeek = QDate::currentDate().dayOfWeek();
+    before = dayOfWeek - 1;
+    after = 7 - dayOfWeek;
+
     auto r = NetResult<Timeline>::Alloc();
-    fetchTimelineInternal().then([r](const Result<BiliTimeline> &timeline) mutable {
+    fetchTimelineInternal(1, before, after).then([r](const Result<BiliTimeline> &timeline) mutable {
         if (!timeline) {
             r.putResult(std::nullopt);
             return;

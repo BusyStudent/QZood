@@ -42,22 +42,26 @@ static void SetDefaultFormat() {
 
 int main(int argc, char **argv) {
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) || !defined(ZOOD_WEBENGINE_CORE)
     SetDefaultFormat();
 #endif
 
     QApplication a(argc, argv);
 
-#if defined(_WIN32)
+#if defined(_WIN32) && defined(ZOOD_WEBENGINE_CORE)
     SetDefaultFormat();
 #endif
 
     QThreadPool::globalInstance()->setMaxThreadCount(4);
 
-    ZoodTestWindow* twin = new ZoodTestWindow();
-    twin->setAttribute(Qt::WA_DeleteOnClose, true);
-    OpenTerminal(twin->TerminatorParent());
-    twin->show();
+#if !defined(NDEBUG)
+    ZoodTestWindow twin;
+    OpenTerminal(twin.TerminatorParent());
+    twin.show();
+#else
+    Zood zood;
+    zood.show();
+#endif
 
     return a.exec();
 }

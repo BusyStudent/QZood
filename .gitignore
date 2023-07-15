@@ -37,3 +37,9 @@ compile_commands.json
 /build
 /.vscode
 /.cache
+
+# Node modules
+node_modules
+package-lock.json
+package.json
+*.js

@@ -16,7 +16,7 @@
 // OpenGL parts
 #if !defined(NDEBUG)
 namespace {
-    #define VGL_CHECK_ERROR() _vglCheckError(this, __FUNCTION__, __LINE__)
+    #define VGL_CHECK_ERROR() _vglCheckError(gl.get(), __FUNCTION__, __LINE__)
     void _vglCheckError(QOpenGLFunctions_3_3_Core *fn, const char *file, int line) {
         auto e = fn->glGetError();
         switch (e) {
@@ -42,6 +42,7 @@ VideoCanvas::~VideoCanvas() {
 
 #if !defined(QZOOD_VIDEO_NO_CUSTOMIZE_OPENGL)
     d->cleanupGL();
+    d.reset();
 #endif
 }
 void VideoCanvas::attachPlayer(NekoMediaPlayer *player) {
@@ -188,7 +189,8 @@ void VideoCanvas::resizeGL(int w, int h) {
 void VideoCanvas::initializeGL() {
 #if !defined(QZOOD_VIDEO_NO_CUSTOMIZE_OPENGL)
     auto ctxt = QOpenGLContext::currentContext();
-    d->initializeOpenGLFunctions();
+    d->gl.reset(new QOpenGLFunctions_3_3_Core);
+    d->gl->initializeOpenGLFunctions();
     d->initializeGL();
 
     // Set GL cleanup function
@@ -567,7 +569,7 @@ void VideoCanvasPrivate::_on_VideoFrameChanged(const NekoVideoFrame &frame) {
         // Free previously texture memory
         for (auto &t : textures) {
             if (t) {
-                glDeleteTextures(1, &t);
+                gl->glDeleteTextures(1, &t);
                 t = 0;
             }
         }
@@ -625,22 +627,22 @@ void VideoCanvasPrivate::_on_VideoFrameChanged(const NekoVideoFrame &frame) {
         // Free previously texture memory
         for (auto &t : textures) {
             if (t) {
-                glDeleteTextures(1, &t);
+                gl->glDeleteTextures(1, &t);
                 t = 0;
             }
         }
-        glGenTextures(planes, textures);
+        gl->glGenTextures(planes, textures);
         VGL_CHECK_ERROR();
 
         for (int n = 0; n < planes; n++) {
-            glBindTexture(GL_TEXTURE_2D, textures[n]);
+            gl->glBindTexture(GL_TEXTURE_2D, textures[n]);
             VGL_CHECK_ERROR();
 
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+            gl->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+            gl->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            gl->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            gl->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         }
 
         updateGLBuffer();
@@ -648,21 +650,21 @@ void VideoCanvasPrivate::_on_VideoFrameChanged(const NekoVideoFrame &frame) {
     
     // Prepare the texture
     if (currentShader == Shader_RGBA) {
-        glBindTexture(GL_TEXTURE_2D, textures[0]);
+        gl->glBindTexture(GL_TEXTURE_2D, textures[0]);
         VGL_CHECK_ERROR();
 
         // Settings updates
         // glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, pitch / 4);
+        gl->glPixelStorei(GL_UNPACK_ROW_LENGTH, pitch / 4);
 
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+        gl->glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
         VGL_CHECK_ERROR();
 
         // Restore
         // glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-        glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
-        glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+        gl->glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        gl->glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+        gl->glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
     }
     else if (currentShader == Shader_YUV420P) {
         Q_ASSERT(planes == 3); // Has 3 planes
@@ -674,25 +676,25 @@ void VideoCanvasPrivate::_on_VideoFrameChanged(const NekoVideoFrame &frame) {
         auto uPitch = frame.bytesPerLine(1);
         auto vPitch = frame.bytesPerLine(1);
 
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, yPitch);
-        glBindTexture(GL_TEXTURE_2D, textures[0]);
+        gl->glPixelStorei(GL_UNPACK_ROW_LENGTH, yPitch);
+        gl->glBindTexture(GL_TEXTURE_2D, textures[0]);
         VGL_CHECK_ERROR();
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, yData);
-        VGL_CHECK_ERROR();
-
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, uPitch);
-        glBindTexture(GL_TEXTURE_2D, textures[1]);
-        VGL_CHECK_ERROR();
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w / 2, h / 2, 0, GL_RED, GL_UNSIGNED_BYTE, uData);
+        gl->glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, yData);
         VGL_CHECK_ERROR();
 
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, vPitch);
-        glBindTexture(GL_TEXTURE_2D, textures[2]);
+        gl->glPixelStorei(GL_UNPACK_ROW_LENGTH, uPitch);
+        gl->glBindTexture(GL_TEXTURE_2D, textures[1]);
         VGL_CHECK_ERROR();
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w / 2, h / 2, 0, GL_RED, GL_UNSIGNED_BYTE, vData);
+        gl->glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w / 2, h / 2, 0, GL_RED, GL_UNSIGNED_BYTE, uData);
         VGL_CHECK_ERROR();
 
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        gl->glPixelStorei(GL_UNPACK_ROW_LENGTH, vPitch);
+        gl->glBindTexture(GL_TEXTURE_2D, textures[2]);
+        VGL_CHECK_ERROR();
+        gl->glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w / 2, h / 2, 0, GL_RED, GL_UNSIGNED_BYTE, vData);
+        VGL_CHECK_ERROR();
+
+        gl->glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
     }
     else if (currentShader == Shader_NV12) {
         Q_ASSERT(planes == 2); // Has 3 planes
@@ -703,20 +705,20 @@ void VideoCanvasPrivate::_on_VideoFrameChanged(const NekoVideoFrame &frame) {
         auto uvPitch = frame.bytesPerLine(1);
 
         // Update Y
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, yPitch);
-        glBindTexture(GL_TEXTURE_2D, textures[0]);
+        gl->glPixelStorei(GL_UNPACK_ROW_LENGTH, yPitch);
+        gl->glBindTexture(GL_TEXTURE_2D, textures[0]);
         VGL_CHECK_ERROR();
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, yData);
+        gl->glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, yData);
         VGL_CHECK_ERROR();
 
         // Update UV
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, uvPitch / 2);
-        glBindTexture(GL_TEXTURE_2D, textures[1]);
+        gl->glPixelStorei(GL_UNPACK_ROW_LENGTH, uvPitch / 2);
+        gl->glBindTexture(GL_TEXTURE_2D, textures[1]);
         VGL_CHECK_ERROR();
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RG, w / 2, h / 2, 0, GL_RG, GL_UNSIGNED_BYTE, uvData);
+        gl->glTexImage2D(GL_TEXTURE_2D, 0, GL_RG, w / 2, h / 2, 0, GL_RG, GL_UNSIGNED_BYTE, uvData);
         VGL_CHECK_ERROR();
 
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        gl->glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
     }
 #endif    
 
@@ -812,38 +814,39 @@ void VideoCanvasPrivate::cleanupGL() {
     qDebug() << "VideoCanvasPrivate::cleanGL";
     
     if (vertexArrayObject) {
-        glDeleteVertexArrays(1, &vertexArrayObject);
+        gl->glDeleteVertexArrays(1, &vertexArrayObject);
         vertexArrayObject = 0;
     }
     if (vertexBufferObject) {
-        glDeleteBuffers(1, &vertexBufferObject);
+        gl->glDeleteBuffers(1, &vertexBufferObject);
         vertexBufferObject = 0;
     }
     for (auto &t : textures) {
         if (t) {
-            glDeleteTextures(1, &t);
+            gl->glDeleteTextures(1, &t);
             t = 0;
         }
     }
 
     for (auto &program : programObjects) {
         if (program) {
-            glDeleteProgram(program);
+            gl->glDeleteProgram(program);
             program = 0;
         }
     }
+    gl.reset();
 }
 void VideoCanvasPrivate::initializeGL() {
     qDebug() << "VideoCanvasPrivate::initializeGL";
 
     // Make vertex array
-    glGenVertexArrays(1, &vertexArrayObject);
+    gl->glGenVertexArrays(1, &vertexArrayObject);
     VGL_CHECK_ERROR();
-    glBindVertexArray(vertexArrayObject);
+    gl->glBindVertexArray(vertexArrayObject);
     VGL_CHECK_ERROR();
 
     // prepare vertex buffer objects
-    glGenBuffers(1, &vertexBufferObject);
+    gl->glGenBuffers(1, &vertexBufferObject);
     VGL_CHECK_ERROR();
 
     float vertices[] = {
@@ -854,20 +857,20 @@ void VideoCanvasPrivate::initializeGL() {
         -1.0f, -1.0f,      0.0f, 0.0f, 
         -1.0f, 1.0f,       0.0f, 1.0f,
     };
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
+    gl->glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
     VGL_CHECK_ERROR();
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    gl->glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     VGL_CHECK_ERROR();
 
     // configure this buffer props
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), 0);
+    gl->glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), 0);
     VGL_CHECK_ERROR();
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
+    gl->glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (void*)(2 * sizeof(GLfloat)));
     VGL_CHECK_ERROR();
-    glEnableVertexAttribArray(0);
+    gl->glEnableVertexAttribArray(0);
     VGL_CHECK_ERROR();
-    glEnableVertexAttribArray(1);
+    gl->glEnableVertexAttribArray(1);
     VGL_CHECK_ERROR();
 
     // prepare shader objects
@@ -876,72 +879,72 @@ void VideoCanvasPrivate::initializeGL() {
     prepareProgram(Shader_YUV420P, vertexShaderCode, yuv420PShaderCode);
 }
 void VideoCanvasPrivate::prepareProgram(int type, const char *vtCode, const char *frCode) {
-    GLuint programObject = glCreateProgram();
+    GLuint programObject = gl->glCreateProgram();
     VGL_CHECK_ERROR();
 
-    auto vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    auto fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    auto vertexShader = gl->glCreateShader(GL_VERTEX_SHADER);
+    auto fragmentShader = gl->glCreateShader(GL_FRAGMENT_SHADER);
     int  success;
     char infoLog[512];
 
-    glShaderSource(vertexShader, 1, &vtCode, nullptr);
-    glCompileShader(vertexShader);
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    gl->glShaderSource(vertexShader, 1, &vtCode, nullptr);
+    gl->glCompileShader(vertexShader);
+    gl->glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
     if (!success) {
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
+        gl->glGetShaderInfoLog(vertexShader, 512, NULL, infoLog);
         qDebug() << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog;
     }
 
-    glShaderSource(fragmentShader, 1, &frCode, nullptr);
-    glCompileShader(fragmentShader);
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+    gl->glShaderSource(fragmentShader, 1, &frCode, nullptr);
+    gl->glCompileShader(fragmentShader);
+    gl->glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
     if (!success) {
-        glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
+        gl->glGetShaderInfoLog(fragmentShader, 512, NULL, infoLog);
         qDebug() << "ERROR::SHADER::FRAGM::COMPILATION_FAILED\n" << infoLog;
     }
 
     // Link it
-    glAttachShader(programObject, vertexShader);
-    glAttachShader(programObject, fragmentShader);
-    glLinkProgram(programObject);
-    glGetProgramiv(programObject, GL_LINK_STATUS, &success);
+    gl->glAttachShader(programObject, vertexShader);
+    gl->glAttachShader(programObject, fragmentShader);
+    gl->glLinkProgram(programObject);
+    gl->glGetProgramiv(programObject, GL_LINK_STATUS, &success);
     if(!success) {
-        glGetProgramInfoLog(programObject, 512, NULL, infoLog);
+        gl->glGetProgramInfoLog(programObject, 512, NULL, infoLog);
         qDebug() << "ERROR::SHADER::LINK_FAILED\n" << infoLog;
     }
 
     // Release
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
+    gl->glDeleteShader(vertexShader);
+    gl->glDeleteShader(fragmentShader);
 
 
     // Bind uniform locations
-    glUseProgram(programObject);
+    gl->glUseProgram(programObject);
     if (type == Shader_RGBA) {
-        glUniform1i(glGetUniformLocation(programObject, "videoTexture"), 0);
+        gl->glUniform1i(gl->glGetUniformLocation(programObject, "videoTexture"), 0);
         VGL_CHECK_ERROR();
     }
     if (type == Shader_YUV420P) {
-        glUniform1i(glGetUniformLocation(programObject, "yTexture"), 0);
+        gl->glUniform1i(gl->glGetUniformLocation(programObject, "yTexture"), 0);
         VGL_CHECK_ERROR();
-        glUniform1i(glGetUniformLocation(programObject, "uTexture"), 1);
+        gl->glUniform1i(gl->glGetUniformLocation(programObject, "uTexture"), 1);
         VGL_CHECK_ERROR();
-        glUniform1i(glGetUniformLocation(programObject, "vTexture"), 2);
+        gl->glUniform1i(gl->glGetUniformLocation(programObject, "vTexture"), 2);
         VGL_CHECK_ERROR();
     }
     if (type == Shader_NV12) {
-        glUniform1i(glGetUniformLocation(programObject, "yTexture"), 0);
+        gl->glUniform1i(gl->glGetUniformLocation(programObject, "yTexture"), 0);
         VGL_CHECK_ERROR();
-        glUniform1i(glGetUniformLocation(programObject, "uvTexture"), 1);
+        gl->glUniform1i(gl->glGetUniformLocation(programObject, "uvTexture"), 1);
         VGL_CHECK_ERROR();
     }
 
     programObjects[type] = programObject;
 }
 void VideoCanvasPrivate::paintGL() {
-    glClearColor(0.0, 0.0f, 0.0f, 1.0f);
+    gl->glClearColor(0.0, 0.0f, 0.0f, 1.0f);
     VGL_CHECK_ERROR();
-    glClear(GL_COLOR_BUFFER_BIT);
+    gl->glClear(GL_COLOR_BUFFER_BIT);
     VGL_CHECK_ERROR();
 
 
@@ -956,19 +959,19 @@ void VideoCanvasPrivate::paintGL() {
         if (t == 0) {
             break;
         }
-        glActiveTexture(GL_TEXTURE0 + n);
-        glBindTexture(GL_TEXTURE_2D, t);
+        gl->glActiveTexture(GL_TEXTURE0 + n);
+        gl->glBindTexture(GL_TEXTURE_2D, t);
 
         n += 1;
     }
-    glBindVertexArray(vertexArrayObject);
+    gl->glBindVertexArray(vertexArrayObject);
     VGL_CHECK_ERROR();
-    glUseProgram(programObjects[currentShader]);
+    gl->glUseProgram(programObjects[currentShader]);
     VGL_CHECK_ERROR();
     
     
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glDrawArrays(GL_TRIANGLES, 2, 3);
+    gl->glDrawArrays(GL_TRIANGLES, 0, 3);
+    gl->glDrawArrays(GL_TRIANGLES, 2, 3);
     VGL_CHECK_ERROR();
 }
 void VideoCanvasPrivate::resizeGL(int w, int h) {
@@ -1004,10 +1007,10 @@ void VideoCanvasPrivate::updateGLBuffer() {
         bottomLeft.x(), bottomLeft.y(),   0.0f, 0.0f,  
         topLeft.x(), topLeft.y(),         0.0f, 1.0f,
     };
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
+    gl->glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
     VGL_CHECK_ERROR();
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    gl->glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
     VGL_CHECK_ERROR();
 }
 

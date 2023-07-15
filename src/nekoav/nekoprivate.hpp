@@ -300,8 +300,8 @@ class DemuxerThread final : public QThread {
 
         // Buffering     
         int                 bufferedPacketsLimit = 4000;
-        int                 bufferedPacketsLessThreshold = 100;
-        int                 bufferedPacketsEnough = 500;
+        int                 bufferedPacketsLessThreshold = 50;
+        int                 bufferedPacketsEnough = 100;
         float               prevBufferProgress = 0.0f;
         int64_t             prevTooLessPacketsTime = 0; //< Previous buffer data not enough time
 

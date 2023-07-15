@@ -29,12 +29,15 @@ class YhdmClient : public VideoInterface {
         NetResult<Timeline>    fetchTimeline()                     override;
         QString                name()                              override;
         QString                domain()                            const;
+        QNetworkAccessManager &networkManager()                    {
+            return manager;
+        }
 
         NetResult<QByteArray>  fetchFile(const QString &url);
         NetResult<QImage>      fetchImage(const QString &url);
     private:
         QNetworkAccessManager  manager;
-        QStringList            urls = QStringList(QString("http://www.yinghuacd.com/"));
+        QStringList            urls = QStringList(QString("https://www.yhdmz2.com/"));
 };
 
 #endif

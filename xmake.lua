@@ -18,7 +18,7 @@ add_requires("libxml2")
 add_packages("libxml2")
 
 includes("./src/ui")
-includes("./src/common/")
+includes("./src/common")
 includes("./src/nekoav")
 
 target("zood")
@@ -30,7 +30,7 @@ target("zood")
     add_frameworks("QtNetwork")
 
     -- WebEngine
-    add_frameworks("QtWebEngineCore", "QtWebChannel");
+    -- add_frameworks("QtWebEngineCore", "QtWebChannel");
 
 	add_deps("ui", "nekoav", "common")
 	add_files("./resources/resources.qrc")
