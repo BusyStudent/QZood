@@ -37,6 +37,7 @@ compile_commands.json
 /build
 /.vscode
 /.cache
+/vsxmake2022
 
 # Node modules
 node_modules

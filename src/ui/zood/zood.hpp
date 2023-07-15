@@ -21,6 +21,9 @@ class Zood : public CustomizeTitleWidget {
         void mouseMoveEvent(QMouseEvent* event) override;
         void showEvent(QShowEvent *event) override;
 
+    private:
+        void moveSearchWidgetAnimation(const QRect& startRect, const QRect& endRect);
+
     Q_SIGNALS:
         void editTextChanged(const QString &);
 
