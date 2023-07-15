@@ -77,6 +77,20 @@ public:
         connectSearch();
     }
 
+    void moveSearchWidgetAnimation(const QRect& startRect, const QRect& endRect)
+    {
+        QPropertyAnimation* animation(new QPropertyAnimation(mUi->searchBox, "geometry"));
+        animation->setDuration(500); // 设置动画持续时间为0.5秒
+        animation->setStartValue(startRect); // 设置起始值为左对齐
+        animation->setEndValue(endRect); // 设置结束值为居中对齐
+        animation->setEasingCurve(QEasingCurve::InOutQuad); // 设置缓动曲线为InOutQuad
+        QWidget::connect(animation, &QPropertyAnimation::finished, self, [animation]() {
+            animation->deleteLater();
+            });
+        // 启动动画
+        animation->start();
+    }
+
 private:
     void connectTitleBar() {
         // 连接默认窗口按钮的功能
@@ -177,31 +191,17 @@ void Zood::mouseMoveEvent(QMouseEvent* event) {
     CustomizeTitleWidget::mouseMoveEvent(event);
 }
 
-void Zood::moveSearchWidgetAnimation(const QRect & startRect, const QRect& endRect)
-{
-    QPropertyAnimation* animation(new QPropertyAnimation(d->mUi->searchBox, "geometry"));
-    animation->setDuration(500); // 设置动画持续时间为0.5秒
-    animation->setStartValue(startRect); // 设置起始值为左对齐
-    animation->setEndValue(endRect); // 设置结束值为居中对齐
-    animation->setEasingCurve(QEasingCurve::InOutQuad); // 设置缓动曲线为InOutQuad
-    connect(animation, &QPropertyAnimation::finished, this, [animation]() {
-        animation->deleteLater();
-        });
-    // 启动动画
-    animation->start();
-}
-
 bool Zood::eventFilter(QObject *obj, QEvent *e) {
     if (obj == d->mUi->searchBox) {
         if (e->type() == QEvent::FocusIn) {
             auto rect = d->mUi->searchBox->geometry();
             auto container_rect = d->mUi->searchBoxContainer->geometry();
-            moveSearchWidgetAnimation(rect, QRect((container_rect.width() - rect.width()) / 2, rect.y(), rect.width(), rect.height()));
+            d->moveSearchWidgetAnimation(rect, QRect((container_rect.width() - rect.width()) / 2, rect.y(), rect.width(), rect.height()));
         } else if (e->type() == QEvent::FocusOut) {
             QPropertyAnimation* animation(new QPropertyAnimation(d->mUi->searchBox, "geometry"));
             auto rect = d->mUi->searchBox->geometry();
             auto container_rect = d->mUi->searchBoxContainer->geometry();
-            moveSearchWidgetAnimation(rect, QRect(container_rect.width() - rect.width(), rect.y(), rect.width(), rect.height()));
+            d->moveSearchWidgetAnimation(rect, QRect(container_rect.width() - rect.width(), rect.y(), rect.width(), rect.height()));
         }
     }
 

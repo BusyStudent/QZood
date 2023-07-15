@@ -3,6 +3,7 @@
 
 #include <QObjectList>
 #include <QResizeEvent>
+#include <QWheelEvent>
 #include <QScrollBar>
 #include <QMetaObject>
 
@@ -45,45 +46,63 @@ public:
         centralWidget = new QWidget();
         ui->setupUi(centralWidget);
 
-        areaToWidget = {
-            {HomeWidget::Monday, ui->mondayContents},
-            {HomeWidget::Tuesday, ui->tuesdayContents},
-            {HomeWidget::Wednesday, ui->wednesdayContents},
-            {HomeWidget::Thursday, ui->thursdayContents},
-            {HomeWidget::Friday, ui->fridayContents},
-            {HomeWidget::Saturday, ui->saturdayContents},
-            {HomeWidget::Sunday, ui->sundayContents},
-            {HomeWidget::Recommend, ui->recommend},
-            {HomeWidget::New, ui->recentlyUpdatedContents}
-        };
+        initializeAreaToWidget();
 
         self->setWidget(centralWidget);
         self->setObjectName("HomeWidget");
-        self->setStyleSheet(R"(QScrollArea#HomeWidget{
-            border:none;
-            background: transparent;
-            })");
         QWidget::connect(self->verticalScrollBar(), &QScrollBar::valueChanged, self, [this](int value){
             if (value >= self->verticalScrollBar()->maximum()) {
                 self->dataRequest();
             }
         });
-        QWidget::connect(self, &HomeWidget::refreshRequest, VideoDataManager::instance(), &VideoDataManager::requestTimelineData);
-        QWidget::connect(VideoDataManager::instance(), &VideoDataManager::timelineDataReply, self, [this](TimelineEpisodeList tep, int week) {
-            auto w = (HomeWidget::DisplayArea)week;
-            updateVideo(areaToWidget[w], tep);
-        });
+        connectToDataLayer();
 
-        QMetaObject::invokeMethod(self, [this](){
-            // 初始化所有区域请求数据更新
-            self->refreshRequest();
-        }, Qt::ConnectionType::QueuedConnection);
+        requestDataLater();
 
         ui->timeTab->setCurrentRow(0);
+        ui->timeAnimeView->installEventFilter(self);
         ui->recommend->installEventFilter(self);
 
         // 设置推荐区域为流式布局
         ui->recommend->setLayout(new FlowLayout());
+
+        setupScrollBarStyle();
+    }
+
+    void requestDataLater() {
+        QMetaObject::invokeMethod(self, [this]() {
+            // 初始化所有区域请求数据更新
+            self->refreshRequest();
+            }, Qt::ConnectionType::QueuedConnection);
+    }
+
+    void connectToDataLayer() {
+        QWidget::connect(self, &HomeWidget::refreshRequest, VideoDataManager::instance(), &VideoDataManager::requestTimelineData);
+        QWidget::connect(VideoDataManager::instance(), &VideoDataManager::timelineDataReply, self, [this](TimelineEpisodeList tep, int week) {
+            auto w = (HomeWidget::DisplayArea)week;
+        updateVideo(areaToWidget[w], tep);
+            });
+    }
+
+    void initializeAreaToWidget() {
+        areaToWidget = {
+            { HomeWidget::Monday, ui->mondayContents },
+            { HomeWidget::Tuesday, ui->tuesdayContents },
+            { HomeWidget::Wednesday, ui->wednesdayContents },
+            { HomeWidget::Thursday, ui->thursdayContents },
+            { HomeWidget::Friday, ui->fridayContents },
+            { HomeWidget::Saturday, ui->saturdayContents },
+            { HomeWidget::Sunday, ui->sundayContents },
+            { HomeWidget::Recommend, ui->recommend },
+            { HomeWidget::New, ui->recentlyUpdatedContents }
+        };
+    }
+
+    void setupScrollBarStyle() {
+        self->setStyleSheet(R"(QScrollArea#HomeWidget{
+            border:none;
+            background: transparent;
+            })");
 
         // 设置主界面滑动条不显示
         self->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -92,25 +111,25 @@ public:
         // 设置更新栏滑动条款式
         ui->mondayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         ui->mondayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-        
+
         ui->tuesdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         ui->tuesdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-        
+
         ui->wednesdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         ui->wednesdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
 
         ui->thursdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         ui->thursdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-        
+
         ui->fridayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         ui->fridayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-        
+
         ui->saturdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         ui->saturdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-        
+
         ui->sundayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         ui->sundayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-        
+
         ui->recentlyUpdatedContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         ui->recentlyUpdatedContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
     }
@@ -246,6 +265,10 @@ bool HomeWidget::eventFilter(QObject *obj,QEvent *event) {
         auto preferred_height = d->ui->recommend->layout()->heightForWidth(width); 
         preferred_height = max(preferred_height, 200);
         d->centralWidget->setFixedHeight(preferred_height + d->ui->recommend->geometry().y() + 3);
+    } else if (obj == d->ui->timeAnimeView && event->type() == QEvent::Type::Wheel) {
+        auto wheel_event = dynamic_cast<QWheelEvent*>(event);
+        auto wi = d->ui->timeAnimeView->currentWidget()->findChild<QScrollArea*>();
+        wi->horizontalScrollBar()->setValue(wi->horizontalScrollBar()->value() - wheel_event->angleDelta().y());
     }
 
     return QScrollArea::eventFilter(obj, event);
