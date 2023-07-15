@@ -75,48 +75,6 @@ public:
         connectSearch();
     }
 
-    void refreshAll() {
-        VideoSourceBLL *videoSource = VideoSourceBLL::instance();
-        videoSource->searchVideoTimeline(self, [this](const Result<Timeline>& timeline) {
-            if (timeline.has_value()) {
-                qDebug() << "timeline size : " << timeline.value().size();
-                refreshWeek(HomeWidget::Monday);
-                refreshWeek(HomeWidget::Tuesday);
-                refreshWeek(HomeWidget::Wednesday);
-                refreshWeek(HomeWidget::Thursday);
-                refreshWeek(HomeWidget::Friday);
-                refreshWeek(HomeWidget::Saturday);
-                refreshWeek(HomeWidget::Sunday);
-            } else {
-                qWarning() << "can't get Timeline!!!";
-            }
-        });
-    }
-
-    void refreshWeek(HomeWidget::DisplayArea area) {
-        VideoSourceBLL *videoSource = VideoSourceBLL::instance();
-        videoSource->searchBangumiFromTimeline(videoSource->videoInWeek((TimeWeek)area), self, [this, area] (const Result<TimelineEpisodeList>& bangumiList) {
-            if (!bangumiList.has_value()) {
-                return;
-            }
-            homePage->clearItem(area);
-            auto bangumis = bangumiList.value();
-            auto video_views = homePage->addItems(area, bangumis.size());
-            for (int i = 0; i < video_views.size(); ++i) {
-                video_views[i]->setVideoId(bangumis[i]->bangumiTitle());
-                video_views[i]->setTitle(bangumis[i]->bangumiTitle());
-                video_views[i]->setExtraInformation(bangumis[i]->pubIndexTitle());
-                video_views[i]->setSourceInformation(bangumis[i]->availableSource().join("; "));
-                video_views[i]->setImage(QImage(":/icons/loading_bar.png"));
-                bangumis[i]->fetchCover().then(video_views[i], [video_view = video_views[i]](const Result<QImage>& img) {
-                    if (img.has_value()) {
-                        video_view->setImage(img.value());
-                    }
-                });
-            }
-        });
-    }
-
 private:
     void connectTitleBar() {
         // 连接默认窗口按钮的功能
@@ -180,10 +138,6 @@ QLineEdit* Zood::searchBox() {
     return d->searchEdit;
 }
 
-void Zood::refreshAll() {
-    d->refreshAll();
-}
-
 void Zood::setPredictStringList(QStringList indicator) {
     auto model = static_cast<QStringListModel *>(d->searchCompleter->model());
 
@@ -197,7 +151,6 @@ void Zood::setPredictStringList(QStringList indicator) {
 
 void Zood::showEvent(QShowEvent *event) {
     createShadow(d->ui->containerWidget);
-   refreshAll();
 }
 
 void Zood::resizeEvent(QResizeEvent *event) {

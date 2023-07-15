@@ -8,9 +8,12 @@
 
 #include <QList>
 #include <QApplication>
+#include <QImage>
 
 #include "../../net/promise.hpp"
 #include "videoBLL.hpp"
+
+const QImage kLoadingImage = QImage(":/icons/loading_bar.png");
 
 class VideoInterface;
 class BiliClient;

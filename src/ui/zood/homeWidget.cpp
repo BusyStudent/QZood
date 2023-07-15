@@ -9,6 +9,11 @@
 #include "../common/flowlayout.hpp"
 #include "../player/playerWidget.hpp"
 #include "../../BLL/data/videoSourceBLL.hpp"
+#include "../../BLL/manager/videoDataManager.hpp"
+#include "../../common/myGlobalLog.hpp"
+
+#define min(x, y) (x < y ? x : y)
+#define max(x, y) (x > y ? x : y)
 
 const QString kScrollBarStyleSheet =
 R"(
@@ -63,6 +68,11 @@ public:
                 self->dataRequest();
             }
         });
+        QWidget::connect(self, &HomeWidget::refreshRequest, VideoDataManager::instance(), &VideoDataManager::requestTimelineData);
+        QWidget::connect(VideoDataManager::instance(), &VideoDataManager::timelineDataReply, self, [this](TimelineEpisodeList tep, int week) {
+            auto w = (HomeWidget::DisplayArea)week;
+            updateVideo(areaToWidget[w], tep);
+        });
 
         QMetaObject::invokeMethod(self, [this](){
             // 初始化所有区域请求数据更新
@@ -105,19 +115,55 @@ public:
         ui->recentlyUpdatedContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
     }
 
-    void refresh(QWidget* container, const QList<videoData>& dataList){
-        auto childs = container->children();
-        for (auto &child : childs) {
-            if (child->isWidgetType()) {
-                child->deleteLater();
+    void refresh(QWidget* container, const VideoDataVector &videoVector){
+        clearItems(container);
+        auto videos = addItems(container, videoVector.size());
+        for (int i = 0;i < videoVector.size(); ++i) {
+            videos[i]->setImage(videoVector[i].image);
+            videos[i]->setTitle(videoVector[i].videoTitle);
+            videos[i]->setExtraInformation(videoVector[i].videoExtraInformation);
+            videos[i]->setSourceInformation(videoVector[i].videoSourceInformation);
+        }
+    }
+    void updateVideo(QWidget* container, TimelineEpisodeList teps) {
+        auto videos = container->findChildren<VideoView*>();
+        for (auto tep : teps) {
+            bool f = false;
+            for (auto video : videos) {
+                if (video->videoId() == tep->bangumiTitle()) {
+                    video->setTimelineEpisode(tep);
+                    f = true;
+                    break;
+                }
+            }
+            if (!f) {
+                auto video = addItems(container, 1).at(0);
+                video->setTimelineEpisode(tep);
             }
         }
-        auto videos = addItems(container, dataList.size());
-        for (int i = 0;i < dataList.size(); ++i) {
-            videos[i]->setImage(dataList[i].image);
-            videos[i]->setTitle(dataList[i].videoTitle);
-            videos[i]->setExtraInformation(dataList[i].videoExtraInformation);
-            videos[i]->setSourceInformation(dataList[i].videoSourceInformation);
+    }
+    void updateVideo(QWidget* container, const VideoDataVector &videoVector) {
+        auto videos = container->findChildren<VideoView*>();
+        for (int i = 0;i < videoVector.size(); ++i) {
+            auto f = false;
+            for (auto video : videos) {
+                if (video->videoId() == videoVector[i].videoId) {
+                    video->setImage(videoVector[i].image);
+                    video->setTitle(videoVector[i].videoTitle);
+                    video->setExtraInformation(videoVector[i].videoExtraInformation);
+                    video->setSourceInformation(videoVector[i].videoSourceInformation);
+                    f = true;
+                    break;
+                }
+            }
+            if (!f) {
+                auto video = addItems(container, 1).at(0);
+                video->setVideoId(videoVector[i].videoId);
+                video->setImage(videoVector[i].image);
+                video->setTitle(videoVector[i].videoTitle);
+                video->setExtraInformation(videoVector[i].videoExtraInformation);
+                video->setSourceInformation(videoVector[i].videoSourceInformation);
+            }
         }
     }
     
@@ -128,24 +174,18 @@ public:
             auto videoView = new VideoView();
             container->layout()->addWidget(videoView);
             result.append(videoView);
-            QWidget::connect(videoView, &VideoView::clickedImage, self, [this](QString Id){
+            QWidget::connect(videoView, &VideoView::clicked, self, [this](const QString &Id){
                 auto videoSource = VideoSourceBLL::instance();
+                MDebug(MyDebug::WARNING) << "open video " << Id;
                 QApplication::setOverrideCursor(Qt::WaitCursor);
                 videoSource->searchVideosFromTitle(Id, self, [this, Id](const Result<VideoBLLList>& videos){
                     if (videos.has_value()){
                         self->runPlayer(videos.value(), Id);
+                    } else {
+                        MDebug(MyDebug::WARNING) << "video " << Id << " not has data!";
                     }
                     QApplication::restoreOverrideCursor();
                 });
-            });
-            QWidget::connect(videoView, &VideoView::clickedTitle, self, [videoView](const QString &id, const QString &title){
-                Q_EMIT videoView->clickedImage(id);
-            });
-            QWidget::connect(videoView, &VideoView::clickedSourceInformation, self, [videoView](const QString &id, const QString &sourceInfo){
-                Q_EMIT videoView->clickedImage(id);
-            });
-            QWidget::connect(videoView, &VideoView::clickedExtraInformation, self, [videoView](const QString &id, const QString &extraInfo){
-                Q_EMIT videoView->clickedImage(id);
             });
         }
         QMetaObject::invokeMethod(self, [container, this](){
@@ -184,8 +224,12 @@ HomeWidget::HomeWidget(QWidget* parent) : QScrollArea(parent), d(new HomeWidgetP
 
 HomeWidget::~HomeWidget() { }
 
-void HomeWidget::refresh(const QList<videoData>& dataList,const DisplayArea area) {
-    d->refresh(d->areaToWidget[area], dataList);
+void HomeWidget::refresh(const VideoDataVector& dataVector,const DisplayArea area) {
+    d->refresh(d->areaToWidget[area], dataVector);
+}
+
+void HomeWidget::updateVideo(const VideoDataVector& dataVector,const DisplayArea area) {
+    d->updateVideo(d->areaToWidget[area], dataVector);
 }
 
 void HomeWidget::resizeEvent(QResizeEvent *event) {
@@ -200,7 +244,7 @@ bool HomeWidget::eventFilter(QObject *obj,QEvent *event) {
     if (obj == d->ui->recommend && event->type() == QEvent::Type::Resize) {
         auto width = d->ui->recommend->size().width();
         auto preferred_height = d->ui->recommend->layout()->heightForWidth(width); 
-        preferred_height = std::max(preferred_height, 200);
+        preferred_height = max(preferred_height, 200);
         d->centralWidget->setFixedHeight(preferred_height + d->ui->recommend->geometry().y() + 3);
     }
 

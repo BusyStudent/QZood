@@ -2,10 +2,6 @@
 
 #include "../common/customizeTitleWidget.hpp"
 
-namespace Ui {
-class Zood;
-}
-
 class ZoodPrivate;
 class HomeWidget;
 class QLineEdit;
@@ -17,7 +13,6 @@ class Zood : public CustomizeTitleWidget {
         virtual ~Zood();
         HomeWidget* homeWidget();
         QLineEdit* searchBox();
-        void refreshAll();
 
     public:
         void resizeEvent(QResizeEvent *event) override;

@@ -65,6 +65,10 @@ public:
         videoWidget->stop();
     }
 
+    void setAutoPlay(bool f) {
+        mAutoPlay = f;
+    }
+
 private:
     /**
      * @brief 标题栏
@@ -255,6 +259,7 @@ public:
 
     int _index = -1;
     Order _order = Order::IN_ORDER;
+    bool mAutoPlay;
 };
 
 PlayerWidget::PlayerWidget(QWidget* parent) : CustomizeTitleWidget(parent), d(new PlayerWidgetPrivate(this)) {
@@ -331,6 +336,13 @@ void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
 
 void PlayerWidget::showEvent(QShowEvent *event) {
     createShadow(d->ui->containerWidget);
+    if (d->mAutoPlay) {
+        d->setCurrentIndex(0);
+    }
+}
+
+void PlayerWidget::setAutoPlay(bool f) {
+    d->setAutoPlay(f);
 }
 
 PlayerWidget::~PlayerWidget() { }

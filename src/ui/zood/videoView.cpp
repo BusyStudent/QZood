@@ -52,21 +52,40 @@ void VideoView::setImage(const QImage &image, const QString &tooltip) {
 }
 
 void VideoView::setVideoId(const QString &videoId) {
-    this->videoId = videoId;
+    mVideoId = videoId;
 }
 
 bool VideoView::eventFilter(QObject *obj, QEvent *event) {
     if (event->type() == QEvent::MouseButtonPress) {
         if (obj == ui->videoIcon) {
-            clickedImage(videoId);
+            Q_EMIT clickedImage(mVideoId);
         } else if (obj == ui->videoTitle) {
-            clickedTitle(videoId, ui->videoTitle->text());
+            Q_EMIT clickedTitle(mVideoId, ui->videoTitle->text());
         } else if (obj == ui->videoExtraInfo) {
-            clickedExtraInformation(videoId, ui->videoExtraInfo->text());
+            Q_EMIT clickedExtraInformation(mVideoId, ui->videoExtraInfo->text());
         } else if (obj == ui->videoSource) {
-            clickedSourceInformation(videoId, ui->videoSource->text());
+            Q_EMIT clickedSourceInformation(mVideoId, ui->videoSource->text());
         }
+        Q_EMIT clicked(mVideoId);
     }
 
     return QWidget::eventFilter(obj, event);
+}
+
+void VideoView::setTimelineEpisode(TimelineEpisodePtr tep) {
+    setImage(kLoadingImage);
+    setVideoId(tep->bangumiTitle());
+    setTitle(tep->bangumiTitle());
+    setExtraInformation(tep->pubIndexTitle());
+    setSourceInformation(tep->availableSource().join(","));
+    tep->fetchCover().then(this, [this](const Result<QImage>& img) {
+        if (img.has_value()) {
+            setImage(img.value());
+        }
+    });
+}
+
+
+QString VideoView::videoId() const {
+    return mVideoId;
 }

@@ -2,13 +2,17 @@
 
 #include <QWidget>
 
-struct videoData {
+#include "../../BLL/data/videoSourceBLL.hpp"
+
+struct VideoData {
     QString videoId;
     QString videoTitle;
     QString videoExtraInformation;
     QString videoSourceInformation;
     QImage image;
 };
+
+typedef QVector<VideoData> VideoDataVector;
 
 namespace Ui {
 class VideoView;
@@ -19,6 +23,7 @@ class VideoView : public QWidget {
     public:
         VideoView(QWidget *parent = nullptr);
         virtual ~VideoView();
+        QString videoId() const;
 
     public Q_SLOTS:
         void setImage(const QImage &image, const QString &tooltip = QString());
@@ -26,8 +31,10 @@ class VideoView : public QWidget {
         void setExtraInformation(const QString &str, const QString &tooltip = QString());
         void setSourceInformation(const QString &str, const QString &tooltip = QString());
         void setVideoId(const QString &videoId);
+        void setTimelineEpisode(TimelineEpisodePtr tep);
     
     Q_SIGNALS:
+        void clicked(const QString &videoId);
         void clickedImage(const QString &videoId);
         void clickedTitle(const QString &videoId, const QString &title);
         void clickedExtraInformation(const QString &videoId, const QString &extraInformation);
@@ -38,5 +45,5 @@ class VideoView : public QWidget {
 
     private:
         QScopedPointer<Ui::VideoView> ui;
-        QString videoId = "";
+        QString mVideoId = "";
 };

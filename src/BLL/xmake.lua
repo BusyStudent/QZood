@@ -12,4 +12,7 @@ target("BLL")
     add_frameworks("QtOpenGL", "QtOpenGLWidgets", "QtNetwork")
     add_deps("nekoav")
     add_files("data/*.cpp")
+
+    add_files("manager/*.cpp")
+    add_files("manager/*.hpp")
 target_end()

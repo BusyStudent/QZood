@@ -7,29 +7,6 @@
 #include <QToolButton>
 #include <QMenu>
 
-#if defined(_WIN32)
-#include <Windows.h>
-
-#define SetConsoleColor(color)                                          \
-	::SetConsoleTextAttribute(::GetStdHandle(STD_OUTPUT_HANDLE), color);  \
-	::SetConsoleTextAttribute(::GetStdHandle(STD_ERROR_HANDLE), color);
-
-#define CONSOLE_RED     FOREGROUND_RED
-#define CONSOLE_GREEN   FOREGROUND_GREEN
-#define CONSOLE_BLUE    FOREGROUND_BLUE
-#define CONSOLE_DEFAULT CONSOLE_RED | CONSOLE_GREEN | CONSOLE_BLUE
-#define CONSOLE_YELLOW  CONSOLE_GREEN | FOREGROUND_RED
-#define CONSOLE_LIGHTBLUE  CONSOLE_GREEN | FOREGROUND_BLUE
-#else
-#define SetConsoleColor(color)
-#define CONSOLE_RED     
-#define CONSOLE_GREEN   
-#define CONSOLE_BLUE    
-#define CONSOLE_DEFAULT 
-#define CONSOLE_YELLOW  
-#define CONSOLE_LIGHTBLUE 
-#endif
-
 struct TestTask {
     TestTask() {};
     TestTask(const uint64_t id,const QString &module_name, const QString &test_name, const TestType type,const std::function<void*()> &task) : 

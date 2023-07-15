@@ -29,7 +29,7 @@ class HomeWidget : public QScrollArea {
         VideoView* addItem(const DisplayArea& area);
         QList<VideoView *> addItems(const DisplayArea& area, int count);
         void clearItem(const DisplayArea& area);
-    
+
     public Q_SLOTS :
         void runPlayer(VideoBLLList videos, const QString &title);
     
@@ -47,7 +47,8 @@ class HomeWidget : public QScrollArea {
         void dataRequest();
 
     public Q_SLOTS:
-        void refresh(const QList<videoData>& dataList,const DisplayArea area);
+        void refresh(const VideoDataVector& dataVector,const DisplayArea area);
+        void updateVideo(const VideoDataVector& dataVector,const DisplayArea area);
 
     private:
         QScopedPointer<HomeWidgetPrivate> d;

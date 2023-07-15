@@ -11,6 +11,7 @@ class PlayerWidget final : public CustomizeTitleWidget {
         PlayerWidget(QWidget* parent = nullptr);
         virtual ~PlayerWidget();
         void setVideoList(VideoBLLList videos);
+        void setAutoPlay(bool f);
         void appendVideo(VideoBLLPtr video);
         void clearVideoList();
         void setTitle(const QString &title);

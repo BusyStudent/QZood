@@ -76,7 +76,7 @@ QLabel {
          </sizepolicy>
         </property>
         <property name="text">
-         <string>TextLabel</string>
+         <string></string>
         </property>
         <property name="alignment">
          <set>Qt::AlignCenter</set>
