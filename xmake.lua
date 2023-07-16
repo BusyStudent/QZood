@@ -23,7 +23,7 @@ includes("./src/nekoav")
 
 target("zood")
     add_rules("qt.widgetapp")
-    add_rules("protobuf.cpp")
+    -- add_rules("protobuf.cpp")
 
     add_frameworks("QtCore", "QtGui", "QtWidgets")
     add_frameworks("QtOpenGL", "QtOpenGLWidgets")

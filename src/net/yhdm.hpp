@@ -29,6 +29,7 @@ class YhdmClient : public VideoInterface {
         NetResult<Timeline>    fetchTimeline()                     override;
         QString                name()                              override;
         QString                domain()                            const;
+        bool                   hasSupport(int w)                   override;
         QNetworkAccessManager &networkManager()                    {
             return manager;
         }

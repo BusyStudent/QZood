@@ -154,7 +154,7 @@ class BiliClient final : public VideoInterface {
          * @param text 
          * @return NetResult<QStringList> 
          */
-        NetResult<QStringList> fetchSearchSuggestions(const QString &text);
+        NetResult<QStringList> fetchSearchSuggestions(const QString &text) override;
         /**
          * @brief fetch file by
          * 
@@ -233,9 +233,11 @@ class BiliClient final : public VideoInterface {
         static QString  avidToBvid(uint64_t avid);
         static uint64_t bvidToAvid(const QString &bvid);
     public: //< VideoInterface
-        QString                name();
-        NetResult<BangumiList> searchBangumi(const QString &what);
-        NetResult<Timeline>    fetchTimeline();
+        QString                name() override;
+        NetResult<BangumiList> searchBangumi(const QString &what) override;
+        NetResult<Timeline>    fetchTimeline() override;
+
+        bool                   hasSupport(int s) override;
     private:
         NetResult<BiliBangumi> fetchBangumiInternal(const QString &seasonID, const QString &episodeID);
         void                   fetchCookie();

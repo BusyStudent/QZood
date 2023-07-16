@@ -78,6 +78,7 @@ public:
         connect(reply, &QNetworkReply::finished, [this, reply]() mutable {
             reply->deleteLater();
             if (reply->attribute(QNetworkRequest::HttpStatusCodeAttribute) != 200) {
+                qDebug() << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
                 fail();
                 return;
             }
@@ -101,12 +102,15 @@ public:
                 return;
             }
             resultUrl = doc["vurl"].toString();
-            if (resultUrl.isEmpty()) {
+            if (resultUrl.isEmpty() || resultUrl == QStringLiteral("404.mp4")) {
                 fail();
                 return;
             }
             resultUrl = QUrl::fromPercentEncoding(resultUrl.toUtf8());
             qDebug() << resultUrl;
+            if (resultUrl.startsWith("/")) {
+                
+            }
             result.putResult(resultUrl);
             deleteLater();
         });
@@ -558,7 +562,7 @@ NetResult<Timeline>    YhdmClient::fetchTimeline() {
             // Get sub
             auto item = std::make_shared<YhdmTimelineItem>(*this); //< As a day
             item->_dayOfWeek = current;
-            item->_date = currentDate.addDays(currentDayOfWeek - current);
+            item->_date = currentDate.addDays(current - currentDayOfWeek);
 
             auto aNodeset = ctxt.eval(node, ".//li/a");
             for (auto a : aNodeset) {
@@ -611,6 +615,15 @@ NetResult<QImage> YhdmClient::fetchImage(const QString &url) {
 }
 QString YhdmClient::domain() const {
     return urls[0];
+}
+bool    YhdmClient::hasSupport(int what)  {
+    switch (what) {
+        case SearchSupport:
+        case TimelineSupport:
+            return true;
+        default:
+            return false;
+    }
 }
 
 

@@ -16,7 +16,6 @@
 const QImage kLoadingImage = QImage(":/icons/loading_bar.png");
 
 class VideoInterface;
-class BiliClient;
 class VideoSourceBLLHelper;
 
 enum TimeWeek : int {
@@ -117,7 +116,6 @@ class VideoSourceBLL : public QObject{
 
     private:
         RefPtr<VideoSourceBLLHelper> d;
-        RefPtr<BiliClient> client;
         QList<TimelineItemPtr> videoTimelineItems;
         QMap<TimeWeek, TimelineEpisodeList> bangumis;
         QMap<QString, QList<VideoBLLPtr>> videos;

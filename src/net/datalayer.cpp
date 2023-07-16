@@ -278,6 +278,13 @@ public:
     DataServicePrivate(QObject *parent) {
         setParent(parent);
         InitializeVideoInterface();
+
+        for (auto v : GetVideoInterfaceList()) {
+            if (v->hasSupport(SuggestionsSupport)) {
+                suggestionProvider = v;
+                break;
+            }
+        }
     }
 
     NetResult<Timeline> fetchTimeline() override {
@@ -326,12 +333,22 @@ public:
 
         return r;
     }
+    NetResult<QStringList> fetchSearchSuggestions(const QString &what) override {
+        if (suggestionProvider) {
+            return suggestionProvider->fetchSearchSuggestions(what);
+        }
+        return NetResult<QStringList>::AllocWithResult(std::nullopt);
+    }
     QString name() override {
         return QStringLiteral("DataService");
+    }
+    bool hasSupport(int) override {
+        return true;
     }
 
 
     QMap<QString, QString> strDict; //< Map 
+    VideoInterface        *suggestionProvider = nullptr;
 };
 
 static DataServicePrivate *dataService = nullptr;

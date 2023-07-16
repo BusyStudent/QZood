@@ -35,7 +35,7 @@ private:
     QList<std::function<void(const Result<Timeline>&)> > timelineQueue;
 };
 
-VideoSourceBLL::VideoSourceBLL(QObject *parent) : QObject(parent), d(new VideoSourceBLLHelper()), client(new BiliClient()) {}
+VideoSourceBLL::VideoSourceBLL(QObject *parent) : QObject(parent), d(new VideoSourceBLLHelper()) {}
 
 VideoSourceBLL::~VideoSourceBLL() { }
 
@@ -44,7 +44,7 @@ void VideoSourceBLL::searchSuggestion(const QString& text, QObject *obj, std::fu
     if (obj == nullptr) {
         obj = this;
     }
-    client->fetchSearchSuggestions(text).then(obj, func);
+    DataService::instance()->fetchSearchSuggestions(text).then(obj, func);
 }
 
 void VideoSourceBLL::searchVideoTimeline(QObject *obj, std::function<void(const Result<Timeline>&)> func) {

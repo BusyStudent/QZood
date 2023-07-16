@@ -10,6 +10,7 @@ class QNetworkReply;
 
 class Episode;
 class Bangumi;
+class MiniBangumi;
 class TimelineItem;
 class TimelineEpisode;
 class VideoInterface;
@@ -18,6 +19,8 @@ using EpisodePtr = RefPtr<Episode>;
 using BangumiPtr = RefPtr<Bangumi>;
 using EpisodeList = QList<EpisodePtr>;
 using BangumiList = QList<BangumiPtr>;
+using MiniBangumiPtr = RefPtr<MiniBangumi>;
+using MinuBangumiList = QList<MiniBangumiPtr>;
 using TimelineItemPtr = RefPtr<TimelineItem>;
 using TimelineEpisodePtr = RefPtr<TimelineEpisode>;
 using TimelineEpisodeList = QList<TimelineEpisodePtr>;
@@ -129,7 +132,7 @@ class Bangumi : public DataObject {
         virtual NetResult<QImage> fetchCover() = 0;
 };
 
-class TimelineEpisode : public DataObject {
+class MiniBangumi : public DataObject {
     public:
         /**
          * @brief Get the title of the bangumi
@@ -137,13 +140,6 @@ class TimelineEpisode : public DataObject {
          * @return QString 
          */
         virtual QString bangumiTitle() = 0;
-        /**
-         * @brief Get the pubTitle of the episode
-         * 
-         * @return QString 
-         */
-        virtual QString pubIndexTitle() = 0;
-
         /**
          * @brief Check the Episode in timeline proivde the cover
          * 
@@ -171,6 +167,16 @@ class TimelineEpisode : public DataObject {
          * @return NetResult<BangumiPtr> 
          */
         virtual NetResult<BangumiPtr> fetchBangumi() = 0;
+};
+
+class TimelineEpisode : public MiniBangumi {
+    public:
+        /**
+         * @brief Get the pubTitle of the episode
+         * 
+         * @return QString 
+         */
+        virtual QString pubIndexTitle() = 0;
 };
 
 class TimelineItem : public DataObject {
@@ -201,6 +207,11 @@ class TimelineItem : public DataObject {
  */
 class VideoInterface : public QObject {
     public:
+        enum Support {
+            TimelineSupport,        // Represents support for timeline functionality
+            SearchSupport,          // Represents support for search functionality
+            SuggestionsSupport      // Represents support for suggestions functionality
+        };
         /**
          * @brief Do search videos
          * 
@@ -213,8 +224,16 @@ class VideoInterface : public QObject {
          * 
          * @return NetResult<Timeline> 
          */
-        virtual NetResult<Timeline>    fetchTimeline()                        ;
+        virtual NetResult<Timeline>    fetchTimeline()                            ;
+        /**
+         * @brief Get search suggestions of the text
+         * 
+         * @param text 
+         * @return NetResult<QStringList> 
+         */
+        virtual NetResult<QStringList> fetchSearchSuggestions(const QString &text);
         virtual QString                name()                              = 0;
+        virtual bool                   hasSupport(int sup)                 = 0;
     protected:
         virtual ~VideoInterface() = default;
 };
@@ -240,6 +259,9 @@ inline NetResult<DanmakuList> Episode::fetchDanmaku(const QString &) {
 
 inline NetResult<Timeline> VideoInterface::fetchTimeline() {
     return NetResult<Timeline>::Alloc().putLater(std::nullopt);
+}
+inline NetResult<QStringList> VideoInterface::fetchSearchSuggestions(const QString &) {
+    return NetResult<QStringList>::Alloc().putLater(std::nullopt);
 }
 
 
@@ -269,6 +291,14 @@ inline QList<RefPtr<T> > ToSuperObjectList(const QList<RefPtr<U> > &lt) {
     QList<RefPtr<T> > ret;
     for (const auto &o : lt) {
         ret.push_back(o);
+    }
+    return ret;
+}
+template <typename T, typename U>
+inline QList<RefPtr<T> > ToDerivedObjectList(const QList<RefPtr<U> > &lt) {
+    QList<RefPtr<T> > ret;
+    for (const auto &o : lt) {
+        ret.push_back(std::dynamic_pointer_cast<T>(o));
     }
     return ret;
 }

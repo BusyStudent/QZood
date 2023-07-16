@@ -707,6 +707,16 @@ NetResult<BangumiList> BiliClient::searchBangumi(const QString &what) {
     });
     return r;
 }
+bool BiliClient::hasSupport(int what) {
+    switch (what) {
+        case SearchSupport:
+        case SuggestionsSupport:
+        case TimelineSupport:
+            return true;
+        default:
+            return false;
+    }
+}
 // Convert Utils
 
 // From https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/docs/other/bvid_desc.md
