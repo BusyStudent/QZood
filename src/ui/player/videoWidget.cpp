@@ -15,7 +15,9 @@
 #include "videoWidget.hpp"
 #include "fullSettingWidget.hpp"
 #include "../common/customSlider.hpp"
-#include "../../player/videocanvas.hpp"
+#include "videoWidgetStatus.hpp"
+#include "../../common/myGlobalLog.hpp"
+
 #include "logWidget.hpp"
 
 static QString timeFormat(int sec) {
@@ -78,6 +80,8 @@ public:
         volumeSetting->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
         volumeSetting->setAuotLayout();
         volumeSetting->setOutside(true);
+        volumeSetting->setHideAfterLeave(true);
+
         // 播放设置控件
         settings = new FullSettingWidget(self, Qt::Popup | Qt::WindowStaysOnTopHint);
         settings->setAssociateWidget(ui_videoSetting->settingButton);
@@ -85,6 +89,7 @@ public:
         settings->setAuotLayout();
         settings->setHideAfterLeave(false);
         settings->setOutside(true);
+
         // 显示信息的标签
         logWidget = new LogWidget(self);
         logWidget->setAssociateWidget(videoSetting);
@@ -186,48 +191,19 @@ public:
             button->setText(source);
             QWidget::connect(button, &QPushButton::clicked, self, [this, source](bool checked){
                 if (video->getCurrentVideoSource() != source) {
-                    stop();
-                    videoLog("正在切换视频源");
-                    video->setCurrentVideoSource(source);
-                    ui_videoSetting->sourceButton->setText(source);
-                    videoLog("切换完成");
-                    play(video);
+                    self->status()->changeSource(source);
                 }
             });
         }
         sourceListWidget->resize(sourceListWidget->sizeHint());
     }
 
-    void play(const VideoBLLPtr video) {
-        player->setHttpReferer("https://www.bilibili.com");
-        player->setHttpUseragent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537");
-        player->setOption("multiple_requests", "1");
-
-
-        if (isLoddingVideo) {
-            videoLog("正在加载视频，请不要操作");
-            return;
-        }
-        if (player->isPlaying()) {
-            stop();
-        }
-        videoLog("开始加载视频");
-        isLoddingVideo = true;
-        updateSourceList(video->sourcesList());
-        ui_videoSetting->sourceButton->setText(video->getCurrentVideoSource());
-        this->video = video;
-        video->loadVideoToPlay(self, [this](const Result<QString>& url){
-            if (url.has_value()) {
-                player->setSource(url.value());
-                player->play();
-                videoLog("视频加载完成");
-            } else {
-                videoLog("视频加载失败");
-            }
-            QTimer::singleShot(5000, self, [this](){
-                isLoddingVideo = false;
-            });
-        });
+    void setVideoSource(const QString &source) {
+        stop();
+        videoLog("正在切换视频源");
+        video->setCurrentVideoSource(source);
+        ui_videoSetting->sourceButton->setText(source);
+        videoLog("切换完成");
     }
 
     void resume() {
@@ -249,7 +225,6 @@ public:
 
     int duration() {
         if (!player->hasVideo()) {
-            videoLog("请先播放视频");
             return 0;
         }
         return player->duration();
@@ -257,7 +232,6 @@ public:
 
     void setPosition(int sec) {
         if (!player->hasVideo()) {
-            videoLog("请先播放视频");
             return;
         }
         player->setPosition(sec);
@@ -270,7 +244,6 @@ public:
     
     int position() {
         if (!player->hasVideo()) {
-            videoLog("请先播放视频");
             return 0;
         }
         return player->position();
@@ -281,6 +254,13 @@ public:
             savePlayStatus();
             player->stop();
         }
+    }
+    
+    void clean() {
+        stop();
+        deleteAllChildren(sourceListWidget);
+        videoProgressBar->setValue(0);
+        videoProgressBar->setPreloadValue(0);
     }
 
     void hideCursor() {
@@ -299,13 +279,7 @@ private:
         // 处理来自进度条的请求
         QWidget::connect(videoProgressBar, &CustomSlider::sliderMoved, self, [this](int position){
             if (player->isSeekable()) {
-                player->setPosition(position);
-            } else {
-                if (!player->hasVideo()) {
-                    videoLog("请先播放视频");
-                } else {
-                    videoLog("无效操作");
-                }
+                self->status()->changePostion(position);
             }
         });
 
@@ -346,16 +320,14 @@ private:
             // Q_EMIT self->finished();
         });
         QWidget::connect(player, &NekoMediaPlayer::mediaStatusChanged, self, [this](NekoMediaPlayer::MediaStatus status){
-            switch (status)
-            {
+            switch (status) {
             case NekoMediaPlayer::MediaStatus::InvalidMedia:
                 videoLog("非法文件");
                 Q_EMIT self->invalidVideo(video);
                 break;
             case NekoMediaPlayer::MediaStatus::EndOfMedia:
                 Q_EMIT self->finished();
-            break;
-            
+                break;
             default:
                 break;
             }
@@ -429,9 +401,9 @@ private:
         // 连接播放按钮的行为
         QWidget::connect(ui_videoSetting->playerButton, &QToolButton::clicked, self, [this](bool checked){
             if (!checked) {
-                pause();
+                self->status()->pause();
             } else {
-                resume();
+                self->status()->play();
             }
         });
         QWidget::connect(player, &NekoMediaPlayer::playbackStateChanged, self, [this](NekoMediaPlayer::PlaybackState status){
@@ -480,8 +452,7 @@ private:
      */
     void connectVideoStatus() {
         QWidget::connect(player, &NekoMediaPlayer::mediaStatusChanged, self, [this](NekoMediaPlayer::MediaStatus status){
-            switch (status)
-            {
+            switch (status) {
             case NekoMediaPlayer::MediaStatus::LoadedMedia:
                 resumePlayStatus();
                 break;
@@ -591,10 +562,25 @@ VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent), d(new VideoWidgetPr
     setFocusPolicy(Qt::StrongFocus);
     
     d->update();
+    changeStatus(new EmptyStatus(this));
 }
 
 void VideoWidget::resizeEvent(QResizeEvent* event) {
-    d->vcanvas->resize(size());
+    videoCanvas()->resize(size());
+}
+
+VideoCanvas* VideoWidget::videoCanvas()
+{
+    return d->vcanvas;
+}
+
+NekoMediaPlayer* VideoWidget::player() {
+    return d->player;
+}
+
+VideoWidgetStatus* VideoWidget::status()
+{
+    return mStatus.get();
 }
 
 bool VideoWidget::event(QEvent *event) {
@@ -632,10 +618,15 @@ void VideoWidget::mouseMoveEvent(QMouseEvent* event) {
         }, Qt::QueuedConnection);
 }
 void VideoWidget::playVideo(const VideoBLLPtr video) {
-    d->play(video);
+    status()->LoadVideo(video);
+    status()->play();
 }
 void VideoWidget::stop() {
     d->stop();
+}
+void VideoWidget::changeStatus(VideoWidgetStatus* status) {
+    mStatus.reset(status);
+    MDebug(MyDebug::DEBUG) << "video widget status : " << status->type();
 }
 void VideoWidget::videoLog(const QString& info) {
     d->videoLog(info);
@@ -649,122 +640,214 @@ void VideoWidget::setSkipStep(int v) {
 void VideoWidget::setPlaybackRate(qreal v) {
     d->player->setPlaybackRate(v);
 }
-// 画面设置
-void VideoWidget::setAspectRationMode(ScalingMode mode) {
-    switch (mode) {
-        case ScalingMode::NONE: d->vcanvas->setAspectMode(VideoCanvas::KeepAspect); break;
-        case ScalingMode::FILLING: d->vcanvas->setAspectMode(VideoCanvas::Filling); break;
-        case ScalingMode::_16X9: d->vcanvas->setAspectMode(VideoCanvas::_16x9); break;
-        case ScalingMode::_4X3: d->vcanvas->setAspectMode(VideoCanvas::_4x3); break;
-    }
-}
-void VideoWidget::RotationScreen(Rotation direction) {
-    // TODO(llhsdmd) : RotationScreen
-    qInfo() << "TODO(RotationScreen)";
-}
-void VideoWidget::setImageQualityEnhancement(bool v) {
-    // TODO(llhsdmd) : setImageQualityEnhancement
-    qInfo() << "TODO(setImageQualityEnhancement)";
-}
-// 色彩设置
-void VideoWidget::setBrightness(int v) {
-    // TODO(llhsdmd) : setBrightness
-    qInfo() << "TODO(setBrightness)";
-}
-void VideoWidget::setContrast(int v) {
-    // TODO(llhsdmd) : setContrast
-    qInfo() << "TODO(setContrast)";
-}
-void VideoWidget::setHue(int v) {
-    // TODO(llhsdmd) : setHue
-    qInfo() << "TODO(setHue)";
-}
-void VideoWidget::setSaturation(int v) {
-    // TODO(llhsdmd) : setSaturation
-    qInfo() << "TODO(setSaturation)";
-}
-// 弹幕设置
-void VideoWidget::setDanmaku(const QString& danmakuSource) {
-    currentVideo()->setCurrentDanmakuSource(danmakuSource);
-    currentVideo()->loadDanmaku(this, [this](const Result<DanmakuList>& danmakulist) {
-        if (danmakulist.has_value()) {
-            d->vcanvas->setDanmakuList(danmakulist.value());
-        }
-    });
-}
-void VideoWidget::setDanmakuShowArea(qreal occupationRatio) {
-    d->vcanvas->setDanmakuTracksLimit(occupationRatio);
-}
-void VideoWidget::setDanmakuSize(qreal ratio) {
-    QFont font = d->vcanvas->danmakuFont();
-    font.setPixelSize(font.pixelSize() * ratio);
-    d->vcanvas->setDanmakuFont(font);
-}
-void VideoWidget::setDanmakuSpeed(int speed) {
-    // TODO(llhsdmd) : setDanmakuSpeed
-    qInfo() << "TODO(setDanmakuSpeed)";
-}
-void VideoWidget::setDanmakuFont(const QFont& font) {
-    d->vcanvas->setDanmakuFont(font);
-}
-QFont VideoWidget::danmakuFont() {
-    return d->vcanvas->danmakuFont();
-}
-void VideoWidget::setDanmakuTransparency(qreal ratio) {
-    d->vcanvas->setDanmakuOpacity(1 - ratio);
-}
-void VideoWidget::setDanmakuStroke(StrokeType stroke) {
-    // qInfo() << "TODO(setDanmakuStroke)";
-    switch (stroke) {
-        case StrokeType::NONE :
-        case StrokeType::STROKE :d->vcanvas->setDanmakuShadowMode(VideoCanvas::Outline); break;
-        case StrokeType::PROJECT :d->vcanvas->setDanmakuShadowMode(VideoCanvas::Projection); break;
-    }
-}
 // 当前指针
 VideoBLLPtr VideoWidget::currentVideo() {
     return d->video;
 }
-// 字幕设置
-void VideoWidget::setSubtitleSynchronizeTime(qreal t) {
-    // TODO(llhsdmd) : setSubtitleSynchronizeTime
-    qInfo() << "TODO(setSubtitleSynchronizeTime)";
-}
-void VideoWidget::setSubtitlePosition(qreal t) {
-    // TODO(llhsdmd) : setSubtitlePosition
-    qInfo() << "TODO(setSubtitlePosition)";
-}
-QFont VideoWidget::subtitleFont() {
-    // qInfo() << "TODO(subtitleFont)";
-    return d->vcanvas->subtitleFont();
-}
-void VideoWidget::setSubtitleFont(const QFont& font) {
-    // qInfo() << "TODO(setSubtitleFont)";
-    d->vcanvas->setSubtitleFont(font);
-}
-void VideoWidget::setSubtitleColor(const QColor& color) {
-    // qInfo() << "TODO(setSubtitleColor)";
-    d->vcanvas->setSubtitleColor(color);
-}
-void VideoWidget::setSubtitleStroke(bool v) {
-    // TODO(llhsdmd) : setSubtitleStroke
-    qInfo() << "TODO(setSubtitleStroke)";
-}
-void VideoWidget::setSubtitleStrokeColor(const QColor& color) {
-    // qInfo() << "TODO(setSubtitleStrokeColor)";
-    d->vcanvas->setSubtitleOutlineColor(color);
-}
-void VideoWidget::setSubtitleStrokeTransparency(qreal percentage) {
-    // TODO(llhsdmd) : setSubtitleStrokeTransparency
-    qInfo() << "TODO(setSubtitleStrokeTransparency)";
-}
-void VideoWidget::setSubtitleTransparency(qreal percentag) {
-    // qInfo() << "TODO(setSubtitleTransparency)";
-    d->vcanvas->setSubtitleOpacity(1.0 - percentag);
-}
-void VideoWidget::setSubtitle(int index) {
-    d->video->setCurrentSubtitleSource(d->video->subtitleSourceList()[index]);
-    d->player->setActiveSubtitleTrack(index);
+
+VideoWidget::~VideoWidget() {
+    status()->clean();
 }
 
-VideoWidget::~VideoWidget() { }
+VideoWidgetStatus::VideoWidgetStatus(VideoWidget* self) : self(self) { }
+
+int VideoWidgetStatus::clean() {
+    self->d->clean();
+    self->changeStatus(new EmptyStatus(self));
+    return VideoWidgetStatus::OK;
+}
+
+int VideoWidgetStatus::changeSource(const QString &source) {
+    self->d->setVideoSource(source);
+    self->status()->play();
+    return VideoWidgetStatus::OK;
+}
+
+int VideoWidgetStatus::changePostion(int pos) {
+    self->d->setPosition(pos);
+    return OK;
+}
+
+EmptyStatus::EmptyStatus(VideoWidget* self) : VideoWidgetStatus(self) { 
+    self->player()->setHttpReferer("https://www.bilibili.com");
+    self->player()->setHttpUseragent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537");
+    self->player()->setOption("multiple_requests", "1");
+}
+
+QString EmptyStatus::type() {
+    return "EmptyStatus";
+}
+
+int EmptyStatus::LoadVideo(const VideoBLLPtr video) {
+    self->d->updateSourceList(video->sourcesList());
+    self->d->ui_videoSetting->sourceButton->setText(video->getCurrentVideoSource());
+    self->d->video = video;
+    self->changeStatus(new ReadyStatus(self));
+    return OK;
+}
+
+int EmptyStatus::changeSource(const QString &source) {
+    return NO_VIDEO;
+}
+
+int EmptyStatus::changePostion(int pos)
+{
+    return INVALID;
+}
+
+int EmptyStatus::play() {
+    self->videoLog("请先加载视频");
+    return NO_VIDEO;
+}
+
+int EmptyStatus::pause() {
+    self->videoLog("请先加载视频");
+    return NO_VIDEO;
+}
+
+int EmptyStatus::clean() { 
+    return NO_VIDEO;
+ }
+
+LoadingStatus::LoadingStatus(VideoWidget* self) : VideoWidgetStatus(self) { }
+
+QString LoadingStatus::type() {
+    return "LoadingStatus";
+}
+
+int LoadingStatus::LoadVideo(const VideoBLLPtr video) {
+    self->videoLog("有视频正在加载中，无法进行该操作。");
+    return VIDEO_LOADING;
+}
+
+int LoadingStatus::changeSource(const QString &source) { 
+    return VIDEO_LOADING;
+ }
+
+int LoadingStatus::changePostion(int pos) {
+    return INVALID;
+}
+
+int LoadingStatus::play() {
+    self->videoLog("视频加载中...");
+    return VIDEO_LOADING;
+}
+
+int LoadingStatus::pause() {
+    self->videoLog("视频加载中...");
+    return VIDEO_LOADING;
+}
+
+int LoadingStatus::clean() {
+    self->videoLog("有视频正在加载中，无法进行该操作。");
+    return VIDEO_LOADING;
+}
+
+ReadyStatus::ReadyStatus(VideoWidget* self) : VideoWidgetStatus(self) { }
+
+QString ReadyStatus::type() {
+    return "ReadyStatus";
+}
+
+int ReadyStatus::LoadVideo(const VideoBLLPtr video) {
+    self->d->clean();
+    auto status = new EmptyStatus(self);
+    self->changeStatus(status);
+    status->LoadVideo(video);
+    return OK;
+}
+
+int ReadyStatus::changePostion(int pos) {
+    return INVALID;
+}
+
+int ReadyStatus::play() {
+    self->videoLog("开始加载视频");
+    self->currentVideo()->loadVideoToPlay(self, [self = this->self](const Result<QString>& url) {
+        if (url.has_value()) {
+            self->player()->setSource(url.value());
+            self->player()->play();
+            self->videoLog("视频加载完成");
+            self->videoLog("视频开始播放");
+            self->changeStatus(new PlayingStatus(self));
+        }
+        else {
+            self->videoLog("视频加载失败");
+            self->d->clean();
+            self->changeStatus(new EmptyStatus(self));
+        }
+    });
+    return OK;
+}
+
+int ReadyStatus::pause() {
+    self->d->pause();
+    return OK;
+}
+
+int ReadyStatus::clean() {
+    self->d->clean();
+    return OK;
+}
+
+PlayingStatus::PlayingStatus(VideoWidget* self) : VideoWidgetStatus(self) { }
+
+QString PlayingStatus::type() {
+    return "PlayingStatus";
+}
+
+int PlayingStatus::LoadVideo(const VideoBLLPtr video) {
+    self->d->clean();
+    auto status = new EmptyStatus(self);
+    self->changeStatus(status);
+    status->LoadVideo(video);
+    return OK;
+}
+
+
+
+int PlayingStatus::play() {
+    return INVALID;
+}
+
+int PlayingStatus::pause() {
+    self->d->pause();
+    self->changeStatus(new PauseStatus(self));
+    return OK;
+}
+
+int PlayingStatus::clean() {
+    self->d->clean();
+    self->changeStatus(new EmptyStatus(self));
+    return OK;
+}
+
+PauseStatus::PauseStatus(VideoWidget* self) : VideoWidgetStatus(self) { }
+
+QString PauseStatus::type()
+{
+    return "PauseStatus";
+}
+
+int PauseStatus::LoadVideo(const VideoBLLPtr video) {
+    self->d->clean();
+    auto status = new EmptyStatus(self);
+    self->changeStatus(status);
+    status->LoadVideo(video);
+    return OK;
+}
+
+int PauseStatus::play() {
+    self->d->resume();
+    return OK;
+}
+
+int PauseStatus::pause() {
+    return INVALID;
+}
+
+int PauseStatus::clean() {
+    self->d->clean();
+    self->changeStatus(new EmptyStatus(self));
+    return OK;
+}
