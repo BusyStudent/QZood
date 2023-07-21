@@ -13,6 +13,8 @@
 #include "../../BLL/manager/videoDataManager.hpp"
 #include "../../common/myGlobalLog.hpp"
 
+#undef min
+#undef max
 #define min(x, y) (x < y ? x : y)
 #define max(x, y) (x > y ? x : y)
 
@@ -149,7 +151,8 @@ public:
         for (auto tep : teps) {
             bool f = false;
             for (auto video : videos) {
-                if (video->videoId() == tep->bangumiTitle()) {
+                auto ptr = dynamic_cast<TimelineEpisode *>(video->videoPtr().get());
+                if (nullptr != ptr && ptr->bangumiTitle() == tep->bangumiTitle()) {
                     video->setTimelineEpisode(tep);
                     f = true;
                     break;
@@ -166,7 +169,7 @@ public:
         for (int i = 0;i < videoVector.size(); ++i) {
             auto f = false;
             for (auto video : videos) {
-                if (video->videoId() == videoVector[i].videoId) {
+                if (video->videoPtr().get() == videoVector[i].videoPtr.get()) {
                     video->setImage(videoVector[i].image);
                     video->setTitle(videoVector[i].videoTitle);
                     video->setExtraInformation(videoVector[i].videoExtraInformation);
@@ -177,7 +180,7 @@ public:
             }
             if (!f) {
                 auto video = addItems(container, 1).at(0);
-                video->setVideoId(videoVector[i].videoId);
+                video->setVideoPtr(videoVector[i].videoPtr);
                 video->setImage(videoVector[i].image);
                 video->setTitle(videoVector[i].videoTitle);
                 video->setExtraInformation(videoVector[i].videoExtraInformation);
@@ -193,15 +196,15 @@ public:
             auto videoView = new VideoView();
             container->layout()->addWidget(videoView);
             result.append(videoView);
-            QWidget::connect(videoView, &VideoView::clicked, self, [this](const QString &Id){
+            QWidget::connect(videoView, &VideoView::clicked, self, [this, videoView](const RefPtr<DataObject> &voidePtr){
                 auto videoSource = VideoSourceBLL::instance();
-                MDebug(MyDebug::WARNING) << "open video " << Id;
+                MDebug(MyDebug::WARNING) << "open video " << videoView->videoTitle();
                 QApplication::setOverrideCursor(Qt::WaitCursor);
-                videoSource->searchVideosFromTitle(Id, self, [this, Id](const Result<VideoBLLList>& videos){
+                videoSource->searchVideosFromBangumi(voidePtr, self, [this, videoView](const Result<VideoBLLList>& videos){
                     if (videos.has_value()){
-                        self->runPlayer(videos.value(), Id);
+                        self->runPlayer(videos.value(), videoView->videoTitle());
                     } else {
-                        MDebug(MyDebug::WARNING) << "video " << Id << " not has data!";
+                        MDebug(MyDebug::WARNING) << "video " << videoView->videoTitle() << " not has data!";
                     }
                     QApplication::restoreOverrideCursor();
                 });

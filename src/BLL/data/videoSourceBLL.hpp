@@ -84,6 +84,7 @@ class VideoSourceBLL : public QObject{
          * @param func 得到搜索结果时的调用
          */
         void searchVideosFromBangumi(BangumiPtr b, QObject *obj, std::function<void(const Result<QList<VideoBLLPtr>>&)> func);
+        void searchVideosFromBangumi(RefPtr<DataObject> b, QObject *obj, std::function<void(const Result<QList<VideoBLLPtr>>&)> func);
         /**
          * @brief 通过标题搜索视频
          * 

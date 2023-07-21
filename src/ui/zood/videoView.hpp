@@ -5,7 +5,7 @@
 #include "../../BLL/data/videoSourceBLL.hpp"
 
 struct VideoData {
-    QString videoId;
+    RefPtr<DataObject> videoPtr;
     QString videoTitle;
     QString videoExtraInformation;
     QString videoSourceInformation;
@@ -23,27 +23,28 @@ class VideoView : public QWidget {
     public:
         VideoView(QWidget *parent = nullptr);
         virtual ~VideoView();
-        QString videoId() const;
+        RefPtr<DataObject> videoPtr() const;
+        QString videoTitle() const;
 
     public Q_SLOTS:
         void setImage(const QImage &image, const QString &tooltip = QString());
         void setTitle(const QString &str, const QString &tooltip = QString());
         void setExtraInformation(const QString &str, const QString &tooltip = QString());
         void setSourceInformation(const QString &str, const QString &tooltip = QString());
-        void setVideoId(const QString &videoId);
+        void setVideoPtr(const RefPtr<DataObject> &videoPtr);
         void setTimelineEpisode(TimelineEpisodePtr tep);
     
     Q_SIGNALS:
-        void clicked(const QString &videoId);
-        void clickedImage(const QString &videoId);
-        void clickedTitle(const QString &videoId, const QString &title);
-        void clickedExtraInformation(const QString &videoId, const QString &extraInformation);
-        void clickedSourceInformation(const QString &videoId, const QString &sourceInformation);
+        void clicked(const RefPtr<DataObject> &videoPtr);
+        void clickedImage(const RefPtr<DataObject> &videoPtr);
+        void clickedTitle(const RefPtr<DataObject> &videoPtr, const QString &title);
+        void clickedExtraInformation(const RefPtr<DataObject> &videoPtr, const QString &extraInformation);
+        void clickedSourceInformation(const RefPtr<DataObject> &videoPtr, const QString &sourceInformation);
 
     public:
         bool eventFilter(QObject* obj, QEvent *event) override;
 
     private:
         QScopedPointer<Ui::VideoView> ui;
-        QString mVideoId = "";
+        RefPtr<DataObject> mVideoPtr = nullptr;
 };

@@ -73,6 +73,21 @@ Timeline VideoSourceBLL::videoInWeek(TimeWeek week) {
     return result;
 }
 
+void VideoSourceBLL::searchVideosFromBangumi(RefPtr<DataObject> b, QObject *obj, std::function<void(const Result<QList<VideoBLLPtr>>&)> func) {
+    auto eptr = b->as<Episode>();
+    if (nullptr != eptr) {
+        searchVideosFromBangumi(eptr, obj, func);
+    }
+    auto teptr = b->as<TimelineEpisode>();
+    if (nullptr != teptr) {
+        teptr->fetchBangumi().then(obj, [this, obj, func](const Result<BangumiPtr> &bangumi) {
+            if (bangumi.has_value()) {
+                searchVideosFromBangumi(bangumi.value(), obj, func);
+            }
+        });
+    }
+}
+
 void VideoSourceBLL::searchBangumiFromTimeline(Timeline t,QObject *obj, std::function<void(const Result<TimelineEpisodeList>&)> func) {
     if (obj == nullptr) {
         obj = this;

@@ -51,30 +51,34 @@ void VideoView::setImage(const QImage &image, const QString &tooltip) {
     ui->videoIcon->setToolTip(tooltip);
 }
 
-void VideoView::setVideoId(const QString &videoId) {
-    mVideoId = videoId;
+void VideoView::setVideoPtr(const RefPtr<DataObject> &videoPtr) {
+    mVideoPtr = videoPtr;
 }
 
 bool VideoView::eventFilter(QObject *obj, QEvent *event) {
     if (event->type() == QEvent::MouseButtonPress) {
         if (obj == ui->videoIcon) {
-            Q_EMIT clickedImage(mVideoId);
+            Q_EMIT clickedImage(mVideoPtr);
         } else if (obj == ui->videoTitle) {
-            Q_EMIT clickedTitle(mVideoId, ui->videoTitle->text());
+            Q_EMIT clickedTitle(mVideoPtr, ui->videoTitle->text());
         } else if (obj == ui->videoExtraInfo) {
-            Q_EMIT clickedExtraInformation(mVideoId, ui->videoExtraInfo->text());
+            Q_EMIT clickedExtraInformation(mVideoPtr, ui->videoExtraInfo->text());
         } else if (obj == ui->videoSource) {
-            Q_EMIT clickedSourceInformation(mVideoId, ui->videoSource->text());
+            Q_EMIT clickedSourceInformation(mVideoPtr, ui->videoSource->text());
         }
-        Q_EMIT clicked(mVideoId);
+        Q_EMIT clicked(mVideoPtr);
     }
 
     return QWidget::eventFilter(obj, event);
 }
 
+QString VideoView::videoTitle() const {
+    return ui->videoTitle->toolTip();
+}
+
 void VideoView::setTimelineEpisode(TimelineEpisodePtr tep) {
     setImage(kLoadingImage);
-    setVideoId(tep->bangumiTitle());
+    setVideoPtr(tep);
     setTitle(tep->bangumiTitle());
     setExtraInformation(tep->pubIndexTitle());
     setSourceInformation(tep->availableSource().join(","));
@@ -86,6 +90,6 @@ void VideoView::setTimelineEpisode(TimelineEpisodePtr tep) {
 }
 
 
-QString VideoView::videoId() const {
-    return mVideoId;
+RefPtr<DataObject> VideoView::videoPtr() const {
+    return mVideoPtr;
 }
