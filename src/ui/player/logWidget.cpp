@@ -12,7 +12,7 @@ class LogWidgetPrivate {
         void setupUi() {
             ui->setupUi(self);
 
-            QWidget::connect(self->m_timer, &QTimer::timeout, self, [this]() {
+            QWidget::connect(self->mTimer, &QTimer::timeout, self, [this]() {
                 if (logs.size() > 0) {
                     logs.pop_front();
                 }

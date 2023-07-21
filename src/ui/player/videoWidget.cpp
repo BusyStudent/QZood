@@ -36,97 +36,97 @@ static QString timeFormat(int sec) {
 class VideoWidgetPrivate {
 public:
     VideoWidgetPrivate(VideoWidget* parent) : self(parent) {
-        mainLayout = new QVBoxLayout(self);
+        mMainLayout = new QVBoxLayout(self);
     }
 
     ~VideoWidgetPrivate() {
-        if (player->isPlaying()) {
-            player->stop();
+        if (mPlayer->isPlaying()) {
+            mPlayer->stop();
         }
-        delete audio;
-        delete player;
+        delete mAudio;
+        delete mPlayer;
     }
 
     void setupUi() {
         // 构建核心播放器界面
-        audio = new NekoAudioOutput();
-        player = new NekoMediaPlayer();
-        player->setAudioOutput(audio);
-        vcanvas = new VideoCanvas(self);
-        vcanvas->lower();
-        vcanvas->attachPlayer(player);
+        mAudio = new NekoAudioOutput();
+        mPlayer = new NekoMediaPlayer();
+        mPlayer->setAudioOutput(mAudio);
+        mVcanvas = new VideoCanvas(self);
+        mVcanvas->lower();
+        mVcanvas->attachPlayer(mPlayer);
 
-        mainLayout->addStretch();
-        mainLayout->setContentsMargins(1, 0, 1, 0);
+        mMainLayout->addStretch();
+        mMainLayout->setContentsMargins(1, 0, 1, 0);
 
         // 实例化视频播放进度条及设置栏
-        videoSetting = new PopupWidget();
+        mVideoSetting = new PopupWidget();
         ui_videoSetting.reset(new Ui::VideoSettingView());
-        ui_videoSetting->setupUi(videoSetting);
-        mainLayout->addWidget(videoSetting);
+        ui_videoSetting->setupUi(mVideoSetting);
+        mMainLayout->addWidget(mVideoSetting);
         ui_videoSetting->playerButton->setCheckable(false);
         ui_videoSetting->playerButton->setChecked(false);
-        videoSetting->show();
+        mVideoSetting->show();
 
         // 实例化视频进度条
-        videoProgressBar = new CustomSlider();
-        videoProgressBar->setObjectName("videoProgressBar");
-        static_cast<QVBoxLayout*>(videoSetting->layout())->insertWidget(0, videoProgressBar);
+        mVideoProgressBar = new CustomSlider();
+        mVideoProgressBar->setObjectName("videoProgressBar");
+        static_cast<QVBoxLayout*>(mVideoSetting->layout())->insertWidget(0, mVideoProgressBar);
 
         // 实例化音量控制界面
-        volumeSetting = new VolumeSettingWidget(self);
+        mVolumeSetting = new VolumeSettingWidget(self);
         ui_videoSetting->voiceSettingButton->installEventFilter(self);
-        volumeSetting->setAssociateWidget(ui_videoSetting->voiceSettingButton);
-        volumeSetting->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
-        volumeSetting->setAuotLayout();
-        volumeSetting->setOutside(true);
-        volumeSetting->setHideAfterLeave(true);
+        mVolumeSetting->setAssociateWidget(ui_videoSetting->voiceSettingButton);
+        mVolumeSetting->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+        mVolumeSetting->setAuotLayout();
+        mVolumeSetting->setOutside(true);
+        mVolumeSetting->setHideAfterLeave(true);
 
         // 播放设置控件
-        settings = new FullSettingWidget(self, Qt::Popup | Qt::WindowStaysOnTopHint);
-        settings->setAssociateWidget(ui_videoSetting->settingButton);
-        settings->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
-        settings->setAuotLayout();
-        settings->setHideAfterLeave(false);
-        settings->setOutside(true);
+        mSettings = new FullSettingWidget(self, Qt::Popup | Qt::WindowStaysOnTopHint);
+        mSettings->setAssociateWidget(ui_videoSetting->settingButton);
+        mSettings->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+        mSettings->setAuotLayout();
+        mSettings->setHideAfterLeave(false);
+        mSettings->setOutside(true);
 
         // 显示信息的标签
-        logWidget = new LogWidget(self);
-        logWidget->setAssociateWidget(videoSetting);
-        logWidget->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-        logWidget->setAuotLayout(true);
-        logWidget->setHideAfterLeave(false);
-        logWidget->setStopTimerEnter(false);
-        logWidget->hide();
-        logWidget->setOutside(true);
+        mLogWidget = new LogWidget(self);
+        mLogWidget->setAssociateWidget(mVideoSetting);
+        mLogWidget->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+        mLogWidget->setAuotLayout(true);
+        mLogWidget->setHideAfterLeave(false);
+        mLogWidget->setStopTimerEnter(false);
+        mLogWidget->hide();
+        mLogWidget->setOutside(true);
 
         // 源列表
-        sourceListWidget = new PopupWidget(self);
+        mSourceListWidget = new PopupWidget(self);
         ui_sourceList.reset(new Ui::SourceList());
-        ui_sourceList->setupUi(sourceListWidget);
-        sourceListWidget->setAssociateWidget(ui_videoSetting->sourceButton);
-        sourceListWidget->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
-        sourceListWidget->setAuotLayout();
-        sourceListWidget->setOutside(true);
+        ui_sourceList->setupUi(mSourceListWidget);
+        mSourceListWidget->setAssociateWidget(ui_videoSetting->sourceButton);
+        mSourceListWidget->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+        mSourceListWidget->setAuotLayout();
+        mSourceListWidget->setOutside(true);
     }
     
     void setupShortcut() {
         // 设置快捷键
         QShortcut* keySpace = new QShortcut(Qt::Key_Space, self);
         QWidget::connect(keySpace, &QShortcut::activated, self, [this](){
-            if (player->isLoaded()) {
-                player->isPlaying() ? pause() : resume();
+            if (mPlayer->isLoaded()) {
+                mPlayer->isPlaying() ? pause() : resume();
             }
         });
         QShortcut* keyLeft = new QShortcut(Qt::Key_Left, self);
         QWidget::connect(keyLeft, &QShortcut::activated, self, [this](){
-            videoLog(QString("快退 %1s").arg(skipStep));
-            setPosition(position() - skipStep);
+            videoLog(QString("快退 %1s").arg(mSkipStep));
+            setPosition(position() - mSkipStep);
         });
         QShortcut* keyRight = new QShortcut(Qt::Key_Right, self);
         QWidget::connect(keyRight, &QShortcut::activated, self, [this](){
-            videoLog(QString("快进 %1s").arg(skipStep));
-            setPosition(position() + skipStep);
+            videoLog(QString("快进 %1s").arg(mSkipStep));
+            setPosition(position() + mSkipStep);
         });
         QShortcut* keyUp = new QShortcut(Qt::Key_Up, self);
         QWidget::connect(keyUp, &QShortcut::activated, self, [this](){
@@ -158,19 +158,19 @@ public:
 
     void update() {
         // 进度条
-        videoProgressBar->setValue(position());
-        volumeSetting->setValue(volume());
+        mVideoProgressBar->setValue(position());
+        mVolumeSetting->setValue(volume());
     }
 
     void videoLog(const QString& msg) {
-        logWidget->setDefualtHideTime(2000);
-        logWidget->pushLog(msg);
+        mLogWidget->setDefualtHideTime(2000);
+        mLogWidget->pushLog(msg);
     }
 
     void pause() {
-        if (player->isPlaying()) {
+        if (mPlayer->isPlaying()) {
             savePlayStatus();
-            player->pause();
+            mPlayer->pause();
         } else {
             videoLog("请先播放视频");
         }
@@ -184,83 +184,83 @@ public:
     }
 
     void updateSourceList(const QStringList& sourceList) {
-        deleteAllChildren(sourceListWidget);
+        deleteAllChildren(mSourceListWidget);
         for (auto source : sourceList) {
-            QPushButton *button = new QPushButton(sourceListWidget);
-            sourceListWidget->layout()->addWidget(button);
+            QPushButton *button = new QPushButton(mSourceListWidget);
+            mSourceListWidget->layout()->addWidget(button);
             button->setText(source);
             QWidget::connect(button, &QPushButton::clicked, self, [this, source](bool checked){
-                if (video->getCurrentVideoSource() != source) {
+                if (mVideo->getCurrentVideoSource() != source) {
                     self->status()->changeSource(source);
                 }
             });
         }
-        sourceListWidget->resize(sourceListWidget->sizeHint());
+        mSourceListWidget->resize(mSourceListWidget->sizeHint());
     }
 
     void setVideoSource(const QString &source) {
         stop();
         videoLog("正在切换视频源");
-        video->setCurrentVideoSource(source);
+        mVideo->setCurrentVideoSource(source);
         ui_videoSetting->sourceButton->setText(source);
         videoLog("切换完成");
     }
 
     void resume() {
-        if (player->hasVideo() && !player->isPlaying()) {
-            player->play();
+        if (mPlayer->hasVideo() && !mPlayer->isPlaying()) {
+            mPlayer->play();
         } else {
             videoLog("没有视频暂停");
         }
     }
 
     int volume() {
-        return (audio->volume() + 0.005) * 100;
+        return (mAudio->volume() + 0.005) * 100;
     }
 
     void setVolume(int value) {
         value = std::clamp(value, 0, 100);
-        audio->setVolume((float) value / 100.0);
+        mAudio->setVolume((float) value / 100.0);
     }
 
     int duration() {
-        if (!player->hasVideo()) {
+        if (!mPlayer->hasVideo()) {
             return 0;
         }
-        return player->duration();
+        return mPlayer->duration();
     }
 
     void setPosition(int sec) {
-        if (!player->hasVideo()) {
+        if (!mPlayer->hasVideo()) {
             return;
         }
-        player->setPosition(sec);
-        vcanvas->setDanmakuPosition(sec);
+        mPlayer->setPosition(sec);
+        mVcanvas->setDanmakuPosition(sec);
     }
 
     void setSkipStep(int sec) {
-        skipStep = sec;
+        mSkipStep = sec;
     }
     
     int position() {
-        if (!player->hasVideo()) {
+        if (!mPlayer->hasVideo()) {
             return 0;
         }
-        return player->position();
+        return mPlayer->position();
     }
 
     void stop() {
-        if (player->isPlaying()) {
+        if (mPlayer->isPlaying()) {
             savePlayStatus();
-            player->stop();
+            mPlayer->stop();
         }
     }
     
     void clean() {
         stop();
-        deleteAllChildren(sourceListWidget);
-        videoProgressBar->setValue(0);
-        videoProgressBar->setPreloadValue(0);
+        deleteAllChildren(mSourceListWidget);
+        mVideoProgressBar->setValue(0);
+        mVideoProgressBar->setPreloadValue(0);
     }
 
     void hideCursor() {
@@ -275,25 +275,25 @@ private:
      * @brief 视频进度条
      */
     void connectVideoProgressBar() {
-        videoProgressBar->setDisabled(true);
+        mVideoProgressBar->setDisabled(true);
         // 处理来自进度条的请求
-        QWidget::connect(videoProgressBar, &CustomSlider::sliderMoved, self, [this](int position){
-            if (player->isSeekable()) {
+        QWidget::connect(mVideoProgressBar, &CustomSlider::sliderMoved, self, [this](int position){
+            if (mPlayer->isSeekable()) {
                 self->status()->changePostion(position);
             }
         });
 
         // 同步更新进度条的进度信息
-        QWidget::connect(player, &NekoMediaPlayer::durationChanged, self, [this](qreal sec){
-            videoProgressBar->setRange(0, sec);
+        QWidget::connect(mPlayer, &NekoMediaPlayer::durationChanged, self, [this](qreal sec){
+            mVideoProgressBar->setRange(0, sec);
         });
 
-        QWidget::connect(player, &NekoMediaPlayer::seekableChanged, self, [this](bool v) {
-            videoProgressBar->setEnabled(v);
+        QWidget::connect(mPlayer, &NekoMediaPlayer::seekableChanged, self, [this](bool v) {
+            mVideoProgressBar->setEnabled(v);
         });
 
-        QWidget::connect(player, &NekoMediaPlayer::positionChanged, self, [this](int value){
-            auto total = timeFormat(player->duration());
+        QWidget::connect(mPlayer, &NekoMediaPlayer::positionChanged, self, [this](int value){
+            auto total = timeFormat(mPlayer->duration());
             auto current = timeFormat(value);
             if (total.length() > current.length()) {
                 current = QString("%1:%2").
@@ -301,29 +301,29 @@ private:
                     arg(current);
             }
             ui_videoSetting->videoTimeLabel->setText(current + "/" + total);
-            if (videoProgressBar->isSliderDown()) {
+            if (mVideoProgressBar->isSliderDown()) {
                 return;
             }
-            videoProgressBar->setValue(value);
+            mVideoProgressBar->setValue(value);
         });
 
-        QWidget::connect(videoProgressBar, &CustomSlider::tipBeforeShow, self, [this](QLabel *tipLabel, int value){
+        QWidget::connect(mVideoProgressBar, &CustomSlider::tipBeforeShow, self, [this](QLabel *tipLabel, int value){
             tipLabel->setText(timeFormat(value));
         });
 
-        QWidget::connect(player, &NekoMediaPlayer::bufferedDurationChanged, self, [this](double sec){
-            videoProgressBar->setPreloadValue(sec + position());
+        QWidget::connect(mPlayer, &NekoMediaPlayer::bufferedDurationChanged, self, [this](double sec){
+            mVideoProgressBar->setPreloadValue(sec + position());
         });
         // 结束信号
-        QWidget::connect(player, &NekoMediaPlayer::errorOccurred, self, [this](NekoMediaPlayer::Error error, const QString &errorString){
+        QWidget::connect(mPlayer, &NekoMediaPlayer::errorOccurred, self, [this](NekoMediaPlayer::Error error, const QString &errorString){
             videoLog(errorString);
             // Q_EMIT self->finished();
         });
-        QWidget::connect(player, &NekoMediaPlayer::mediaStatusChanged, self, [this](NekoMediaPlayer::MediaStatus status){
+        QWidget::connect(mPlayer, &NekoMediaPlayer::mediaStatusChanged, self, [this](NekoMediaPlayer::MediaStatus status){
             switch (status) {
             case NekoMediaPlayer::MediaStatus::InvalidMedia:
                 videoLog("非法文件");
-                Q_EMIT self->invalidVideo(video);
+                Q_EMIT self->invalidVideo(mVideo);
                 break;
             case NekoMediaPlayer::MediaStatus::EndOfMedia:
                 Q_EMIT self->finished();
@@ -339,36 +339,37 @@ private:
      */
     void connectVolumeSetting() {
         // 连接音量调节条显示：定义弹出窗口显示时进度条不自动隐藏。
-        QWidget::connect(volumeSetting, &VolumeSettingWidget::showed, self, [this](){
-            videoSetting->show();
-            videoSetting->setDefualtHideTime(std::numeric_limits<int>::max());
+        QWidget::connect(mVolumeSetting, &VolumeSettingWidget::showed, self, [this](){
+            mVideoSetting->show();
+            mVideoSetting->setHideAfterLeave(false);
         });
         // 连接音量调节条隐藏：恢复视频进度条自动隐藏
-        QWidget::connect(volumeSetting, &VolumeSettingWidget::hided, self, [this](){
-            videoSetting->setDefualtHideTime(100);
-            videoSetting->hideLater(5000);
+        QWidget::connect(mVolumeSetting, &VolumeSettingWidget::hided, self, [this](){
+            mVideoSetting->setHideAfterLeave(true);
+            mVideoSetting->setDefualtHideTime(100);
+            mVideoSetting->hideLater(5000);
         });
         // 按钮图标并更新程序播放音量
-        QWidget::connect(audio, &NekoAudioOutput::volumeChanged, self, [this](float value){
-            volumeSetting->setValue((value + 0.005) * 100);
+        QWidget::connect(mAudio, &NekoAudioOutput::volumeChanged, self, [this](float value){
+            mVolumeSetting->setValue((value + 0.005) * 100);
         });
         // 连接音量调节条调节：同步音量
-        QWidget::connect(volumeSetting, &VolumeSettingWidget::sliderMoved, self, [this](int value) {
-            audio->setVolume(value / 100.0);
+        QWidget::connect(mVolumeSetting, &VolumeSettingWidget::sliderMoved, self, [this](int value) {
+            mAudio->setVolume(value / 100.0);
         });
         // 连接视频播放进度条隐藏：隐藏自己
-        QWidget::connect(videoSetting, &PopupWidget::hided, volumeSetting, &VolumeSettingWidget::hide);
+        QWidget::connect(mVideoSetting, &PopupWidget::hided, mVolumeSetting, &VolumeSettingWidget::hide);
         // 连接音量按钮点击：切换静音-有声模式
         QWidget::connect(ui_videoSetting->voiceSettingButton, &QToolButton::clicked, self,  [this, volume = 0.0]() mutable {
             if (ui_videoSetting->voiceSettingButton->isChecked()) {
-                volume = audio->volume();
-                audio->setVolume(0);
+                volume = mAudio->volume();
+                mAudio->setVolume(0);
             } else {
-                audio->setVolume(volume);
+                mAudio->setVolume(volume);
             }
         });
         // 同步音量按钮图标
-        QWidget::connect(volumeSetting, &VolumeSettingWidget::valueChanged, self, [this, flag = -1](int value) mutable {
+        QWidget::connect(mVolumeSetting, &VolumeSettingWidget::valueChanged, self, [this, flag = -1](int value) mutable {
             if (value == 0 && flag != 0) {
                 flag = 0;
                 QIcon icon;
@@ -406,7 +407,7 @@ private:
                 self->status()->play();
             }
         });
-        QWidget::connect(player, &NekoMediaPlayer::playbackStateChanged, self, [this](NekoMediaPlayer::PlaybackState status){
+        QWidget::connect(mPlayer, &NekoMediaPlayer::playbackStateChanged, self, [this](NekoMediaPlayer::PlaybackState status){
             switch (status){
                 case NekoMediaPlayer::PlayingState:
                     ui_videoSetting->playerButton->setCheckable(true);
@@ -435,12 +436,12 @@ private:
         QWidget::connect(ui_videoSetting->showFullScreenButton, &QToolButton::clicked, self, [this, parent = self->parentWidget()](bool clicked) mutable {
             if (!self->isFullScreen()) {
                 self->setWindowFlags(Qt::Window);
-                settings->setParent(self, Qt::Widget);
-                settings->raise();
+                mSettings->setParent(self, Qt::Widget);
+                mSettings->raise();
                 self->showFullScreen();
             } else {
                 self->setWindowFlags(Qt::SubWindow);
-                settings->setParent(self, Qt::Popup);
+                mSettings->setParent(self, Qt::Popup);
                 self->showNormal();
             }
         });
@@ -451,7 +452,7 @@ private:
      * 
      */
     void connectVideoStatus() {
-        QWidget::connect(player, &NekoMediaPlayer::mediaStatusChanged, self, [this](NekoMediaPlayer::MediaStatus status){
+        QWidget::connect(mPlayer, &NekoMediaPlayer::mediaStatusChanged, self, [this](NekoMediaPlayer::MediaStatus status){
             switch (status) {
             case NekoMediaPlayer::MediaStatus::LoadedMedia:
                 resumePlayStatus();
@@ -466,90 +467,90 @@ private:
      */
     void connectVideoPlaySetting() {
         // 设置窗口显示和隐藏
-        QWidget::connect(videoSetting, &PopupWidget::hided,self, [this](){
-            settings->hide();
+        QWidget::connect(mVideoSetting, &PopupWidget::hided,self, [this](){
+            mSettings->hide();
             hideCursor();
         });
-        QWidget::connect(videoSetting, &PopupWidget::showed, self, [this](){
+        QWidget::connect(mVideoSetting, &PopupWidget::showed, self, [this](){
             showCursor();
         });
-        QWidget::connect(settings, &FullSettingWidget::showed, self, [this](){
-            videoSetting->show();
-            videoSetting->setDefualtHideTime(std::numeric_limits<int>::max());
+        QWidget::connect(mSettings, &FullSettingWidget::showed, self, [this](){
+            mVideoSetting->show();
+            mVideoSetting->setDefualtHideTime(std::numeric_limits<int>::max());
         });
-        QWidget::connect(settings, &FullSettingWidget::hided, self, [this](){
-            videoSetting->setDefualtHideTime(100);
-            videoSetting->hideLater(5000);
+        QWidget::connect(mSettings, &FullSettingWidget::hided, self, [this](){
+            mVideoSetting->setDefualtHideTime(100);
+            mVideoSetting->hideLater(5000);
         });
-        QWidget::connect(ui_videoSetting->settingButton, &QToolButton::clicked, settings, [this](){
+        QWidget::connect(ui_videoSetting->settingButton, &QToolButton::clicked, mSettings, [this](){
             // TODO(llhsdmd):popup属性的窗口在全屏模式下无法正常的弹出。
-            if (player->isLoaded()) {
-                if (settings->isHidden()) {
-                    settings->show();
-                    settings->hideLater(5000);
+            if (mPlayer->isLoaded()) {
+                if (mSettings->isHidden()) {
+                    mSettings->show();
+                    mSettings->hideLater(5000);
                 } else {
-                    settings->hide();
+                    mSettings->hide();
                 }
             }
         });
-        settings->setupSetting(self);
+        mSettings->setupSetting(self);
     }
 
     void connectSourceList() {
-        QWidget::connect(ui_videoSetting->sourceButton, &QToolButton::clicked, sourceListWidget, [this](bool checked) {
-            videoSetting->setHideAfterLeave(false);
-            sourceListWidget->show();
-            sourceListWidget->hideLater(5000);
+        QWidget::connect(ui_videoSetting->sourceButton, &QToolButton::clicked, mSourceListWidget, [this](bool checked) {
+            mVideoSetting->setHideAfterLeave(false);
+            mSourceListWidget->show();
+            mSourceListWidget->hideLater(5000);
         });
-        QWidget::connect(sourceListWidget, &PopupWidget::hided, self, [this]() {
-            videoSetting->setHideAfterLeave(true);
-            videoSetting->hideLater();
+        QWidget::connect(mSourceListWidget, &PopupWidget::hided, self, [this]() {
+            mVideoSetting->setHideAfterLeave(true);
+            mVideoSetting->hideLater();
         });
     }
 
     void savePlayStatus() {
-        video->setStatus("position", position());
+        mVideo->setStatus("position", position());
     }
 
     void resumePlayStatus() {
-        if (video->containsStatus("position")) {
-            setPosition(video->getStatus<int>("position"));
+        if (mVideo->containsStatus("position")) {
+            setPosition(mVideo->getStatus<int>("position"));
         }
         qWarning() << "resumePlayStatus";
-        for (const auto source : player->subtitleTracks()) {
+        for (const auto source : mPlayer->subtitleTracks()) {
             qWarning() << "subtitle title : " << source[NekoMediaMetaData::Title];
-            video->addSubtitleSource(source[NekoMediaMetaData::Title]);
+            mVideo->addSubtitleSource(source[NekoMediaMetaData::Title]);
         }
-        settings->initSubtitleSetting(video);
-        settings->initDanmakuSetting(video);
+        mSettings->initSubtitleSetting(mVideo);
+        mSettings->initDanmakuSetting(mVideo);
     }
 
 public:
-    VideoCanvas *vcanvas;
-    NekoMediaPlayer *player;
-    NekoAudioOutput *audio;
+    VideoCanvas *mVcanvas;
+    NekoMediaPlayer *mPlayer;
+    NekoAudioOutput *mAudio;
 
-    PopupWidget *videoSetting = nullptr;
+    PopupWidget *mVideoSetting = nullptr;
     QScopedPointer<Ui::VideoSettingView> ui_videoSetting;
-    CustomSlider *videoProgressBar = nullptr;
+    CustomSlider *mVideoProgressBar = nullptr;
 
-    VolumeSettingWidget *volumeSetting = nullptr;
+    VolumeSettingWidget *mVolumeSetting = nullptr;
 
-    PopupWidget *sourceListWidget = nullptr;
+    PopupWidget *mSourceListWidget = nullptr;
     QScopedPointer<Ui::SourceList> ui_sourceList;
 
-    FullSettingWidget *settings = nullptr;
+    FullSettingWidget *mSettings = nullptr;
 
-    LogWidget *logWidget = nullptr;
+    LogWidget *mLogWidget = nullptr;
 
-    VideoBLLPtr video;
+    VideoBLLPtr mVideo;
 
-    int skipStep = 10;
-    bool isLoddingVideo = false;
+    int mSkipStep = 10;
+    bool mIsLoddingVideo = false;
 
 private:
     VideoWidget *self;
-    QVBoxLayout* mainLayout;
+    QVBoxLayout *mMainLayout;
 };
 
 VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent), d(new VideoWidgetPrivate(this)) {
@@ -560,7 +561,7 @@ VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent), d(new VideoWidgetPr
     setMinimumSize(100,75);
     setAttribute(Qt::WA_Hover);                  // 启动鼠标悬浮追踪
     setFocusPolicy(Qt::StrongFocus);
-    
+
     d->update();
     changeStatus(new EmptyStatus(this));
 }
@@ -569,17 +570,15 @@ void VideoWidget::resizeEvent(QResizeEvent* event) {
     videoCanvas()->resize(size());
 }
 
-VideoCanvas* VideoWidget::videoCanvas()
-{
-    return d->vcanvas;
+VideoCanvas* VideoWidget::videoCanvas() {
+    return d->mVcanvas;
 }
 
 NekoMediaPlayer* VideoWidget::player() {
-    return d->player;
+    return d->mPlayer;
 }
 
-VideoWidgetStatus* VideoWidget::status()
-{
+VideoWidgetStatus* VideoWidget::status() {
     return mStatus.get();
 }
 
@@ -595,11 +594,13 @@ bool VideoWidget::event(QEvent *event) {
 }
 
 bool VideoWidget::eventFilter(QObject *obj, QEvent *event) {
-    if (d->videoSetting != nullptr && obj == d->ui_videoSetting->voiceSettingButton) {
+    if (d->mVideoSetting != nullptr && obj == d->ui_videoSetting->voiceSettingButton) {
         if (event->type() == QEvent::Enter) {
-            d->volumeSetting->show();
+            d->mVolumeSetting->setDefualtHideTime(5000);
+            d->mVolumeSetting->show();
+            d->mVolumeSetting->setFocus();
         } else if (event->type() == QEvent::Leave) {
-            d->volumeSetting->hideLater(100);
+            d->mVolumeSetting->hideLater(300);
         }
     }
 
@@ -607,14 +608,14 @@ bool VideoWidget::eventFilter(QObject *obj, QEvent *event) {
 }
 
 void VideoWidget::leaveEvent(QEvent* event) {
-    d->videoSetting->hideLater();
+    d->mVideoSetting->hideLater();
     QWidget::leaveEvent(event);
 }
 
 void VideoWidget::mouseMoveEvent(QMouseEvent* event) {
     QMetaObject::invokeMethod(this, [this](){
-            d->videoSetting->show();
-            d->videoSetting->hideLater(5000);
+            d->mVideoSetting->show();
+            d->mVideoSetting->hideLater(5000);
         }, Qt::QueuedConnection);
 }
 void VideoWidget::playVideo(const VideoBLLPtr video) {
@@ -626,23 +627,23 @@ void VideoWidget::stop() {
 }
 void VideoWidget::changeStatus(VideoWidgetStatus* status) {
     mStatus.reset(status);
-    MDebug(MyDebug::DEBUG) << "video widget status : " << status->type();
+    MDebug(MyDebug::INFO) << "video widget status : " << status->type();
 }
 void VideoWidget::videoLog(const QString& info) {
     d->videoLog(info);
 }
 int VideoWidget::skipStep() {
-    return d->skipStep;
+    return d->mSkipStep;
 }
 void VideoWidget::setSkipStep(int v) {
     d->setSkipStep(v);
 }
 void VideoWidget::setPlaybackRate(qreal v) {
-    d->player->setPlaybackRate(v);
+    d->mPlayer->setPlaybackRate(v);
 }
 // 当前指针
 VideoBLLPtr VideoWidget::currentVideo() {
-    return d->video;
+    return d->mVideo;
 }
 
 VideoWidget::~VideoWidget() {
@@ -654,13 +655,15 @@ VideoWidgetStatus::VideoWidgetStatus(VideoWidget* self) : self(self) { }
 int VideoWidgetStatus::clean() {
     self->d->clean();
     self->changeStatus(new EmptyStatus(self));
-    return VideoWidgetStatus::OK;
+    return OK;
 }
 
 int VideoWidgetStatus::changeSource(const QString &source) {
     self->d->setVideoSource(source);
-    self->status()->play();
-    return VideoWidgetStatus::OK;
+    auto status = new ReadyStatus(self);
+    self->changeStatus(status);
+    status->play();
+    return OK;
 }
 
 int VideoWidgetStatus::changePostion(int pos) {
@@ -681,7 +684,7 @@ QString EmptyStatus::type() {
 int EmptyStatus::LoadVideo(const VideoBLLPtr video) {
     self->d->updateSourceList(video->sourcesList());
     self->d->ui_videoSetting->sourceButton->setText(video->getCurrentVideoSource());
-    self->d->video = video;
+    self->d->mVideo = video;
     self->changeStatus(new ReadyStatus(self));
     return OK;
 }
@@ -690,8 +693,7 @@ int EmptyStatus::changeSource(const QString &source) {
     return NO_VIDEO;
 }
 
-int EmptyStatus::changePostion(int pos)
-{
+int EmptyStatus::changePostion(int pos) {
     return INVALID;
 }
 
@@ -770,8 +772,7 @@ int ReadyStatus::play() {
             self->videoLog("视频加载完成");
             self->videoLog("视频开始播放");
             self->changeStatus(new PlayingStatus(self));
-        }
-        else {
+        } else {
             self->videoLog("视频加载失败");
             self->d->clean();
             self->changeStatus(new EmptyStatus(self));
@@ -781,7 +782,6 @@ int ReadyStatus::play() {
 }
 
 int ReadyStatus::pause() {
-    self->d->pause();
     return OK;
 }
 
@@ -803,8 +803,6 @@ int PlayingStatus::LoadVideo(const VideoBLLPtr video) {
     status->LoadVideo(video);
     return OK;
 }
-
-
 
 int PlayingStatus::play() {
     return INVALID;
@@ -839,6 +837,7 @@ int PauseStatus::LoadVideo(const VideoBLLPtr video) {
 
 int PauseStatus::play() {
     self->d->resume();
+    self->changeStatus(new PlayingStatus(self));
     return OK;
 }
 

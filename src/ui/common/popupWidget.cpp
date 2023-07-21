@@ -84,16 +84,16 @@ class PopupWidgetPrivate {
 
 
 PopupWidget::PopupWidget(QWidget* parent, Qt::WindowFlags f) : QWidget(parent, f), d(new PopupWidgetPrivate(this)) {
-    m_timer = new QTimer(this);
-    m_timer->setSingleShot(true);
-    connect(m_timer, &QTimer::timeout, this, &PopupWidget::hide);
+    mTimer = new QTimer(this);
+    mTimer->setSingleShot(true);
+    connect(mTimer, &QTimer::timeout, this, &PopupWidget::hide);
     hide();
 }
 
 PopupWidget::~PopupWidget() { }
 
 void PopupWidget::enterEvent(QEnterEvent* event) {
-    if (m_stop_timer_enter) {
+    if (mStopTimerEnter) {
         stopHideTimer();
     }
     QWidget::enterEvent(event);
@@ -107,7 +107,7 @@ void PopupWidget::hideEvent(QHideEvent *event) {
 
 void PopupWidget::showEvent(QShowEvent *event) {
     stopHideTimer();
-    if (m_auto_layout) {
+    if (mAutoLayout) {
         // 计算容器（父窗口或屏幕），贴靠对象，自身在容器坐标系下的矩阵
         QRect containerRect, selfRect;
         auto p = isWindow() ? nullptr : parentWidget();
@@ -116,16 +116,16 @@ void PopupWidget::showEvent(QShowEvent *event) {
         if (p != nullptr) {
             containerRect = p->rect();
             selfRect = rect();
-            if (m_attach_widget != nullptr) {
-                topLeft = p->mapFromGlobal(d->doLayout(m_attach_widget, m_aligns));
+            if (mAttachWidget != nullptr) {
+                topLeft = p->mapFromGlobal(d->doLayout(mAttachWidget, mAligns));
             } else {
-                topLeft = p->mapFromGlobal(d->doLayout(p, m_aligns));
+                topLeft = p->mapFromGlobal(d->doLayout(p, mAligns));
             }
         } else {
             containerRect = QApplication::primaryScreen()->availableGeometry();
             selfRect = QRect(parentWidget()->mapToGlobal(QPoint(0, 0)), size());
-            if (m_attach_widget != nullptr) {
-                topLeft = d->doLayout(m_attach_widget, m_aligns);
+            if (mAttachWidget != nullptr) {
+                topLeft = d->doLayout(mAttachWidget, mAligns);
             }
         }
         // 根据自身超出容器范围进行位置调整
@@ -158,22 +158,31 @@ bool PopupWidget::eventFilter(QObject* obj, QEvent* event) {
     return QWidget::eventFilter(obj, event);
 }
 
+void PopupWidget::mouseMoveEvent(QMouseEvent* event) {
+    if (mStopTimerEnter) {
+        stopHideTimer();
+        emit showed();
+    }
+
+    QWidget::mouseMoveEvent(event);
+}
+
 void PopupWidget::leaveEvent(QEvent* event) {
-    if (m_hide_after_leave) {
+    if (mHideAfterLeave) {
         hideLater();
     }
     QWidget::leaveEvent(event);
 }
 
 void PopupWidget::hideLater(int msec) {
-    msec = (msec == -1 ? m_defualt_hide_after_time : msec);
+    msec = (msec == -1 ? mDefualtHideAfterTime : msec);
     QMetaObject::invokeMethod(this, [this, msec](){
-        m_timer->start(msec);
+        mTimer->start(msec);
     }, Qt::QueuedConnection);
 }
 
 void PopupWidget::stopHideTimer() {
-    if (m_timer->isActive()) {
-        m_timer->stop();
+    if (mTimer->isActive()) {
+        mTimer->stop();
     }
 }

@@ -163,7 +163,7 @@ void VideoSourceBLL::searchVideosFromTitle(const QString& title, QObject *obj, s
         }
         qDebug() << "video size : " << videos[title].size();
         qDebug() << "bangumiList size : " << bangumis->size();
-        searchVideosFromBangumi(bangumis->back(), obj, [this, title, func](const Result<VideoBLLList>& bvideos) {
+        searchVideosFromBangumi(bangumis->front(), obj, [this, title, func](const Result<VideoBLLList>& bvideos) {
             videos[title].clear();
             if (bvideos.has_value()){
                 videos[title] = bvideos.value();

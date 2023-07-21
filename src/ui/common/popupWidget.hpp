@@ -11,24 +11,25 @@ class PopupWidget : public QWidget {
         PopupWidget(QWidget* parent = nullptr,Qt::WindowFlags f = Qt::Widget);
         ~PopupWidget();
         inline void setAlignment(Qt::Alignment align) {
-            m_aligns = align;
+            mAligns = align;
         }
         inline void setAssociateWidget(QWidget* widget) {
-            m_attach_widget = widget;
+            mAttachWidget = widget;
         }
-        inline void setAuotLayout(bool flag = true) { m_auto_layout = flag; }
-        inline bool autoLayout() { return m_auto_layout; }
-        inline void setHideAfterLeave(bool flag = true) { m_hide_after_leave = flag; }
-        inline bool hideAfterLeave() { return m_hide_after_leave; }
-        inline void setStopTimerEnter(bool flag = true) { m_stop_timer_enter = flag; }
-        inline bool stopTimerEnter() { return m_stop_timer_enter; }
-        inline void setDefualtHideTime(int ms) { m_defualt_hide_after_time = ms; }
-        inline bool defualtHideTime() { return m_defualt_hide_after_time; }
-        inline void setOutside(bool flag = true) { m_outside = flag; }
-        inline bool outside() { return m_outside; }
+        inline void setAuotLayout(bool flag = true) { mAutoLayout = flag; }
+        inline bool autoLayout() { return mAutoLayout; }
+        inline void setHideAfterLeave(bool flag = true) { mHideAfterLeave = flag; }
+        inline bool hideAfterLeave() { return mHideAfterLeave; }
+        inline void setStopTimerEnter(bool flag = true) { mStopTimerEnter = flag; }
+        inline bool stopTimerEnter() { return mStopTimerEnter; }
+        inline void setDefualtHideTime(int ms) { mDefualtHideAfterTime = ms; }
+        inline bool defualtHideTime() { return mDefualtHideAfterTime; }
+        inline void setOutside(bool flag = true) { mOutside = flag; }
+        inline bool outside() { return mOutside; }
 
     public:
         void enterEvent(QEnterEvent* event) override;
+        void mouseMoveEvent(QMouseEvent* event) override;
         void leaveEvent(QEvent* event) override;
         bool eventFilter(QObject* obj, QEvent* event) override;
         void hideEvent(QHideEvent *event) override;
@@ -44,12 +45,12 @@ class PopupWidget : public QWidget {
 
     protected:
         QScopedPointer<PopupWidgetPrivate> d;
-        QTimer* m_timer = nullptr;
-        QWidget* m_attach_widget = nullptr;
-        Qt::Alignment m_aligns = Qt::AlignBottom | Qt::AlignHCenter;
-        bool m_auto_layout = false;
-        bool m_hide_after_leave = true;
-        bool m_stop_timer_enter = true;
-        int m_defualt_hide_after_time = 100;
-        bool m_outside = true;
+        QTimer* mTimer = nullptr;
+        QWidget* mAttachWidget = nullptr;
+        Qt::Alignment mAligns = Qt::AlignBottom | Qt::AlignHCenter;
+        bool mAutoLayout = false;
+        bool mHideAfterLeave = true;
+        bool mStopTimerEnter = true;
+        int mDefualtHideAfterTime = 100;
+        bool mOutside = true;
 };
