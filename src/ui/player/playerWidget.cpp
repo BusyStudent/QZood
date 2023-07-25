@@ -14,6 +14,7 @@
 #include "videoWidget.hpp"
 #include "../common/popupWidget.hpp"
 #include "../../BLL/data/videoItemModel.hpp"
+#include "../../common/myGlobalLog.hpp"
 
 class PlayerWidgetPrivate {
 public:
@@ -25,7 +26,6 @@ public:
 
     void setupUi() {
         ui->setupUi(self);
-        ui->playlist->setFocusPolicy(Qt::FocusPolicy::ClickFocus);
 
         // 设置默认划分比例
         ui->splitter->setStretchFactor(0, 10);
@@ -321,6 +321,7 @@ bool PlayerWidget::eventFilter(QObject* obj,QEvent* event) {
 }
 
 void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
+    // LOG(DEBUG) << objectName() << " : mouse move event.";
     if (movingStatus() && d->ui->titleBar->geometry().contains(event->pos())) {
         if (isMaximized()) {
             showNormal();
@@ -328,7 +329,6 @@ void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
             diff_pos = d->ui->titleBar->rect().bottomRight() / 2;
         }
         move(event->globalPos() - diff_pos);
-        event->accept();
     }
     // 刷新窗体状态
     CustomizeTitleWidget::mouseMoveEvent(event);
@@ -339,6 +339,7 @@ void PlayerWidget::showEvent(QShowEvent *event) {
     if (d->mAutoPlay) {
         d->setCurrentIndex(0);
     }
+    CustomizeTitleWidget::showEvent(event);
 }
 
 void PlayerWidget::setAutoPlay(bool f) {

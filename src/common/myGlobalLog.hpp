@@ -47,16 +47,16 @@ class MyDebug {
         std::function<void(const QString &)> func = [this](const QString &msg){
             switch (mType) {
             case LogType::DEBUG:
-                qt_message_output(QtMsgType::QtDebugMsg,QMessageLogContext() ,mMsg);
+                qt_message_output(QtMsgType::QtDebugMsg,QMessageLogContext() ,msg);
                 break;
             case LogType::INFO:
-                qt_message_output(QtMsgType::QtInfoMsg,QMessageLogContext() ,mMsg);
+                qt_message_output(QtMsgType::QtInfoMsg,QMessageLogContext() ,msg);
                 break;
             case LogType::WARNING:
-                qt_message_output(QtMsgType::QtInfoMsg,QMessageLogContext() ,mMsg);
+                qt_message_output(QtMsgType::QtWarningMsg,QMessageLogContext() ,msg);
                 break;
             case LogType::FATAL:
-                qt_message_output(QtMsgType::QtFatalMsg,QMessageLogContext() ,mMsg);
+                qt_message_output(QtMsgType::QtFatalMsg,QMessageLogContext() ,msg);
                 break;
             default:
                 break;
@@ -71,3 +71,12 @@ class MyDebug {
 #define MyComDebug(type,time, file, line, funcmsg, func) MyDebug(type,"[" time "]" "[" file ":" + QString::number(line) + "][" + QString(QT_MESSAGELOG_FUNC) + "] ", func)
 #define MCDebug(type, func) MyComDebug(type,__TIME__, __FILE__, __LINE__, __FUNCSIG__, func)
 #define MDebug(type) MCDebug(type, nullptr)
+
+#define MDebug_DEBUG() MDebug(MyDebug::DEBUG)
+#define MDebug_INFO() MDebug(MyDebug::INFO)
+#define MDebug_WARNING() MDebug(MyDebug::WARNING)
+#define MDebug_ABANDON() MDebug(MyDebug::ABANDON)
+#define MDebug_FATAL() MDebug(MyDebug::FATAL)
+#define MDebug_NOTYPE() MDebug(MyDebug::NOTYPE)
+
+#define LOG(TYPE) MDebug_ ##TYPE()

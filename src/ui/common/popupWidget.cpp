@@ -4,6 +4,8 @@
 #include <QScreen>
 #include <QMouseEvent>
 
+#include "../../common/myGlobalLog.hpp"
+
 class PopupWidgetPrivate {
     public:
         PopupWidgetPrivate(PopupWidget* parent) : self(parent) {}
@@ -85,14 +87,21 @@ class PopupWidgetPrivate {
 
 PopupWidget::PopupWidget(QWidget* parent, Qt::WindowFlags f) : QWidget(parent, f), d(new PopupWidgetPrivate(this)) {
     mTimer = new QTimer(this);
+
     mTimer->setSingleShot(true);
-    connect(mTimer, &QTimer::timeout, this, &PopupWidget::hide);
-    hide();
+    setHideAfterLeave(true);
+    setStopTimerEnter(true);
+    connect(mTimer, &QTimer::timeout, this, &PopupWidget::hide, Qt::UniqueConnection);
+    connect(this, &PopupWidget::showed, this, QOverload<>::of(&PopupWidget::stopHideTimer), Qt::UniqueConnection);
+    setHidden(true);
+    setMouseTracking(true);
+    setAttribute(Qt::WA_TransparentForMouseEvents, false);
 }
 
 PopupWidget::~PopupWidget() { }
 
 void PopupWidget::enterEvent(QEnterEvent* event) {
+    Q_EMIT mouseEnter();
     if (mStopTimerEnter) {
         stopHideTimer();
     }
@@ -100,18 +109,32 @@ void PopupWidget::enterEvent(QEnterEvent* event) {
 }
 
 void PopupWidget::hideEvent(QHideEvent *event) {
-    stopHideTimer();
-    emit hided();
+    Q_EMIT hided();
     QWidget::hideEvent(event);
 }
 
+void PopupWidget::focusInEvent(QFocusEvent *event) {
+    Q_EMIT focusEnter();
+    if (mStopTimerEnter) {
+        stopHideTimer();
+    }
+    QWidget::focusInEvent(event);
+}
+
+void PopupWidget::focusOutEvent(QFocusEvent *event) {
+    Q_EMIT focusLeave();
+    if (mHideAfterLeave) {
+        hideLater();
+    }
+    QWidget::focusOutEvent(event);
+}
+
 void PopupWidget::showEvent(QShowEvent *event) {
-    stopHideTimer();
     if (mAutoLayout) {
         // 计算容器（父窗口或屏幕），贴靠对象，自身在容器坐标系下的矩阵
         QRect containerRect, selfRect;
         auto p = isWindow() ? nullptr : parentWidget();
-        qDebug() << "parent : " << p;
+        LOG(DEBUG) << this->objectName() <<  " : parent : " << p;
         QPoint topLeft(0, 0);
         if (p != nullptr) {
             containerRect = p->rect();
@@ -144,14 +167,14 @@ void PopupWidget::showEvent(QShowEvent *event) {
 
         move(topLeft);
     }
-    emit showed();
+    Q_EMIT showed();
     QWidget::showEvent(event);
 }
 
 bool PopupWidget::eventFilter(QObject* obj, QEvent* event) {
     if (obj == parent() && event->type() == QEvent::MouseButtonPress) {
         if (!rect().contains(static_cast<QMouseEvent*>(event)->pos())) {
-            qDebug() << "mouse button press outside";
+            LOG(DEBUG) << "mouse button press outside";
             hideLater(100);
         }
     }
@@ -159,15 +182,16 @@ bool PopupWidget::eventFilter(QObject* obj, QEvent* event) {
 }
 
 void PopupWidget::mouseMoveEvent(QMouseEvent* event) {
+    LOG(DEBUG) << objectName() << " : mouse move : " << event->pos().x() << ", " << event->pos().y();
     if (mStopTimerEnter) {
         stopHideTimer();
-        emit showed();
     }
 
     QWidget::mouseMoveEvent(event);
 }
 
 void PopupWidget::leaveEvent(QEvent* event) {
+    Q_EMIT mouseLeave();
     if (mHideAfterLeave) {
         hideLater();
     }
@@ -176,13 +200,25 @@ void PopupWidget::leaveEvent(QEvent* event) {
 
 void PopupWidget::hideLater(int msec) {
     msec = (msec == -1 ? mDefualtHideAfterTime : msec);
-    QMetaObject::invokeMethod(this, [this, msec](){
-        mTimer->start(msec);
-    }, Qt::QueuedConnection);
+    LOG(INFO) << this->objectName() << " : hide later : " << msec;
+    mTimer->start(msec);
 }
 
 void PopupWidget::stopHideTimer() {
+    LOG(INFO) << this->objectName() << " : stop timer";
     if (mTimer->isActive()) {
         mTimer->stop();
     }
+}
+
+void PopupWidget::setHideAfterLeave(bool flag) {
+    mHideAfterLeave = flag;
+}
+
+void PopupWidget::hideLater() {
+    hideLater(-1);
+}
+
+void PopupWidget::setStopTimerEnter(bool flag) {
+    mStopTimerEnter = flag;
 }

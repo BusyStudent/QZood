@@ -37,6 +37,7 @@ class VideoWidgetPrivate {
 public:
     VideoWidgetPrivate(VideoWidget* parent) : self(parent) {
         mMainLayout = new QVBoxLayout(self);
+        self->setMouseTracking(true);
     }
 
     ~VideoWidgetPrivate() {
@@ -55,6 +56,7 @@ public:
         mVcanvas = new VideoCanvas(self);
         mVcanvas->lower();
         mVcanvas->attachPlayer(mPlayer);
+        mVcanvas->setAttribute(Qt::WA_TransparentForMouseEvents, true);;
 
         mMainLayout->addStretch();
         mMainLayout->setContentsMargins(1, 0, 1, 0);
@@ -75,6 +77,7 @@ public:
 
         // 实例化音量控制界面
         mVolumeSetting = new VolumeSettingWidget(self);
+        mVolumeSetting->setObjectName("VolumeSettingWidget");
         ui_videoSetting->voiceSettingButton->installEventFilter(self);
         mVolumeSetting->setAssociateWidget(ui_videoSetting->voiceSettingButton);
         mVolumeSetting->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
@@ -84,6 +87,7 @@ public:
 
         // 播放设置控件
         mSettings = new FullSettingWidget(self, Qt::Popup | Qt::WindowStaysOnTopHint);
+        mSettings->setObjectName("FullSettingWidget");
         mSettings->setAssociateWidget(ui_videoSetting->settingButton);
         mSettings->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
         mSettings->setAuotLayout();
@@ -109,7 +113,7 @@ public:
         mSourceListWidget->setAuotLayout();
         mSourceListWidget->setOutside(true);
     }
-    
+
     void setupShortcut() {
         // 设置快捷键
         QShortcut* keySpace = new QShortcut(Qt::Key_Space, self);
@@ -268,7 +272,9 @@ public:
     }
 
     void showCursor() {
-        self->setCursor(Qt::ArrowCursor);
+        if (self->cursor() != cursorShape) {
+            self->setCursor(cursorShape);
+        }
     }
 private:
      /**
@@ -340,8 +346,9 @@ private:
     void connectVolumeSetting() {
         // 连接音量调节条显示：定义弹出窗口显示时进度条不自动隐藏。
         QWidget::connect(mVolumeSetting, &VolumeSettingWidget::showed, self, [this](){
-            mVideoSetting->show();
             mVideoSetting->setHideAfterLeave(false);
+            mVideoSetting->show();
+            mVideoSetting->stopHideTimer();
         });
         // 连接音量调节条隐藏：恢复视频进度条自动隐藏
         QWidget::connect(mVolumeSetting, &VolumeSettingWidget::hided, self, [this](){
@@ -471,9 +478,6 @@ private:
             mSettings->hide();
             hideCursor();
         });
-        QWidget::connect(mVideoSetting, &PopupWidget::showed, self, [this](){
-            showCursor();
-        });
         QWidget::connect(mSettings, &FullSettingWidget::showed, self, [this](){
             mVideoSetting->show();
             mVideoSetting->setDefualtHideTime(std::numeric_limits<int>::max());
@@ -551,6 +555,7 @@ public:
 private:
     VideoWidget *self;
     QVBoxLayout *mMainLayout;
+    Qt::CursorShape cursorShape = Qt::CursorShape::ArrowCursor;
 };
 
 VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent), d(new VideoWidgetPrivate(this)) {
@@ -559,8 +564,6 @@ VideoWidget::VideoWidget(QWidget* parent) : QWidget(parent), d(new VideoWidgetPr
     d->setupShortcut();
 
     setMinimumSize(100,75);
-    setAttribute(Qt::WA_Hover);                  // 启动鼠标悬浮追踪
-    setFocusPolicy(Qt::StrongFocus);
 
     d->update();
     changeStatus(new EmptyStatus(this));
@@ -587,6 +590,7 @@ bool VideoWidget::event(QEvent *event) {
     QHoverEvent *hoverEvent = static_cast<QHoverEvent *>(event);
     QMouseEvent mouseEvent(QEvent::MouseMove, hoverEvent->pos(), Qt::NoButton,
                            Qt::NoButton, Qt::NoModifier);
+
     mouseMoveEvent(&mouseEvent);
   }
 
@@ -616,7 +620,10 @@ void VideoWidget::mouseMoveEvent(QMouseEvent* event) {
     QMetaObject::invokeMethod(this, [this](){
             d->mVideoSetting->show();
             d->mVideoSetting->hideLater(5000);
+            d->showCursor();
         }, Qt::QueuedConnection);
+
+    QWidget::mouseMoveEvent(event);
 }
 void VideoWidget::playVideo(const VideoBLLPtr video) {
     status()->LoadVideo(video);

@@ -15,7 +15,6 @@ public:
 
     void setupUi() {
         ui->setupUi(self);
-
         // ====================播放列表====================
         ui->settingStackWidget->setCurrentIndex(0);
         ui->settingList->setCurrentRow(0);

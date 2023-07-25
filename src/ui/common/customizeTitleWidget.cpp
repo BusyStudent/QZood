@@ -217,7 +217,6 @@ void CustomizeTitleWidget::updateRegion(QMouseEvent *event) {
 
   if (resizingStatus()) {
     resizeRegion(marginTop, marginBottom, marginLeft, marginRight);
-    event->accept();
   }
 }
 
