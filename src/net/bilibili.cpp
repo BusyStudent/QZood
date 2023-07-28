@@ -1,4 +1,4 @@
-#include "../log.hpp"
+#include "../common/myGlobalLog.hpp"
 #include "bilibili.hpp"
 #include "cache.hpp"
 #include <QNetworkCookieJar>

@@ -5,7 +5,7 @@
 #include <QThread>
 #include <functional>
 
-#include "../log.hpp"
+#include "../common/myGlobalLog.hpp"
 #include "testregister.hpp"
 
 struct TestTask;

@@ -1,6 +1,6 @@
 #include "../player/videocanvas.hpp"
 #include "../net/bilibili.hpp"
-#include "../log.hpp"
+#include "../common/myGlobalLog.hpp"
 #include "testregister.hpp"
 #include "ui_biliplay.h"
 

@@ -80,3 +80,5 @@ class MyDebug {
 #define MDebug_NOTYPE() MDebug(MyDebug::NOTYPE)
 
 #define LOG(TYPE) MDebug_ ##TYPE()
+#define ZOOD_CLOG(...)      LOG(INFO) << (QString::asprintf(__VA_ARGS__))
+#define ZOOD_QLOG(fmt, ...) LOG(INFO) << (QString(fmt).arg(__VA_ARGS__))

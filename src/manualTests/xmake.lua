@@ -17,12 +17,11 @@ end
 add_requires("libxml2")
 add_packages("libxml2")
 
-includes("./src/ui")
-includes("./src/common")
-includes("./src/nekoav")
-includes("./src/manualTests")
+includes("../ui")
+includes("../common")
+includes("../nekoav")
 
-target("zood")
+target("zoodWidgetTest")
     add_rules("qt.widgetapp")
     -- add_rules("protobuf.cpp")
 
@@ -34,14 +33,20 @@ target("zood")
     -- add_frameworks("QtWebEngineCore", "QtWebChannel");
 
 	add_deps("ui", "nekoav", "common")
-	add_files("./resources/resources.qrc")
+	add_files("../../resources/resources.qrc")
 
     -- Main
-    add_files("./src/*.cpp")
+    add_files("../log.hpp")
+    add_files("./*.cpp")
+    add_files("./*.hpp")
+    add_files("./*.ui")
 
     -- Player
-    add_files("./src/player/*")
+    add_files("../player/*")
 
     -- Network
-    add_files("./src/net/*")
+    add_files("../net/*")
     -- add_files("./src/net/protos/*")
+
+    add_files("../danmaku.cpp")
+    add_files("../danmaku.hpp")

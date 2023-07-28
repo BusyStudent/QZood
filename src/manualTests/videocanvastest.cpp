@@ -1,5 +1,5 @@
 #include "../player/videocanvas.hpp"
-#include "../log.hpp"
+#include "../common/myGlobalLog.hpp"
 #include "../net/client.hpp"
 #include "testregister.hpp"
 #include <QMessageBox>

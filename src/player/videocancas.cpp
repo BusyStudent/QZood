@@ -1,7 +1,7 @@
 #include "videocanvas.hpp"
 #include "videocanvasprivate.hpp"
 
-#include "../log.hpp"
+#include "../common/myGlobalLog.hpp"
 #include <QTimerEvent>
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
