@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "../danmaku.hpp"
+#include "../common/danmaku.hpp"
 #include "../nekoav/nekoav.hpp"
 #include <QOpenGLWidget>
 

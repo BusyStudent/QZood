@@ -4,7 +4,7 @@
 #include <QScreen>
 #include <QMouseEvent>
 
-#include "../../common/myGlobalLog.hpp"
+#include "../../../common/myGlobalLog.hpp"
 
 class PopupWidgetPrivate {
     public:

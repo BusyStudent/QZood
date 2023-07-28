@@ -2,7 +2,7 @@
 
 #include "videocanvas.hpp"
 #include "../nekoav/nekoav.hpp"
-#include "../danmaku.hpp"
+#include "../common/danmaku.hpp"
 
 #include <QOpenGLFunctions_3_3_Core>
 #include <QOpenGLContext>

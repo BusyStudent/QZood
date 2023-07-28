@@ -7,7 +7,7 @@
 #include <QScrollBar>
 #include <QMetaObject>
 
-#include "../common/flowlayout.hpp"
+#include "../util/layout/flowlayout.hpp"
 #include "../player/playerWidget.hpp"
 #include "../../BLL/data/videoSourceBLL.hpp"
 #include "../../BLL/manager/videoDataManager.hpp"

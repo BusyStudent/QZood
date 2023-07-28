@@ -1,7 +1,7 @@
 #include "promise.hpp"
 #include <QDateTime>
 
-#include "../danmaku.hpp"
+#include "../common/danmaku.hpp"
 #include "client.hpp"
 
 

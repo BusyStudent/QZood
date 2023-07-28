@@ -1,4 +1,4 @@
-#include "../common/popupWidget.hpp"
+#include "../util/widget/popupWidget.hpp"
 #include "ui_customLabel.h"
 
 class LogWidgetPrivate;

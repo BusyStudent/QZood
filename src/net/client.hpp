@@ -4,7 +4,7 @@
 #include <QImage>
 #include <QList>
 #include "promise.hpp"
-#include "../danmaku.hpp"
+#include "../common/danmaku.hpp"
 
 class QNetworkReply;
 

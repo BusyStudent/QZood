@@ -4,7 +4,7 @@
 #include <QThreadPool>
 
 #include "testwindow.hpp"
-#include "../ui/common/customizeTitleWidget.hpp"
+#include "../ui/util/widget/customizeTitleWidget.hpp"
 #include "../ui/zood/zood.hpp"
 
 #ifdef _WIN32

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../common/customizeTitleWidget.hpp"
+#include "../util/widget/customizeTitleWidget.hpp"
 #include "../../BLL/data/videoBLL.hpp"
 
 class PlayerWidgetPrivate;

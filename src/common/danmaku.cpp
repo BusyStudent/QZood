@@ -1,7 +1,7 @@
 #include <libxml/xmlreader.h>
 #include <algorithm>
 #include "danmaku.hpp"
-#include "common/myGlobalLog.hpp"
+#include "myGlobalLog.hpp"
 
 Result<DanmakuList> ParseDanmaku(const QString &xmlstr) {
     // Parse xml

@@ -1,6 +1,6 @@
 #pragma once
 #include <QObject>
-#include "../stl.hpp"
+#include "../common/stl.hpp"
 
 class NetPromiseHelper : public QObject, public DynRefable {
     Q_OBJECT

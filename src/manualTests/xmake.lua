@@ -36,7 +36,6 @@ target("zoodWidgetTest")
 	add_files("../../resources/resources.qrc")
 
     -- Main
-    add_files("../log.hpp")
     add_files("./*.cpp")
     add_files("./*.hpp")
     add_files("./*.ui")
@@ -47,6 +46,3 @@ target("zoodWidgetTest")
     -- Network
     add_files("../net/*")
     -- add_files("./src/net/protos/*")
-
-    add_files("../danmaku.cpp")
-    add_files("../danmaku.hpp")

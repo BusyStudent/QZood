@@ -21,6 +21,7 @@ includes("./src/ui")
 includes("./src/common")
 includes("./src/nekoav")
 includes("./src/manualTests")
+includes("./src/autoTests")
 
 target("zood")
     add_rules("qt.widgetapp")

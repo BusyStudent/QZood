@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../common/customizeTitleWidget.hpp"
+#include "../util/widget/customizeTitleWidget.hpp"
 
 class ZoodPrivate;
 class HomeWidget;

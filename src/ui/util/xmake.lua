@@ -4,22 +4,15 @@ set_languages("c++17")
 
 if is_host("windows") then
     add_cxxflags("cl::/utf-8")
-end 
+end
 
-includes("../BLL")
-includes("./util")
-
-target("ui")
+target("widgetUtil")
  	add_rules("qt.static")
 	add_frameworks("QtCore", "QtGui", "QtWidgets")
     add_frameworks("QtOpenGL", "QtOpenGLWidgets")
 
-    add_deps("BLL", "widgetUtil")
-
-	add_files("./zood/*.cpp")
-	add_files("./zood/*.hpp")
-    add_files("./player/*.hpp")
-    add_files("./player/*.cpp")
-    add_files("./player/*.ui")
-    add_files("./zood/*.ui")
+    add_files("./layout/*.cpp")
+    add_files("./layout/*.hpp")
+    add_files("./widget/*.cpp")
+    add_files("./widget/*.hpp")
 target_end()

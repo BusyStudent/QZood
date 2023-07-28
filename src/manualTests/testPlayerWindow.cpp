@@ -1,6 +1,6 @@
 #include "../ui/player/playerWidget.hpp"
 #include "testregister.hpp"
-#include "../ui/common/customSlider.hpp"
+#include "../ui/util/widget/customSlider.hpp"
 
 #include <QTimer>
 

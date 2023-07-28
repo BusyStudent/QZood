@@ -12,7 +12,7 @@
 #include <QFileDialog>
 
 #include "videoWidget.hpp"
-#include "../common/popupWidget.hpp"
+#include "../util/widget/popupWidget.hpp"
 #include "../../BLL/data/videoItemModel.hpp"
 #include "../../common/myGlobalLog.hpp"
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../common/popupWidget.hpp"
+#include "../util/widget/popupWidget.hpp"
 #include "../../BLL/data/videoBLL.hpp"
 
 class FullSettingWidgetPrivate;

@@ -5,7 +5,7 @@
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include "client.hpp"
-#include "../danmaku.hpp"
+#include "../common/danmaku.hpp"
 
 #define BILIBILI_CLIENT_NAME QStringLiteral("Bilibili")
 

@@ -4,7 +4,7 @@
 #include "testregister.hpp"
 #include "ui_danmakutest.h"
 
-#include "../danmaku.hpp"
+#include "../common/danmaku.hpp"
 
 ZOOD_TEST(Network, DanmakuParse) {
     auto root = new QWidget;

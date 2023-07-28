@@ -10,11 +10,11 @@
 #include <QPushButton>
 
 #include "../../BLL/data/videoItemModel.hpp"
-#include "../common/popupWidget.hpp"
+#include "../util/widget/popupWidget.hpp"
 #include "volumeSettingWidget.hpp"
 #include "videoWidget.hpp"
 #include "fullSettingWidget.hpp"
-#include "../common/customSlider.hpp"
+#include "../util/widget/customSlider.hpp"
 #include "videoWidgetStatus.hpp"
 #include "../../common/myGlobalLog.hpp"
 

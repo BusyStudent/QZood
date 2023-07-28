@@ -8,7 +8,10 @@ end
 
 target("common")
     add_rules("qt.static")
-    add_frameworks("QtCore")
+
+	add_frameworks("QtCore", "QtGui", "QtWidgets")
+    add_frameworks("QtOpenGL", "QtOpenGLWidgets")
+
     add_files("./*.hpp")
     add_files("./*.cpp")
 target_end()
