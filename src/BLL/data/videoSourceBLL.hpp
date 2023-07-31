@@ -10,7 +10,7 @@
 #include <QApplication>
 #include <QImage>
 
-#include "../../net/promise.hpp"
+#include "../../common/promise.hpp"
 #include "videoBLL.hpp"
 
 const QImage kLoadingImage = QImage(":/icons/loading_bar.png");

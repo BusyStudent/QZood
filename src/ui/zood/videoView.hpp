@@ -4,16 +4,6 @@
 
 #include "../../BLL/data/videoSourceBLL.hpp"
 
-struct VideoData {
-    RefPtr<DataObject> videoPtr;
-    QString videoTitle;
-    QString videoExtraInformation;
-    QString videoSourceInformation;
-    QImage image;
-};
-
-typedef QVector<VideoData> VideoDataVector;
-
 namespace Ui {
 class VideoView;
 }
@@ -21,10 +11,18 @@ class VideoView;
 class VideoView : public QWidget {
     Q_OBJECT
     public:
-        VideoView(QWidget *parent = nullptr);
+        enum Direction {
+            Horizontal,
+            Vertical,
+            Null,
+        };
+        Q_ENUM(Direction);
+    public:
+        VideoView(QWidget *parent = nullptr, Direction direction = Horizontal);
         virtual ~VideoView();
         RefPtr<DataObject> videoPtr() const;
         QString videoTitle() const;
+        void setDirection(Direction direction);
 
     public Q_SLOTS:
         void setImage(const QImage &image, const QString &tooltip = QString());
@@ -47,4 +45,9 @@ class VideoView : public QWidget {
     private:
         QScopedPointer<Ui::VideoView> ui;
         RefPtr<DataObject> mVideoPtr = nullptr;
+        Direction mDirection = Null;
+
+        QString mTitle;
+        QString mSource;
+        QString mInfo;
 };

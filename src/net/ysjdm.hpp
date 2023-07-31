@@ -1,7 +1,7 @@
 #pragma once
 
 #include <QNetworkAccessManager>
-#include "promise.hpp"
+#include "../common/promise.hpp"
 
 class YsjdmBangumi {
     public:

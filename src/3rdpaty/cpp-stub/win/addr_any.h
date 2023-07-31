@@ -27,7 +27,7 @@ public:
     {
         CHAR symbolPath[0x2000] = { 0 };
         CHAR szPath[MAX_PATH] = { 0 };
-        GetModuleFileName(0, szPath, ARRAYSIZE(szPath));
+        GetModuleFileNameA(0, szPath, ARRAYSIZE(szPath));
         CHAR * temp = strchr(szPath, '\\');
         if (temp == NULL)
         {

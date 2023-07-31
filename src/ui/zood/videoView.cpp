@@ -1,20 +1,58 @@
 #include "ui_videoView.h"
 #include "videoView.hpp"
+#include "../../common/myGlobalLog.hpp"
 
-VideoView::VideoView(QWidget *parent) : QWidget(parent), ui(new Ui::VideoView()) {
+struct SizeStyle {
+    int width = 185;
+    int height = 160;
+    int iconWidth = 185;
+    int iconHeight = 100;
+    int titleWidth = 185;
+    int titleHeight = 19;
+    int sourceWidth = 185;
+    int sourceHeight = 19;
+    int infoWidth = 185;
+    int infoHeight = 19;
+};
+
+const SizeStyle kVideoSizeStyleH {185, 160, 185, 100, 185, 19, 185, 19, 185, 19};
+const SizeStyle kVideoSizeStyleV {120, 200, 120, 140, 120, 19, 120, 19, 120, 19};
+
+VideoView::VideoView(QWidget *parent, Direction direction) : QWidget(parent), ui(new Ui::VideoView()) {
     ui->setupUi(this);
 
     ui->videoIcon->installEventFilter(this);
     ui->videoTitle->installEventFilter(this);
     ui->videoExtraInfo->installEventFilter(this);
     ui->videoSource->installEventFilter(this);
+
+    setDirection(direction);
+}
+
+void VideoView::setDirection(Direction direction) {
+    auto setSizeStyle = [this, &direction](const SizeStyle sizeStyle) {
+        setFixedSize(sizeStyle.width, sizeStyle.height);
+        ui->videoIcon->setMinimumSize(sizeStyle.iconWidth, sizeStyle.iconHeight);
+        ui->videoTitle->setMinimumSize(sizeStyle.titleWidth, sizeStyle.titleHeight);
+        ui->videoSource->setMinimumSize(sizeStyle.sourceWidth, sizeStyle.sourceHeight);
+        ui->videoExtraInfo->setMinimumSize(sizeStyle.infoWidth, sizeStyle.infoHeight);
+    };
+
+    if (mDirection != direction) {
+        switch (direction) {
+            case Direction::Vertical: setSizeStyle(kVideoSizeStyleV); break;
+            case Direction::Horizontal: setSizeStyle(kVideoSizeStyleH); break;
+        }
+        mDirection = direction;
+    }
 }
 
 VideoView::~VideoView() { }
 
 void VideoView::setTitle(const QString &str, const QString &tooltip) {
+    mTitle = str;
     QFontMetrics fontWidth(ui->videoTitle->font());
-    QString elideNote = fontWidth.elidedText(str, Qt::ElideRight, width() - 10);
+    QString elideNote = fontWidth.elidedText(str, Qt::ElideRight, width());
     ui->videoTitle->setText(elideNote);
     if (tooltip.isEmpty()) {
         ui->videoTitle->setToolTip(str);
@@ -24,8 +62,9 @@ void VideoView::setTitle(const QString &str, const QString &tooltip) {
 }
 
 void VideoView::setExtraInformation(const QString &str, const QString &tooltip) {
+    mInfo = str;
     QFontMetrics fontWidth(ui->videoExtraInfo->font());
-    QString elideNote = fontWidth.elidedText(str, Qt::ElideRight, width() - 10);
+    QString elideNote = fontWidth.elidedText(str, Qt::ElideRight, width());
     ui->videoExtraInfo->setText(elideNote);
     if (tooltip.isEmpty()) {
         ui->videoExtraInfo->setToolTip(str);
@@ -35,8 +74,9 @@ void VideoView::setExtraInformation(const QString &str, const QString &tooltip) 
 }
 
 void VideoView::setSourceInformation(const QString &str, const QString &tooltip) {
+    mSource = str;
     QFontMetrics fontWidth(ui->videoSource->font());
-    QString elideNote = fontWidth.elidedText(str, Qt::ElideRight, width() -  10);
+    QString elideNote = fontWidth.elidedText(str, Qt::ElideRight, width());
     ui->videoSource->setText(elideNote);
     if (tooltip.isEmpty()) {
         ui->videoSource->setToolTip(str);
@@ -77,6 +117,7 @@ QString VideoView::videoTitle() const {
 }
 
 void VideoView::setTimelineEpisode(TimelineEpisodePtr tep) {
+    setDirection(Vertical);
     setImage(kLoadingImage);
     setVideoPtr(tep);
     setTitle(tep->bangumiTitle());

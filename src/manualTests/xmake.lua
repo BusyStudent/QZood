@@ -20,6 +20,7 @@ add_packages("libxml2")
 includes("../ui")
 includes("../common")
 includes("../nekoav")
+includes("../net")
 
 target("zoodWidgetTest")
     add_rules("qt.widgetapp")
@@ -32,7 +33,7 @@ target("zoodWidgetTest")
     -- WebEngine
     -- add_frameworks("QtWebEngineCore", "QtWebChannel");
 
-	add_deps("ui", "nekoav", "common")
+	add_deps("ui", "nekoav", "common", "net")
 	add_files("../../resources/resources.qrc")
 
     -- Main
@@ -43,6 +44,4 @@ target("zoodWidgetTest")
     -- Player
     add_files("../player/*")
 
-    -- Network
-    add_files("../net/*")
     -- add_files("./src/net/protos/*")

@@ -3,7 +3,7 @@
 #include <memory>
 #include <QImage>
 #include <QList>
-#include "promise.hpp"
+#include "../common/promise.hpp"
 #include "../common/danmaku.hpp"
 
 class QNetworkReply;

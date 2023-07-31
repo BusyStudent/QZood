@@ -3,16 +3,6 @@
 #include <QNetworkReply>
 #include <QThreadPool>
 
-NetPromiseHelper::NetPromiseHelper(QObject *p) : QObject(p) {
-
-}
-NetPromiseHelper::~NetPromiseHelper() {
-
-}
-void NetPromiseHelper::doNotify(const void *value) {
-    emit notify(value);
-}
-
 QByteArray RandomUserAgent() {
     // 创建一个UserAgent数组
     const char * userAgents[] = {

@@ -19,6 +19,7 @@ add_packages("libxml2")
 
 includes("./src/ui")
 includes("./src/common")
+includes("./src/net")
 includes("./src/nekoav")
 includes("./src/manualTests")
 includes("./src/autoTests")
@@ -34,7 +35,7 @@ target("zood")
     -- WebEngine
     -- add_frameworks("QtWebEngineCore", "QtWebChannel");
 
-	add_deps("ui", "nekoav", "common")
+	add_deps("ui", "nekoav", "common", "net")
 	add_files("./resources/resources.qrc")
 
     -- Main
@@ -43,6 +44,4 @@ target("zood")
     -- Player
     add_files("./src/player/*")
 
-    -- Network
-    add_files("./src/net/*")
     -- add_files("./src/net/protos/*")

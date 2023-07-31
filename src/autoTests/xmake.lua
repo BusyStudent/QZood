@@ -11,8 +11,13 @@ end
 add_requires("gtest")
 add_packages("gtest")
 
-target("autoTests")
-    set_kind("binary")
+includes("../common/")
 
-    add_files("main.cpp")
+target("autoTests")
+    add_rules("qt.widgetapp")
+
+    add_deps("sqlite", "common")
+    add_frameworks("QtCore", "QtGui", "QtWidgets")
+
+    add_files("./*.cpp")
 target_end()

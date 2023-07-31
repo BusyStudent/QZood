@@ -46,10 +46,6 @@ class HomeWidget : public QScrollArea {
         void refreshRequest();
         void dataRequest();
 
-    public Q_SLOTS:
-        void refresh(const VideoDataVector& dataVector,const DisplayArea area);
-        void updateVideo(const VideoDataVector& dataVector,const DisplayArea area);
-
     private:
         QScopedPointer<HomeWidgetPrivate> d;
 };

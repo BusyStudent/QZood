@@ -8,13 +8,14 @@ end
 
 includes("../BLL")
 includes("./util")
+includes("../common")
 
 target("ui")
  	add_rules("qt.static")
 	add_frameworks("QtCore", "QtGui", "QtWidgets")
     add_frameworks("QtOpenGL", "QtOpenGLWidgets")
 
-    add_deps("BLL", "widgetUtil")
+    add_deps("BLL", "widgetUtil", "common")
 
 	add_files("./zood/*.cpp")
 	add_files("./zood/*.hpp")

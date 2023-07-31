@@ -6,6 +6,7 @@
 #include <QWheelEvent>
 #include <QScrollBar>
 #include <QMetaObject>
+#include <QTime>
 
 #include "../util/layout/flowlayout.hpp"
 #include "../player/playerWidget.hpp"
@@ -82,8 +83,11 @@ public:
         QWidget::connect(self, &HomeWidget::refreshRequest, VideoDataManager::instance(), &VideoDataManager::requestTimelineData);
         QWidget::connect(VideoDataManager::instance(), &VideoDataManager::timelineDataReply, self, [this](TimelineEpisodeList tep, int week) {
             auto w = (HomeWidget::DisplayArea)week;
-        updateVideo(areaToWidget[w], tep);
-            });
+            QTime time;
+            auto t1 = time.currentTime();
+            updateVideo(areaToWidget[w], tep);
+            auto t2 = time.currentTime();
+        });
     }
 
     void initializeAreaToWidget() {
@@ -136,16 +140,6 @@ public:
         ui->recentlyUpdatedContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
     }
 
-    void refresh(QWidget* container, const VideoDataVector &videoVector){
-        clearItems(container);
-        auto videos = addItems(container, videoVector.size());
-        for (int i = 0;i < videoVector.size(); ++i) {
-            videos[i]->setImage(videoVector[i].image);
-            videos[i]->setTitle(videoVector[i].videoTitle);
-            videos[i]->setExtraInformation(videoVector[i].videoExtraInformation);
-            videos[i]->setSourceInformation(videoVector[i].videoSourceInformation);
-        }
-    }
     void updateVideo(QWidget* container, TimelineEpisodeList teps) {
         auto videos = container->findChildren<VideoView*>();
         for (auto tep : teps) {
@@ -161,30 +155,6 @@ public:
             if (!f) {
                 auto video = addItems(container, 1).at(0);
                 video->setTimelineEpisode(tep);
-            }
-        }
-    }
-    void updateVideo(QWidget* container, const VideoDataVector &videoVector) {
-        auto videos = container->findChildren<VideoView*>();
-        for (int i = 0;i < videoVector.size(); ++i) {
-            auto f = false;
-            for (auto video : videos) {
-                if (video->videoPtr().get() == videoVector[i].videoPtr.get()) {
-                    video->setImage(videoVector[i].image);
-                    video->setTitle(videoVector[i].videoTitle);
-                    video->setExtraInformation(videoVector[i].videoExtraInformation);
-                    video->setSourceInformation(videoVector[i].videoSourceInformation);
-                    f = true;
-                    break;
-                }
-            }
-            if (!f) {
-                auto video = addItems(container, 1).at(0);
-                video->setVideoPtr(videoVector[i].videoPtr);
-                video->setImage(videoVector[i].image);
-                video->setTitle(videoVector[i].videoTitle);
-                video->setExtraInformation(videoVector[i].videoExtraInformation);
-                video->setSourceInformation(videoVector[i].videoSourceInformation);
             }
         }
     }
@@ -213,7 +183,7 @@ public:
         QMetaObject::invokeMethod(self, [container, this](){
             QResizeEvent event(container->size(), container->size());
             self->eventFilter(container, &event);
-        },Qt::QueuedConnection);
+        }, Qt::QueuedConnection);
         return result;
     }
     
@@ -245,14 +215,6 @@ HomeWidget::HomeWidget(QWidget* parent) : QScrollArea(parent), d(new HomeWidgetP
 }
 
 HomeWidget::~HomeWidget() { }
-
-void HomeWidget::refresh(const VideoDataVector& dataVector,const DisplayArea area) {
-    d->refresh(d->areaToWidget[area], dataVector);
-}
-
-void HomeWidget::updateVideo(const VideoDataVector& dataVector,const DisplayArea area) {
-    d->updateVideo(d->areaToWidget[area], dataVector);
-}
 
 void HomeWidget::resizeEvent(QResizeEvent *event) {
     d->centralWidget->setFixedWidth(event->size().width());

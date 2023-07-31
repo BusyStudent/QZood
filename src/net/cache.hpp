@@ -7,7 +7,7 @@
 #include <QMutex>
 #include <map>
 
-#include "promise.hpp"
+#include "../common/promise.hpp"
 
 class HttpCacheServicePrivate;
 class HttpCacheService : public QObject {
