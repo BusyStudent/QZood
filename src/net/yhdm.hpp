@@ -38,7 +38,7 @@ class YhdmClient : public VideoInterface {
         NetResult<QImage>      fetchImage(const QString &url);
     private:
         QNetworkAccessManager  manager;
-        QStringList            urls = QStringList(QString("https://www.yhdmz2.com/"));
+        QStringList            urls = QStringList(QString("https://www.yhdmzz.com/"));
 };
 
 #endif

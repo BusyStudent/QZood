@@ -45,7 +45,8 @@ target("common")
 
 	add_frameworks("QtCore", "QtGui", "QtWidgets")
 
-    add_deps("sqlite", "promise", "myDebug")
+    -- add_deps("sqlite", "promise", "myDebug")
+    add_deps("promise", "myDebug")
 
     add_headerfiles("./*.hpp")
     add_files("./configs.hpp")

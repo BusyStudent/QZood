@@ -14,6 +14,8 @@ target("nekoav")
     add_rules("qt.static")
 
     add_frameworks("QtCore", "QtWidgets", "QtGui")
+    -- OpenGLSupport
+    add_frameworks("QtOpenGL", "QtOpenGLWidgets")
 
     if is_plat("linux") then 
         -- Use ffmpeg from system

@@ -18,7 +18,9 @@
 #endif
 
 CustomizeTitleWidget::CustomizeTitleWidget(QWidget *parent) : QWidget(parent) {
+#if !defined(USE_WINAPI)
   setWindowFlags(Qt::FramelessWindowHint);     // 隐藏窗体原始边框
+#endif
   setAttribute(Qt::WA_StyledBackground);       // 启用样式背景绘制
   setAttribute(Qt::WA_TranslucentBackground);  // 设置背景透明
   setAttribute(Qt::WA_Hover);                  // 启动鼠标悬浮追踪
@@ -35,10 +37,15 @@ bool CustomizeTitleWidget::nativeEvent(const QByteArray &eventType,
       返回false,就是按系统的默认处理，如果返回true,而不做任何绘制，则非客户区域
       就不会被绘制，就相当于没有绘制非客户区域，所以就会看不到非客户区域的效果
       */
+      *result = 0;
       return true;
     } case WM_NCHITTEST: {
+      const POINT border {
+        ::GetSystemMetrics(SM_CXFRAME) + ::GetSystemMetrics(SM_CXPADDEDBORDER),
+        ::GetSystemMetrics(SM_CYFRAME) + ::GetSystemMetrics(SM_CXPADDEDBORDER)
+      };
       RECT winrect;
-      GetWindowRect(HWND(winId()), &winrect);
+      ::GetWindowRect(HWND(winId()), &winrect);
 
       long x = GET_X_LPARAM(param->lParam);
       long y = GET_Y_LPARAM(param->lParam);
@@ -47,30 +54,11 @@ bool CustomizeTitleWidget::nativeEvent(const QByteArray &eventType,
       只用这种办法设置动态改变窗口大小比手动通过鼠标事件效果好，可以
       避免闪烁问题
       */
-      bool insideLeft = x > winrect.left - MARGIN_OUT_SIZE && x < winrect.left + MARGIN_IN_SIZE;
-      bool insideRight = x > winrect.right - MARGIN_IN_SIZE && x < winrect.right + MARGIN_OUT_SIZE;
-      bool insideTop = y > winrect.top - MARGIN_OUT_SIZE && y < winrect.top + MARGIN_IN_SIZE;
-      bool insideBottom = y > winrect.bottom - MARGIN_IN_SIZE && y < winrect.bottom + MARGIN_OUT_SIZE;
-      // left border
-      if (insideLeft) {
-        *result = HTLEFT;
-        return true;
-      }
-      // right border
-      if (insideRight) {
-        *result = HTRIGHT;
-        return true;
-      }
-      // top border
-      if (insideTop) {
-        *result = HTTOP;
-        return true;
-      }
-      // bottom border
-      if (insideBottom) {
-        *result = HTBOTTOM;
-        return true;
-      }
+      bool insideLeft = x < winrect.left + border.x;
+      bool insideRight = x >= winrect.right - border.x;
+      bool insideTop = y < winrect.top + border.y;
+      bool insideBottom = y >= winrect.bottom - border.y;
+
       // bottom left corner
       if (insideBottom && insideLeft) {
         *result = HTBOTTOMLEFT;
@@ -92,7 +80,35 @@ bool CustomizeTitleWidget::nativeEvent(const QByteArray &eventType,
         return true;
       }
 
-      return QWidget::nativeEvent(eventType, message, result);
+      // left border
+      if (insideLeft) {
+        *result = HTLEFT;
+        return true;
+      }
+      // right border
+      if (insideRight) {
+        *result = HTRIGHT;
+        return true;
+      }
+      // top border
+      if (insideTop) {
+        *result = HTTOP;
+        return true;
+      }
+      // bottom border
+      if (insideBottom) {
+        *result = HTBOTTOM;
+        return true;
+      }
+
+      // Check if  is caption
+      // TODO(llhsdmd): 暴露或者抽一个接口判断目前的点是否按到了标题栏上
+      if (false) {
+        *result = HTCAPTION;
+        return true;
+      }
+      *result = HTCLIENT;
+      return true;
     }
   }
 #endif
@@ -301,5 +317,7 @@ void CustomizeTitleWidget::createShadow(QWidget *container_widget) {
     MARGINS m{0};
     m = MARGINS {4, 4, 4, 4};
     hr = DwmExtendFrameIntoClientArea(HWND(winId()), &m);
+
+    SetWindowLongPtrW(HWND(winId()), GWL_STYLE, WS_POPUP | WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX);
 #endif
 }

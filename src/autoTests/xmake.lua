@@ -16,7 +16,9 @@ includes("../common/")
 target("autoTests")
     add_rules("qt.widgetapp")
 
-    add_deps("sqlite", "common")
+    -- add_deps("sqlite", "common")
+    add_deps("common")
+
     add_frameworks("QtCore", "QtGui", "QtWidgets")
 
     add_files("./*.cpp")

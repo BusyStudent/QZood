@@ -103,6 +103,7 @@ public:
             }
             resultUrl = doc["vurl"].toString();
             if (resultUrl.isEmpty() || resultUrl == QStringLiteral("404.mp4")) {
+                qDebug() << doc;
                 fail();
                 return;
             }

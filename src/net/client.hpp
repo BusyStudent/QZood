@@ -266,12 +266,12 @@ inline NetResult<QStringList> VideoInterface::fetchSearchSuggestions(const QStri
 
 
 #define ZOOD_REGISTER_VIDEO_INTERFACE(name)              \
-    static bool video__init_##name = []() {              \
+    void Register##name() {              \
         RegisterVideoInterface([]() -> VideoInterface *{ \
             return new name();                           \
         });                                              \
-        return true;                                     \
-    }();                           
+        return;                                          \
+    };                           
 
 /**
  * @brief Get An random useragent
@@ -281,6 +281,8 @@ inline NetResult<QStringList> VideoInterface::fetchSearchSuggestions(const QStri
 QByteArray RandomUserAgent();
 void       RegisterVideoInterface(VideoInterface *(*fn)());
 void       InitializeVideoInterface();
+void       RegisterBiliClient();
+void       RegisterYhdmClient();
 QList<VideoInterface*> &GetVideoInterfaceList();
 
 NetResult<QByteArray>   WrapQNetworkReply(QNetworkReply *reply);

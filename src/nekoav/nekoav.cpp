@@ -2013,11 +2013,14 @@ void MediaPlayer::setVideoSink(VideoSink *sink) {
     d->videoSink = sink;
     Q_EMIT videoOutputChanged();
 }
-void MediaPlayer::setVideoOutput(GraphicsVideoItem *item) {
-    setVideoSink(item->videoSink());
-}
-void MediaPlayer::setVideoOutput(VideoWidget *item) {
-    setVideoSink(item->videoSink());
+void MediaPlayer::setVideoOutput(QObject *object) {
+    auto sink = object->property("videoSink").value<VideoSink *>();
+    if (sink) {
+        setVideoSink(sink);
+    }
+    else {
+        qDebug() << "MediaPlayer failed to setVideoOutput, Object doesnot has videoSink property";
+    }
 }
 void MediaPlayer::setOption(const QString &key, const QString &value) {
     av_dict_set(&d->options, key.toUtf8().data(), value.toUtf8().data(), 0);

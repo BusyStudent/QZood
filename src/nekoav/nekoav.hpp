@@ -130,6 +130,7 @@ class NEKO_API MediaMetaData : public Dictionary {
 
 class NEKO_API GraphicsVideoItem : public QGraphicsObject {
     Q_OBJECT
+    Q_PROPERTY(VideoSink* videoSink READ videoSink CONSTANT)
     public:
         explicit GraphicsVideoItem(QGraphicsObject *parent = nullptr);
         ~GraphicsVideoItem();
@@ -152,6 +153,7 @@ class NEKO_API GraphicsVideoItem : public QGraphicsObject {
 };
 class NEKO_API VideoWidget       : public QWidget {
     Q_OBJECT
+    Q_PROPERTY(VideoSink* videoSink READ videoSink CONSTANT)
     public:
         explicit VideoWidget(QWidget *parent = nullptr);
         ~VideoWidget();
@@ -170,6 +172,8 @@ class NEKO_API VideoWidget       : public QWidget {
 
 class NEKO_API VideoSink  : public QObject {
     Q_OBJECT
+    Q_PROPERTY(QString subtitleText READ subtitleText WRITE setSubtitleText NOTIFY subtitleTextChanged)
+    Q_PROPERTY(QSize videoSize READ videoSize NOTIFY videoSizeChanged)
     public:
         explicit VideoSink(QObject *parent = nullptr);
         ~VideoSink();
@@ -283,9 +287,8 @@ class NEKO_API MediaPlayer : public QObject {
         void setAudioOutput(AudioOutput *output);
         AudioOutput *audioOutput() const;
 
-        void setVideoOutput(GraphicsVideoItem *);
-        void setVideoOutput(VideoWidget *);
-        // QObject *videoOutput() const;
+        void setVideoOutput(QObject *);
+        QObject *videoOutput() const;
 
         void setVideoSink(VideoSink *sink);
         VideoSink *videoSink() const;

@@ -49,6 +49,9 @@ void InitializeVideoInterface() {
     if (VideoInited) {
         return;
     }
+    RegisterBiliClient();
+    RegisterYhdmClient();
+
     VideoInited = true;
     auto &objects = GetVideoInterfaceList();
     for (auto fn : GetVideoCreateList()) {
