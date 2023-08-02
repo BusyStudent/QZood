@@ -1,6 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#if defined(_WIN32)
+#include <windows.h>
+#pragma comment(linker, "/SUBSYSTEM:CONSOLE /ENTRY:mainCRTStartup")
+#endif
+
 #include <gtest/gtest.h>
 using ::testing::EmptyTestEventListener;
 using ::testing::InitGoogleTest;
