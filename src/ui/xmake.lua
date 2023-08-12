@@ -17,10 +17,16 @@ target("ui")
 
     add_deps("BLL", "widgetUtil", "common")
 
+    -- add zood
 	add_files("./zood/*.cpp")
 	add_files("./zood/*.hpp")
+    add_files("./zood/*.ui")
+    -- add player
     add_files("./player/*.hpp")
     add_files("./player/*.cpp")
     add_files("./player/*.ui")
-    add_files("./zood/*.ui")
+    -- add settings
+    add_files("./player/settings/*.cpp")
+    add_files("./player/settings/*.hpp")
+    add_files("./player/settings/*.ui")
 target_end()

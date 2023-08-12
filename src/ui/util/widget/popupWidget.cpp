@@ -89,8 +89,6 @@ PopupWidget::PopupWidget(QWidget* parent, Qt::WindowFlags f) : QWidget(parent, f
     mTimer = new QTimer(this);
 
     mTimer->setSingleShot(true);
-    setHideAfterLeave(true);
-    setStopTimerEnter(true);
     connect(mTimer, &QTimer::timeout, this, &PopupWidget::hide, Qt::UniqueConnection);
     connect(this, &PopupWidget::showed, this, QOverload<>::of(&PopupWidget::stopHideTimer), Qt::UniqueConnection);
     setHidden(true);
@@ -134,7 +132,6 @@ void PopupWidget::showEvent(QShowEvent *event) {
         // 计算容器（父窗口或屏幕），贴靠对象，自身在容器坐标系下的矩阵
         QRect containerRect, selfRect;
         auto p = isWindow() ? nullptr : parentWidget();
-        LOG(DEBUG) << this->objectName() <<  " : parent : " << p;
         QPoint topLeft(0, 0);
         if (p != nullptr) {
             containerRect = p->rect();
@@ -182,7 +179,6 @@ bool PopupWidget::eventFilter(QObject* obj, QEvent* event) {
 }
 
 void PopupWidget::mouseMoveEvent(QMouseEvent* event) {
-    LOG(DEBUG) << objectName() << " : mouse move : " << event->pos().x() << ", " << event->pos().y();
     if (mStopTimerEnter) {
         stopHideTimer();
     }
@@ -200,25 +196,15 @@ void PopupWidget::leaveEvent(QEvent* event) {
 
 void PopupWidget::hideLater(int msec) {
     msec = (msec == -1 ? mDefualtHideAfterTime : msec);
-    LOG(INFO) << this->objectName() << " : hide later : " << msec;
     mTimer->start(msec);
 }
 
 void PopupWidget::stopHideTimer() {
-    LOG(INFO) << this->objectName() << " : stop timer";
     if (mTimer->isActive()) {
         mTimer->stop();
     }
 }
 
-void PopupWidget::setHideAfterLeave(bool flag) {
-    mHideAfterLeave = flag;
-}
-
 void PopupWidget::hideLater() {
     hideLater(-1);
-}
-
-void PopupWidget::setStopTimerEnter(bool flag) {
-    mStopTimerEnter = flag;
 }

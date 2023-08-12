@@ -105,7 +105,7 @@ QLabel#animaLabel1 {
      <item>
       <widget class="QListWidget" name="timeTab">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+        <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
@@ -189,12 +189,9 @@ QLabel#animaLabel1 {
       </widget>
      </item>
      <item>
-      <spacer name="horizontalSpacer">
+      <spacer name="horizontalSpacer_2">
        <property name="orientation">
         <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="sizeType">
-        <enum>QSizePolicy::Expanding</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>
@@ -268,8 +265,8 @@ QLabel#animaLabel1 {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>100</width>
-            <height>30</height>
+            <width>784</width>
+            <height>200</height>
            </rect>
           </property>
           <property name="sizePolicy">
@@ -339,8 +336,8 @@ QLabel#animaLabel1 {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>100</width>
-            <height>30</height>
+            <width>784</width>
+            <height>200</height>
            </rect>
           </property>
           <property name="sizePolicy">
@@ -410,8 +407,8 @@ QLabel#animaLabel1 {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>100</width>
-            <height>30</height>
+            <width>784</width>
+            <height>200</height>
            </rect>
           </property>
           <property name="sizePolicy">
@@ -555,8 +552,8 @@ QLabel#animaLabel1 {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>100</width>
-            <height>30</height>
+            <width>784</width>
+            <height>200</height>
            </rect>
           </property>
           <property name="sizePolicy">
@@ -629,8 +626,8 @@ QLabel#animaLabel1 {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>100</width>
-            <height>30</height>
+            <width>784</width>
+            <height>200</height>
            </rect>
           </property>
           <property name="sizePolicy">
@@ -694,8 +691,8 @@ QLabel#animaLabel1 {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>100</width>
-            <height>30</height>
+            <width>784</width>
+            <height>200</height>
            </rect>
           </property>
           <property name="sizePolicy">
@@ -759,8 +756,8 @@ QLabel#animaLabel1 {
            <rect>
             <x>0</x>
             <y>0</y>
-            <width>100</width>
-            <height>30</height>
+            <width>784</width>
+            <height>200</height>
            </rect>
           </property>
           <property name="sizePolicy">

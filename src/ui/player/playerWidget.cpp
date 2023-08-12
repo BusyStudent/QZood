@@ -322,6 +322,7 @@ bool PlayerWidget::eventFilter(QObject* obj,QEvent* event) {
 
 void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
     // LOG(DEBUG) << objectName() << " : mouse move event.";
+#if !defined(_WIN32)
     if (movingStatus() && d->ui->titleBar->geometry().contains(event->pos())) {
         if (isMaximized()) {
             showNormal();
@@ -330,6 +331,7 @@ void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
         }
         move(event->globalPos() - diff_pos);
     }
+#endif
     // 刷新窗体状态
     CustomizeTitleWidget::mouseMoveEvent(event);
 }
@@ -360,4 +362,14 @@ void PlayerWidget::appendVideo(VideoBLLPtr video) {
 
 void PlayerWidget::clearVideoList() {
     d->clear();
+}
+
+bool PlayerWidget::isInTitleBar(const QPoint &pos) {
+    auto barLocalPos = d->ui->titleBar->mapFrom(this, pos);
+    return d->ui->titleBar->geometry().contains(pos) &&
+           !d->ui->minimizeButton->geometry().contains(barLocalPos) &&
+           !d->ui->maximizeButton->geometry().contains(barLocalPos) &&
+           !d->ui->closeButton->geometry().contains(barLocalPos) && 
+           !d->ui->onTopButton->geometry().contains(barLocalPos) &&
+           !d->ui->miniPlayerButton->geometry().contains(barLocalPos);
 }

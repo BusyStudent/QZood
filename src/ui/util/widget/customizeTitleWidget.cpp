@@ -4,6 +4,7 @@
 #include <QGraphicsDropShadowEffect>
 #include <QHoverEvent>
 #include <QPainter>
+#include <iostream>
 
 #if defined(_WIN32)
 #define USE_WINAPI
@@ -40,15 +41,20 @@ bool CustomizeTitleWidget::nativeEvent(const QByteArray &eventType,
       *result = 0;
       return true;
     } case WM_NCHITTEST: {
+    
+      auto dpi = ::GetDpiForWindow(HWND(winId()));
+      
       const POINT border {
-        ::GetSystemMetrics(SM_CXFRAME) + ::GetSystemMetrics(SM_CXPADDEDBORDER),
-        ::GetSystemMetrics(SM_CYFRAME) + ::GetSystemMetrics(SM_CXPADDEDBORDER)
+        ::GetSystemMetricsForDpi(SM_CXFRAME, dpi) + ::GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi),
+        ::GetSystemMetricsForDpi(SM_CYFRAME, dpi) + ::GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi)
       };
       RECT winrect;
       ::GetWindowRect(HWND(winId()), &winrect);
 
       long x = GET_X_LPARAM(param->lParam);
       long y = GET_Y_LPARAM(param->lParam);
+      POINT userPos {x, y};
+      ::ScreenToClient(HWND(winId()), &userPos);
 
       /*
       只用这种办法设置动态改变窗口大小比手动通过鼠标事件效果好，可以
@@ -103,7 +109,9 @@ bool CustomizeTitleWidget::nativeEvent(const QByteArray &eventType,
 
       // Check if  is caption
       // TODO(llhsdmd): 暴露或者抽一个接口判断目前的点是否按到了标题栏上
-      if (false) {
+      userPos.x = ::MulDiv(userPos.x, 96, dpi);
+      userPos.y = ::MulDiv(userPos.y, 96, dpi);
+      if (isInTitleBar(QPoint{userPos.x, userPos.y})) {
         *result = HTCAPTION;
         return true;
       }
@@ -127,55 +135,60 @@ bool CustomizeTitleWidget::event(QEvent *event) {
 }
 
 void CustomizeTitleWidget::mousePressEvent(QMouseEvent *event) {
+#ifndef USE_WINAPI
   if (event->button() == Qt::LeftButton) {
     flag_pressed = true;
     press_pos = event->globalPos();
     diff_pos = press_pos - window()->pos();
   }
-
+#endif
   QWidget::mousePressEvent(event);
 }
 
 void CustomizeTitleWidget::mouseDoubleClickEvent(QMouseEvent *event) {
+#ifndef USE_WINAPI
   if (isMaximized()) {
     showNormal();
   } else {
     showMaximized();
   }
-
+#endif
   QWidget::mouseDoubleClickEvent(event);
 }
 
 void CustomizeTitleWidget::mouseMoveEvent(QMouseEvent *event) {
+#ifndef USE_WINAPI
   if (flag_pressed) {
     move_pos = event->globalPos() - press_pos;
     press_pos += move_pos;
   }
-#ifndef USE_WINAPI
+
   if (windowState() != Qt::WindowMaximized && !movingStatus()) {
       updateRegion(event);
   }
-#endif
-  flag_moving = !resizingStatus();
 
+  flag_moving = !resizingStatus();
+#endif
   QWidget::mouseMoveEvent(event);
 }
 
 void CustomizeTitleWidget::mouseReleaseEvent(QMouseEvent *event) {
+#ifndef USE_WINAPI
   flag_pressed = false;
   flag_resizing = false;
   flag_moving = false;
   setCursor(Qt::ArrowCursor);
-
+#endif
   QWidget::mouseReleaseEvent(event);
 }
 
 void CustomizeTitleWidget::leaveEvent(QEvent *event) {
+#ifndef USE_WINAPI
   flag_pressed = false;
   flag_resizing = false;
   flag_moving = false;
   setCursor(Qt::ArrowCursor);
-
+#endif
   QWidget::leaveEvent(event);
 }
 

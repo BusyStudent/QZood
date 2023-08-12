@@ -16,6 +16,8 @@ class PlayerWidget final : public CustomizeTitleWidget {
         void clearVideoList();
         void setTitle(const QString &title);
 
+        bool isInTitleBar(const QPoint &pos) override;
+
     public:
         void resizeEvent(QResizeEvent* event) override;
         void mouseMoveEvent(QMouseEvent* event) override;

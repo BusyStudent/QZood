@@ -18,6 +18,7 @@
 #include "homeWidget.hpp"
 #include "../../net/client.hpp"
 #include "../../BLL/data/videoSourceBLL.hpp"
+#include "../../common/myGlobalLog.hpp"
 #include "ui_zood.h"
 
 class ZoodPrivate {
@@ -183,11 +184,12 @@ void Zood::resizeEvent(QResizeEvent *event) {
 }
 
 void Zood::mouseMoveEvent(QMouseEvent* event) {
+#if !defined(_WIN32)
     if (movingStatus() && d->mUi->topBarWidget->geometry().contains(event->pos())) {
         window()->move(event->globalPos() - diff_pos);
         event->accept();
     }
-
+#endif
     CustomizeTitleWidget::mouseMoveEvent(event);
 }
 
@@ -206,4 +208,13 @@ bool Zood::eventFilter(QObject *obj, QEvent *e) {
     }
 
     return CustomizeTitleWidget::eventFilter(obj, e);
+}
+
+bool Zood::isInTitleBar(const QPoint &pos) {
+    auto barLocalPos = d->mUi->topBarWidget->mapFrom(this, pos);
+    return d->mUi->topBarWidget->geometry().contains(pos) &&
+           !d->mUi->searchBox->geometry().contains(d->mUi->searchBoxContainer->mapFrom(this, pos)) && 
+           !d->mUi->minimizeButton->geometry().contains(barLocalPos) &&
+           !d->mUi->maximizeButton->geometry().contains(barLocalPos) &&
+           !d->mUi->closeButton->geometry().contains(barLocalPos);
 }

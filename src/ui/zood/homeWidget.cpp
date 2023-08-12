@@ -282,4 +282,5 @@ void HomeWidget::runPlayer(VideoBLLList videos,const QString &bangumiName) {
     player->setAttribute(Qt::WA_DeleteOnClose);
     player->setVideoList(videos);
     player->show();
+    connect(this, &HomeWidget::destroyed, player, &PlayerWidget::close);
 }

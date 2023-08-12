@@ -17,6 +17,8 @@ class CustomizeTitleWidget : public QWidget {
                     int marginRight);
   void createShadow(QWidget* container_widget);
 
+  virtual bool isInTitleBar(const QPoint &pos) = 0;
+
  public:
   bool event(QEvent *event) override;
   void mousePressEvent(QMouseEvent *event) override;

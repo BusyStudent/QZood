@@ -4,6 +4,7 @@
 #include <QListWidget>
 
 #include "../../net/datalayer.hpp"
+#include "../../common/myGlobalLog.hpp"
 
 class VideoBLL;
 
@@ -18,15 +19,6 @@ inline VideoBLLPtr createVideoBLL(const SourceT) {
 }
 
 class VideoBLL : public DynRefable {
-    public:
-        enum DataItem : uint16_t {
-            THUMBNAIL = 1<<0,
-            DANMAKU = 1<<1,
-            VIDEOSOURCE = 1<<2,
-            DANMAKUSOURCE = 1<<3,
-
-            ALL = 0xffff,
-        };
     public:
         virtual QListWidgetItem* addToList(QListWidget* listWidget) = 0;
         virtual QString title() = 0;
@@ -47,6 +39,7 @@ class VideoBLL : public DynRefable {
         virtual QStringList sourcesList();
         virtual QStringList danmakuSourceList();
         virtual QStringList subtitleSourceList();
+        virtual void updateSourceList() = 0;
 
         virtual void addSource(const QString& source);
         virtual void addDanmakuSource(const QString& source);
@@ -59,18 +52,28 @@ class VideoBLL : public DynRefable {
         virtual void setCurrentSubtitleSource(const QString& source);
         virtual void setCurrentDanmakuSource(const QString& source);
 
-        virtual inline QString getCurrentVideoSource() { return currentVideoSource; }
-        virtual inline QString getCurrentDanmakuSource() { return currentDanmakuSource; }
-        virtual inline QString getCurrentSubtitleSource() { return currentSubtitleSource; }
+        virtual inline QString getCurrentVideoSource() {
+            return getStatus<QString>("currentVideoSource").value_or("无");
+        }
+        virtual inline QString getCurrentDanmakuSource() { 
+            return getStatus<QString>("currentDanmakuSource").value_or("无");
+        }
+        virtual inline QString getCurrentSubtitleSource() { 
+            return getStatus<QString>("currentSubtitleSource").value_or("无");
+        }
 
-        inline void update(DataItem f = ALL) { dirty = f; }
         template<typename ValueT>
         inline void setStatus(const QString& key,const ValueT& value) {
             status.insert(key, value);
         }
         template<typename ValueT>
-        inline ValueT getStatus(const QString& key) {
-            return status[key].value<ValueT>();
+        inline typename Result<ValueT> getStatus(const QString& key) {
+            if (containsStatus(key)) {
+                return status[key].value<ValueT>();
+            } else {
+                LOG(WARNING) << "video status{" << key << "} not exist!";
+                return Result<ValueT>();
+            }
         }
         inline bool containsStatus(const QString& key) {
             return status.contains(key);
@@ -84,14 +87,7 @@ class VideoBLL : public DynRefable {
         QStringList sourceList;
         QStringList danmakuList;
         QStringList subtitleList;
-        // 本视频当前申请的源
-        QString currentVideoSource = "";
-        QString currentSubtitleSource = "";
-        QString currentDanmakuSource = "";
-        // 本地缓存
-        uint16_t dirty;
-        QImage thumbnail;
-        DanmakuList danmaku;
+
     public:
         // 需要保留的视频播放状态设置
         QMap<QString, QVariant> status;
@@ -108,6 +104,7 @@ class VideoBLLEpisode : public VideoBLL {
         QStringList sourcesList() override;
         QStringList danmakuSourceList() override;
         QStringList subtitleSourceList() override;
+        void updateSourceList() override;
         
         void loadVideoToPlay(std::function<void(const Result<QString>&)> callAble) override;
         void loadVideoToPlay(QObject *ctxt, std::function<void(const Result<QString>&)> callAble) override;
@@ -138,6 +135,7 @@ class VideoBLLLocal : public VideoBLL {
         QString title() override;
         QString longTitle() override;
         QString indexTitle() override;
+        void updateSourceList() override;
 
         void loadVideoToPlay(std::function<void(const Result<QString>&)> callAble) override;
         void loadVideoToPlay(QObject *ctxt, std::function<void(const Result<QString>&)> callAble) override;

@@ -5,6 +5,14 @@
 #if defined(_WIN32)
 #include <Windows.h>
 
+#ifdef max
+#undef max
+#endif
+
+#ifdef min
+#undef min
+#endif
+
 #define SetConsoleColor(color)                                          \
 	::SetConsoleTextAttribute(::GetStdHandle(STD_OUTPUT_HANDLE), color);  \
 	::SetConsoleTextAttribute(::GetStdHandle(STD_ERROR_HANDLE), color);

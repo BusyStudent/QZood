@@ -13,6 +13,7 @@ class Zood : public CustomizeTitleWidget {
         virtual ~Zood();
         HomeWidget* homeWidget();
         QLineEdit* searchBox();
+        bool isInTitleBar(const QPoint &pos) override;
 
     public:
         void resizeEvent(QResizeEvent *event) override;

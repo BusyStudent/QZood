@@ -18,6 +18,12 @@
 #include "videoWidgetStatus.hpp"
 #include "../../common/myGlobalLog.hpp"
 
+#include "settings/playSetting.hpp"
+#include "settings/screenSetting.hpp"
+#include "settings/colorSetting.hpp"
+#include "settings/danmakuSetting.hpp"
+#include "settings/subtitleSetting.hpp"
+
 #include "logWidget.hpp"
 
 static QString timeFormat(int sec) {
@@ -112,6 +118,13 @@ public:
         mSourceListWidget->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
         mSourceListWidget->setAuotLayout();
         mSourceListWidget->setOutside(true);
+        
+        // 设置设置界面
+        mSettings->addSettingItem(new PlaySetting(mSettings), self);
+        mSettings->addSettingItem(new ScreenSetting(mSettings), self);
+        mSettings->addSettingItem(new ColorSetting(mSettings), self);
+        mSettings->addSettingItem(new DanmakuSetting(mSettings), self);
+        mSettings->addSettingItem(new SubtitleSetting(mSettings), self);
     }
 
     void setupShortcut() {
@@ -497,7 +510,6 @@ private:
                 }
             }
         });
-        mSettings->setupSetting(self);
     }
 
     void connectSourceList() {
@@ -518,15 +530,14 @@ private:
 
     void resumePlayStatus() {
         if (mVideo->containsStatus("position")) {
-            setPosition(mVideo->getStatus<int>("position"));
+            setPosition(mVideo->getStatus<int>("position").value_or(0));
         }
         qWarning() << "resumePlayStatus";
         for (const auto source : mPlayer->subtitleTracks()) {
             qWarning() << "subtitle title : " << source[NekoMediaMetaData::Title];
             mVideo->addSubtitleSource(source[NekoMediaMetaData::Title]);
         }
-        mSettings->initSubtitleSetting(mVideo);
-        mSettings->initDanmakuSetting(mVideo);
+        mSettings->refresh();
     }
 
 public:

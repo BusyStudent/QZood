@@ -1,5 +1,6 @@
 #include "../../nekoav/nekoutils.hpp"
 #include "videoBLL.hpp"
+#include "../../common/myGlobalLog.hpp"
 
 #include <QFileInfo>
 
@@ -25,7 +26,7 @@ void VideoBLL::loadSubtitleFromFile(const QString &filepath) {
 
 void VideoBLL::setCurrentVideoSource(const QString& source) {
     if (source.isEmpty() || sourcesList().contains(source)) {
-        currentVideoSource = source;
+        setStatus("currentVideoSource", source);
     }
 }
 
@@ -43,20 +44,19 @@ void VideoBLL::addSubtitleSource(const QString& source) {
 
 void VideoBLL::setCurrentSubtitleSource(const QString& source) {
     if (source.isEmpty() || subtitleSourceList().contains(source)) {
-        currentSubtitleSource = source;
+        setStatus("currentSubtitleSource", source);
     }
 }
 
 void VideoBLL::setCurrentDanmakuSource(const QString& source) {
     if (source.isEmpty() || danmakuSourceList().contains(source)) {
-        currentDanmakuSource = source;
-        dirty &= (uint16_t)DANMAKU;
+        setStatus("currentDanmakuSource", source);
     }
 }
 
 VideoBLLEpisode::VideoBLLEpisode(const EpisodeList episodes) : videos(episodes) {
-    update();
-    setCurrentVideoSource(sourcesList().size() > 0 ? sourcesList()[0] : "");
+    updateSourceList();
+    setCurrentVideoSource(sourceList.size() > 0 ? sourceList[0] : "");
 }
 
 VideoBLLPtr VideoBLLEpisode::operator+(const VideoBLLPtr video) {
@@ -100,32 +100,42 @@ QString VideoBLLEpisode::indexTitle() {
 }
 
 QStringList VideoBLLEpisode::sourcesList() {
-    if (VIDEOSOURCE & dirty) {
-        dirty ^= VIDEOSOURCE;
-        sourceList.clear();
-        for (int index = 0;index < videos.size(); ++index) {
-            for (auto& sourceName : videos[index]->sourcesList()) { 
-                sourceList.push_back(sourceName);
-                mapVideoSourceName.insert(sourceList.back(), qMakePair(index, sourceName));
-            }
-        }
-    }
     return sourceList;
 }
 
-QStringList VideoBLLEpisode::danmakuSourceList() {
-    if (DANMAKUSOURCE & dirty) {
-        dirty ^= DANMAKUSOURCE;
-        danmakuList.clear();
-        danmakuList.push_back("无");
-        mapDanmakuSourceName.insert(danmakuList.back(), qMakePair(-1, "无"));
-        for (int index = 0;index < videos.size(); ++index) {
-            for (auto& sourceName : videos[index]->danmakuSourceList()) {
-                danmakuList.push_back(sourceName);
-                mapDanmakuSourceName.insert(danmakuList.back(), qMakePair(index, sourceName));
+void VideoBLLEpisode::updateSourceList() {
+    for (int index = 0;index < videos.size(); ++index) {
+        for (auto& sourceName : videos[index]->sourcesList()) { 
+            if(!sourceList.contains(sourceName)) {
+                sourceList.push_back(sourceName);
+                mapVideoSourceName.insert(sourceName, qMakePair(index, sourceName));
             }
         }
     }
+    if (0 == danmakuList.size()) {
+        danmakuList.push_back("无");
+        mapDanmakuSourceName.insert(danmakuList.back(), qMakePair(-1, "无"));
+    }
+    for (int index = 0;index < videos.size(); ++index) {
+        for (auto& sourceName : videos[index]->danmakuSourceList()) {
+            if (!danmakuList.contains(sourceName)) {
+                danmakuList.push_back(sourceName);
+                mapDanmakuSourceName.insert(sourceName, qMakePair(index, sourceName));
+            }
+        }
+    }
+    if (0 == subtitleList.size()) {
+        subtitleList.push_back("无");
+    }
+    if (!danmakuList.contains(getCurrentDanmakuSource())) {
+        setCurrentDanmakuSource(danmakuList.at(0));
+    }
+    if (!subtitleList.contains(getCurrentSubtitleSource())) {
+        setCurrentSubtitleSource(subtitleList.at(0));
+    }
+}
+
+QStringList VideoBLLEpisode::danmakuSourceList() {
     return danmakuList;
 }
 
@@ -134,63 +144,56 @@ QStringList VideoBLLEpisode::subtitleSourceList() {
 }
 
 void VideoBLLEpisode::loadVideoToPlay(std::function<void(const Result<QString>&)> callAble) {
-    videos[mapVideoSourceName[currentVideoSource].first]->fetchVideo(mapVideoSourceName[currentVideoSource].second).then(callAble);
+    auto source = mapVideoSourceName[getCurrentVideoSource()];
+    if (source.first >= 0 && source.first < videos.size()) {
+        videos[source.first]->fetchVideo(source.second).then(callAble);
+    }
 }
 
 void VideoBLLEpisode::loadVideoToPlay(QObject *ctxt, std::function<void(const Result<QString>&)> callAble) {
-    videos[mapVideoSourceName[currentVideoSource].first]->fetchVideo(mapVideoSourceName[currentVideoSource].second).then(ctxt, callAble);
+    auto source = mapVideoSourceName[getCurrentVideoSource()];
+    if (source.first >= 0 && source.first < videos.size()) {
+        videos[source.first]->fetchVideo(source.second).then(ctxt, callAble);
+    }
 }
 
 void VideoBLLEpisode::loadThumbnail(std::function<void(const Result<QImage>&)> callAble) {
-    if (dirty & THUMBNAIL) {
-        videos[mapVideoSourceName[currentVideoSource].first]->fetchCover().then([this](const Result<QImage>& img){
-            if(img.has_value()) {
-                thumbnail = img.value();
-            }
-        });
-        dirty = dirty ^ (uint16_t)THUMBNAIL;
+    auto source = mapVideoSourceName[getCurrentVideoSource()];
+    if (source.first >= 0 && source.first < videos.size()) {
+        videos[source.first]->fetchCover().then(callAble);
     }
-    callAble(thumbnail);
 }
 
 void VideoBLLEpisode::loadThumbnail(QObject *ctxt, std::function<void(const Result<QImage>&)> callAble) {
-    if (dirty & THUMBNAIL) {
-        videos[mapVideoSourceName[currentVideoSource].first]->fetchCover().then(ctxt, [this](const Result<QImage>& img){
-            if(img.has_value()) {
-                thumbnail = img.value();
-            }
-        });
-        dirty = dirty ^ (uint16_t)THUMBNAIL;
+    auto source = mapVideoSourceName[getCurrentVideoSource()];
+    if (source.first >= 0 && source.first < videos.size()) {
+        videos[source.first]->fetchCover().then(ctxt, callAble);
     }
-    callAble(thumbnail);
 }
 
 void VideoBLLEpisode::loadDanmaku(std::function<void(const Result<DanmakuList>&)> callAble) {
-    if (dirty & THUMBNAIL) {
-        videos[mapDanmakuSourceName[currentDanmakuSource].first]->fetchDanmaku(mapDanmakuSourceName[currentDanmakuSource].second).then([this](const Result<DanmakuList>& d){
-            if(d.has_value()) {
-                danmaku = d.value();
-            }
-        });
-        dirty = dirty ^ (uint16_t)DANMAKU;
+    auto source = mapDanmakuSourceName[getCurrentDanmakuSource()];
+    if (source.first >= 0 && source.first < videos.size()) {
+        videos[source.first]->fetchDanmaku(source.second).then(callAble);
+    } else {
+        LOG(DEBUG) << "load danmaku : " << getCurrentDanmakuSource() << ", " << source.first;
     }
-    callAble(danmaku);
 }
 
 void VideoBLLEpisode::loadDanmaku(QObject *ctxt, std::function<void(const Result<DanmakuList>&)> callAble) {
-    if (dirty & THUMBNAIL) {
-        videos[mapDanmakuSourceName[currentDanmakuSource].first]->fetchDanmaku(mapDanmakuSourceName[currentDanmakuSource].second).then(ctxt, [this](const Result<DanmakuList>& d){
-            if(d.has_value()) {
-                danmaku = d.value();
-            }
-        });
-        dirty = dirty ^ (uint16_t)DANMAKU;
+    auto source = mapDanmakuSourceName[getCurrentDanmakuSource()];
+    if (source.first >= 0 && source.first < videos.size()) {
+        videos[source.first]->fetchDanmaku(source.second).then(ctxt, callAble);
+    } else {
+        LOG(DEBUG) << "load danmaku : " << getCurrentDanmakuSource() << ", " << source.first;
     }
-    callAble(danmaku);
 }
 
 void VideoBLLEpisode::loadSubtitle(std::function<void(const Result<QString>&)> callAble) {
-    callAble(currentSubtitleSource);
+    auto subtitle = getCurrentSubtitleSource();
+    if (!subtitle.isEmpty() && subtitle != "无") {
+        callAble(subtitle);
+    }
 }
 
 void VideoBLLEpisode::loadSubtitle(QObject *ctxt, std::function<void(const Result<QString>&)> callAble) {
@@ -203,6 +206,22 @@ VideoBLLLocal::VideoBLLLocal(const QStringList filepaths) : filePaths(filepaths)
     }
     if (filepaths.size() > 0) {
         setCurrentVideoSource(sourceList.front());
+        updateSourceList();
+    }
+}
+
+void VideoBLLLocal::updateSourceList() {
+    if (0 == danmakuList.size()) {
+        danmakuList.push_back("无");
+    }
+    if (0 == subtitleList.size()) {
+        subtitleList.push_back("无");
+    }
+    if (!danmakuList.contains(getCurrentDanmakuSource())) {
+        setCurrentDanmakuSource(danmakuList.at(0));
+    }
+    if (!subtitleList.contains(getCurrentSubtitleSource())) {
+        setCurrentSubtitleSource(subtitleList.at(0));
     }
 }
 
@@ -238,8 +257,8 @@ QString VideoBLLLocal::indexTitle() {
 }
 
 void VideoBLLLocal::loadVideoToPlay(std::function<void(const Result<QString>&)> callAble) {
-    if (sourceList.contains(currentVideoSource)) {
-        callAble(filePaths[sourceList.indexOf(currentVideoSource)]);
+    if (sourceList.contains(getCurrentVideoSource())) {
+        callAble(filePaths[sourceList.indexOf(getCurrentVideoSource())]);
     } else {
         callAble(Result<QString>());
     }
@@ -250,8 +269,8 @@ void VideoBLLLocal::loadVideoToPlay(QObject*, std::function<void(const Result<QS
 }
 
 void VideoBLLLocal::loadThumbnail(std::function<void(const Result<QImage>&)> callAble) {
-    if (sourceList.contains(currentVideoSource)) {
-        callAble(NekoAV::GetMediaFileIcon(filePaths[sourceList.indexOf(currentVideoSource)]));
+    if (sourceList.contains(getCurrentVideoSource())) {
+        callAble(NekoAV::GetMediaFileIcon(filePaths[sourceList.indexOf(getCurrentVideoSource())]));
     } else {
         callAble(Result<QImage>());
     }
@@ -262,8 +281,8 @@ void VideoBLLLocal::loadThumbnail(QObject*, std::function<void(const Result<QIma
 }
 
 void VideoBLLLocal::loadDanmaku(std::function<void(const Result<DanmakuList>&)> callAble) {
-    if (!currentDanmakuSource.isEmpty() && danmakuList.size() > 0) {
-        callAble(danmaku);
+    if (!getCurrentDanmakuSource().isEmpty() && danmakuList.size() > 0) {
+        // TODO(llhsdmd): 怎么导入本地弹幕给视频
     }
 }
 
@@ -272,8 +291,9 @@ void VideoBLLLocal::loadDanmaku(QObject*, std::function<void(const Result<Danmak
 }
 
 void VideoBLLLocal::loadSubtitle(std::function<void(const Result<QString>&)> callAble) {
-    if (!currentSubtitleSource.isEmpty()) {
-        callAble(currentSubtitleSource);
+    auto source = getCurrentSubtitleSource();
+    if (!source.isEmpty() && source != "无") {
+        callAble(source);
     }
 }
 

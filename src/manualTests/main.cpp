@@ -12,20 +12,22 @@
 #include <QWindow>
 #include <QListWidget>
 #include <QHBoxLayout>
+#include <windows.h>
+#pragma comment(linker, "/SUBSYSTEM:CONSOLE /ENTRY:mainCRTStartup")
 static void OpenTerminal(QWidget *parent)
 {    
-    AllocConsole();
-    freopen("CON","w",stdout);
-    freopen("CON","w",stderr);
-    freopen("CON","r",stdin);
-    auto hwnd = GetConsoleWindow();
-    auto window = QWindow::fromWinId((WId)hwnd);
-    auto widget = QWidget::createWindowContainer(window, nullptr);
-    parent->setContentsMargins(0, 0, 0, 0);
-    auto hboxlayout = new QHBoxLayout();
-    parent->setLayout(hboxlayout);
-    hboxlayout->setContentsMargins(0, 0, 0, 0);
-    hboxlayout->addWidget(widget);
+    // AllocConsole();
+    // freopen("CON","w",stdout);
+    // freopen("CON","w",stderr);
+    // freopen("CON","r",stdin);
+    // auto hwnd = GetConsoleWindow();
+    // auto window = QWindow::fromWinId((WId)hwnd);
+    // auto widget = QWidget::createWindowContainer(window, nullptr);
+    // parent->setContentsMargins(0, 0, 0, 0);
+    // auto hboxlayout = new QHBoxLayout();
+    // parent->setLayout(hboxlayout);
+    // hboxlayout->setContentsMargins(0, 0, 0, 0);
+    // hboxlayout->addWidget(widget);
 }
 #else
 void OpenTerminal(QWidget *parent) { }
