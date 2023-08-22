@@ -322,16 +322,6 @@ bool PlayerWidget::eventFilter(QObject* obj,QEvent* event) {
 
 void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
     // LOG(DEBUG) << objectName() << " : mouse move event.";
-#if !defined(_WIN32)
-    if (movingStatus() && d->ui->titleBar->geometry().contains(event->pos())) {
-        if (isMaximized()) {
-            showNormal();
-            move(event->globalPos() - d->ui->titleBar->rect().bottomRight() / 2);
-            diff_pos = d->ui->titleBar->rect().bottomRight() / 2;
-        }
-        move(event->globalPos() - diff_pos);
-    }
-#endif
     // 刷新窗体状态
     CustomizeTitleWidget::mouseMoveEvent(event);
 }
@@ -339,6 +329,7 @@ void PlayerWidget::mouseMoveEvent(QMouseEvent* event) {
 void PlayerWidget::showEvent(QShowEvent *event) {
     createShadow(d->ui->containerWidget);
     if (d->mAutoPlay) {
+        d->setAutoPlay(false);
         d->setCurrentIndex(0);
     }
     CustomizeTitleWidget::showEvent(event);

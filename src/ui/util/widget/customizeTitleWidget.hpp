@@ -54,7 +54,7 @@ class CustomizeTitleWidget : public QWidget {
     UP
   };
 
- protected:
+ private:
   MovingDirection m_direction = NONE;
   QPoint press_pos;
   QPoint move_pos;

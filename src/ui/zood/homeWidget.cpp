@@ -13,6 +13,7 @@
 #include "../../BLL/data/videoSourceBLL.hpp"
 #include "../../BLL/manager/videoDataManager.hpp"
 #include "../../common/myGlobalLog.hpp"
+#include "../util/widget/videoListWidget.hpp"
 
 #undef min
 #undef max
@@ -113,31 +114,6 @@ public:
         // 设置主界面滑动条不显示
         self->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         self->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-
-        // 设置更新栏滑动条款式
-        ui->mondayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        ui->mondayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-
-        ui->tuesdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        ui->tuesdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-
-        ui->wednesdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        ui->wednesdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-
-        ui->thursdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        ui->thursdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-
-        ui->fridayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        ui->fridayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-
-        ui->saturdayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        ui->saturdayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-
-        ui->sundayContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        ui->sundayContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
-
-        ui->recentlyUpdatedContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-        ui->recentlyUpdatedContainer->horizontalScrollBar()->setStyleSheet(kScrollBarStyleSheet);
     }
 
     void updateVideo(QWidget* container, TimelineEpisodeList teps) {
@@ -162,9 +138,14 @@ public:
     QList<VideoView* > addItems(QWidget* container, int count) {
         QList<VideoView *> result;
         assert(container != nullptr);
+        auto ccc = qobject_cast<VideoListWidget *>(container);
         for (int i = 0;i < count; ++i) {
             auto videoView = new VideoView();
-            container->layout()->addWidget(videoView);
+            if (nullptr != ccc) {
+                ccc->addWidgetItem(videoView);
+            } else {
+                container->layout()->addWidget(videoView);
+            }
             result.append(videoView);
             QWidget::connect(videoView, &VideoView::clicked, self, [this, videoView](const RefPtr<DataObject> &voidePtr){
                 auto videoSource = VideoSourceBLL::instance();
@@ -191,11 +172,22 @@ public:
         if (nullptr == container) {
         return;
         }
-        for (auto item : container->findChildren<QWidget*>()) {
-            auto wi = dynamic_cast<QWidget*>(item);
-            if (nullptr != wi) {
-                wi->setParent(nullptr);
-                wi->deleteLater();
+        auto ccc = qobject_cast<VideoListWidget *>(container);
+        if (nullptr != ccc) {
+            while (ccc->count() > 0) {
+                QListWidgetItem * item = ccc->takeItem(0);
+                QWidget * wi = ccc->itemWidget(item);
+
+                delete item;
+                delete wi;
+            }
+        } else {
+            for (auto item : container->findChildren<QWidget*>()) {
+                auto wi = dynamic_cast<QWidget*>(item);
+                if (nullptr != wi) {
+                    wi->setParent(nullptr);
+                    wi->deleteLater();
+                }
             }
         }
     }
@@ -233,7 +225,9 @@ bool HomeWidget::eventFilter(QObject *obj,QEvent *event) {
     } else if (obj == d->ui->timeAnimeView && event->type() == QEvent::Type::Wheel) {
         auto wheel_event = dynamic_cast<QWheelEvent*>(event);
         auto wi = d->ui->timeAnimeView->currentWidget()->findChild<QScrollArea*>();
-        wi->horizontalScrollBar()->setValue(wi->horizontalScrollBar()->value() - wheel_event->angleDelta().y());
+        if (nullptr != wi) {
+            wi->horizontalScrollBar()->setValue(wi->horizontalScrollBar()->value() - wheel_event->angleDelta().y());
+        }
     }
 
     return QScrollArea::eventFilter(obj, event);

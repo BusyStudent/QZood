@@ -184,12 +184,6 @@ void Zood::resizeEvent(QResizeEvent *event) {
 }
 
 void Zood::mouseMoveEvent(QMouseEvent* event) {
-#if !defined(_WIN32)
-    if (movingStatus() && d->mUi->topBarWidget->geometry().contains(event->pos())) {
-        window()->move(event->globalPos() - diff_pos);
-        event->accept();
-    }
-#endif
     CustomizeTitleWidget::mouseMoveEvent(event);
 }
 

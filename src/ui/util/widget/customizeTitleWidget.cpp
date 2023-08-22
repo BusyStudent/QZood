@@ -166,6 +166,10 @@ void CustomizeTitleWidget::mouseMoveEvent(QMouseEvent *event) {
   if (windowState() != Qt::WindowMaximized && !movingStatus()) {
       updateRegion(event);
   }
+  
+  if (movingStatus() && isInTitleBar(event->pos())) {
+    window()->move(event->globalPos() - diff_pos);
+  }
 
   flag_moving = !resizingStatus();
 #endif
@@ -331,6 +335,6 @@ void CustomizeTitleWidget::createShadow(QWidget *container_widget) {
     m = MARGINS {4, 4, 4, 4};
     hr = DwmExtendFrameIntoClientArea(HWND(winId()), &m);
 
-    SetWindowLongPtrW(HWND(winId()), GWL_STYLE, WS_POPUP | WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX);
+    // SetWindowLongPtrW(HWND(winId()), GWL_STYLE, WS_OVERLAPPED | WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX);
 #endif
 }

@@ -18,7 +18,7 @@ class VideoView : public QWidget {
         };
         Q_ENUM(Direction);
     public:
-        VideoView(QWidget *parent = nullptr, Direction direction = Horizontal);
+        VideoView(QWidget *parent = nullptr, Direction direction = Vertical);
         virtual ~VideoView();
         RefPtr<DataObject> videoPtr() const;
         QString videoTitle() const;
